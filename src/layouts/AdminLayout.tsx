@@ -1,7 +1,11 @@
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AdminNav } from "../components/AdminNav";
 
 export function AdminLayout() {
+  const { signOut } = useAuthActions();
+  const [error, setError] = useState("");
   return (
     <div className="min-h-screen bg-light">
       <header className="border-b border-sand bg-clay/50">
@@ -15,11 +19,11 @@ export function AdminLayout() {
             <button
               type="button"
               className="text-sm text-ocean underline-offset-2 hover:underline"
-              disabled
-              title="Sign-out will be added with organizer auth"
+              onClick={() => { void signOut().catch(() => setError("Could not sign out. Try again.")); }}
             >
-              Sign out (coming soon)
+              Sign out
             </button>
+            {error && <p role="alert">{error}</p>}
           </div>
         </div>
       </header>

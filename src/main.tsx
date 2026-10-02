@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { ConvexProvider } from "convex/react";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ErrorState } from "./components/states/ErrorState";
@@ -25,7 +25,7 @@ const app = (
 
 ReactDOM.createRoot(root).render(
   convexClient ? (
-    <ConvexProvider client={convexClient}>{app}</ConvexProvider>
+    <ConvexAuthProvider client={convexClient}>{app}</ConvexAuthProvider>
   ) : (
     <ErrorState
       title="Convex not configured"

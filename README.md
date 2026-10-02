@@ -24,7 +24,7 @@ Organizer dashboard for HackUTA 2026. This app is a sibling of [`hackuta-2026-re
 | --- | --- |
 | `/` | Redirects to `/admin` |
 | `/admin` | Dashboard (Convex URL status) |
-| `/admin/applications` | Application queue (placeholder) |
+| `/admin/applications` | Searchable application queue |
 | `/admin/applications/:applicationId` | Single application review |
 | `/admin/participants` | Participant roster (placeholder) |
 | `/admin/check-in` | Check-in tools (placeholder) |
@@ -74,9 +74,25 @@ See `.env.example` for a dev deployment example.
 - Set `VITE_CONVEX_URL` for production to the prod Convex deployment used by register
 - `X-Robots-Tag: noindex` — internal organizer tool
 
-## Auth (planned)
+## Organizer access
 
-`AdminProtectedRoute` is currently a pass-through. Organizer sign-in and role checks will replace it in a follow-up.
+The app uses the registration backend's existing Convex Auth password provider.
+Sign in with an existing verified account. Backend queries require its user ID
+in server-only `ADMIN_USER_IDS` or `REVIEWER_USER_IDS` (comma-separated IDs).
+These variables belong to the Convex deployment, never Vite. Empty lists deny
+all organizer access. Both roles share the same application-list functionality.
+
+Deploy `convex/admin/access.ts` and `convex/admin/applications.ts` from register
+before running this app. No schema changes or application/review writes are needed.
+The local-only sample preview remains available at `/admin/applications?preview=1`.
+
+The live query returns the full active submitted queue, so search and sorting
+operate across all returned applications. Draft and withdrawn records are excluded.
+An untouched `under_review` record (created automatically on submission) displays
+as Unreviewed; one with reviewer metadata displays as Under Review. This mapping
+is necessary because the current schema has no explicit unreviewed status.
+The complete-queue query is subject to Convex read limits; a larger event would
+need server-side pagination/search before those limits are reached.
 
 ## Workspace
 

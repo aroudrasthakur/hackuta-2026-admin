@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useQuery } from "convex/react";
+import { makeFunctionReference } from "convex/server";
+import { LoadingState } from "../../components/states/LoadingState";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../components/states/EmptyState";
 import { applicationStatuses, selectApplications } from "../../lib/applicationList";
@@ -84,6 +87,14 @@ export function ApplicationList({ applications }: { applications: readonly Appli
   );
 }
 
+const listRef = makeFunctionReference<"query", Record<string, never>, ApplicationListItem[]>("admin/applications:list");
+
+function LiveApplications() {
+  const applications = useQuery(listRef, {});
+  if (applications === undefined) return <LoadingState message="Loading applications…" />;
+  return <ApplicationList applications={applications} />;
+}
+
 export function ApplicationsPage() {
   const [params] = useSearchParams();
   const preview = import.meta.env.DEV && params.get("preview") === "1";
@@ -98,8 +109,7 @@ export function ApplicationsPage() {
           <ApplicationList applications={sampleApplications} />
         </>
       ) : (
-        <EmptyState title="Application queue unavailable"
-          description="Application data is not connected yet." />
+        <LiveApplications />
       )}
     </section>
   );
