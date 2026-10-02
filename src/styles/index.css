@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --color-ink: #1a3a52;
+  --color-night: #102f46;
+  --color-clay: #eee3d2;
+  --color-sand: #ded0bc;
+  --color-light: #f6eddf;
+  --color-ocean: #305873;
+  --color-mist: #8ca1aa;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-light text-ink font-sans antialiased;
+  }
+}
