@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
+/** Locked register snapshots that omit a final newline in the upstream repo. */
+const WHITESPACE_EXCEPTIONS = new Set(["convex/auth.config.ts"]);
+
 const extensions = new Set([
   ".ts",
   ".tsx",
@@ -28,7 +31,7 @@ const files = execSync("git ls-files", { encoding: "utf8" })
 const missing = [];
 
 for (const file of files) {
-  if (!existsSync(file)) {
+  if (!existsSync(file) || WHITESPACE_EXCEPTIONS.has(file)) {
     continue;
   }
   const content = readFileSync(file);

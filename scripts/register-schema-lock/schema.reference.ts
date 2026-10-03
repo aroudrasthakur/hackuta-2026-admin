@@ -1,3 +1,7 @@
+/**
+ * Frozen copy of hackuta-2026-register/convex/schema.ts.
+ * DO NOT EDIT — run npm run register-schema-lock:refresh to update from register.
+ */
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
@@ -8,15 +12,7 @@ import {
 } from "./applicationFields";
 import { emailDeliveryKind } from "./lib/emailDeliveries";
 
-/**
- * Deployment schema for standing-manatee-425 / production.
- *
- * Register-owned tables must match hackuta-2026-register/convex/schema.ts
- * (see convex/REGISTER_SCHEMA.md). Only applicationReviews and admins may
- * be edited in this file.
- */
 export default defineSchema({
-  // --- REGISTER-LOCKED (do not edit) ---
   ...authTables,
 
   users: defineTable({
@@ -41,7 +37,6 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_resume", ["resumeStorageId"]),
 
-  // --- ADMIN-OWNED (editable) ---
   applicationReviews: defineTable({
     applicationId: v.id("applications"),
     status: applicationReviewStatus,
@@ -55,7 +50,6 @@ export default defineSchema({
     .index("by_reviewer", ["reviewedBy"])
     .index("by_status", ["status"]),
 
-  // --- REGISTER-LOCKED (do not edit) ---
   applicationSubmissionLogs: defineTable({
     ...applicationSubmissionLogRecord,
     applicationId: v.id("applications"),
@@ -97,16 +91,4 @@ export default defineSchema({
   })
     .index("by_serviceId", ["serviceId"])
     .index("by_recipient", ["recipient"]),
-
-  // --- ADMIN-OWNED (editable) ---
-  admins: defineTable({
-    email: v.string(),
-    name: v.string(),
-    role: v.union(v.literal("reviewer"), v.literal("admin")),
-    active: v.boolean(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_email", ["email"])
-    .index("by_role", ["role"]),
 });

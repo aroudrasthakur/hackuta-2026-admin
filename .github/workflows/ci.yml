@@ -36,6 +36,9 @@ jobs:
       - name: Check trailing newlines
         run: npm run check:whitespace
 
+      - name: Verify register schema lock
+        run: npm run verify:register-schema-lock
+
       - name: Lint application and Convex code
         run: npm run lint
 

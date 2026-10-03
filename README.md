@@ -1,8 +1,8 @@
 # hackuta-2026-admin
 
-Organizer dashboard for HackUTA 2026. This app connects to the shared HackUTA Convex project and **owns the deployment schema** in [`convex/schema.ts`](convex/schema.ts)—registration tables from register plus admin-only tables such as `admins`.
+Organizer dashboard for HackUTA 2026. This app **owns all Convex deploys** for the shared HackUTA project (`standing-manatee-425` and production).
 
-[`hackuta-2026-register`](../hackuta-2026-register) remains the registration app (auth UI, application flows, email). Registration **functions** still live in register; **schema deploys** run from this repo and must include every register table.
+[`hackuta-2026-register`](../hackuta-2026-register) remains the registration frontend; it **does not push** to Convex. Registration tables and backend modules are **frozen** in this repo — see [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md). Only `applicationReviews` and `admins` schema tables may be edited here.
 
 ## Stack
 
@@ -16,8 +16,10 @@ Organizer dashboard for HackUTA 2026. This app connects to the shared HackUTA Co
 | Path | Purpose |
 | --- | --- |
 | `src/` | Admin UI (routes, layouts, pages) |
-| `convex/schema.ts` | Full deployment schema (register tables + `admins`) |
-| `shared/registration/` | Applicant field lists (keep in sync with register) |
+| `convex/schema.ts` | Deployment schema (`applicationReviews` + `admins` editable) |
+| `convex/REGISTER_SCHEMA.md` | File-by-file register lock (68 immutable paths) |
+| `shared/` | Registration shared code (register-locked; see doc for each file) |
+| `shared/admin/` | Admin-only shared code (not locked) |
 | `convex/admin/` | Organizer Convex functions |
 | `convex/_generated/` | Local codegen (`npm run convex:codegen`); gitignored |
 | `scripts/` | Convex CI stub helpers |
@@ -36,14 +38,14 @@ Organizer dashboard for HackUTA 2026. This app connects to the shared HackUTA Co
 ## Convex workflow
 
 1. Copy `.env.example` → `.env.local` and set `CONVEX_DEPLOYMENT=dev:standing-manatee-425`.
-2. **Schema / functions:** edit `convex/schema.ts` and `convex/admin/` in this repo.
-3. **Codegen:** `npm run convex:codegen` (or `npm run convex:dev` while developing).
-4. **Push to shared dev:** `npm run convex:push-dev` (standing-manatee-425).
-5. **Deploy production backend:** `npm run convex:deploy` when ready.
+2. Read [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md) — do not edit register-locked files.
+3. **Schema / functions:** edit `applicationReviews`, `admins`, and `convex/admin/` only.
+4. **Codegen:** `npm run convex:codegen` (or `npm run convex:dev` while developing).
+5. **Verify lock:** `npm run verify:register-schema-lock` (also runs before `convex:push-dev`).
+6. **Push to shared dev:** `npm run convex:push-dev` (standing-manatee-425).
+7. **Deploy production backend:** `npm run convex:deploy` when ready.
 
-Registration **functions** are developed in `hackuta-2026-register` and mirrored under `convex/` for deploy. When register schema or backend changes, copy updates here before `npm run convex:push-dev` so standing-manatee-425 keeps every table and endpoint.
-
-CI does **not** clone register or run `convex:sync`; it uses a stubbed `convex/_generated/server.ts` for typecheck/build.
+If register source files change upstream, run `npm run register-schema-lock:refresh` (requires sibling register repo) and commit the updated manifest.
 
 ## Local development
 
@@ -65,6 +67,8 @@ Dev server: [http://127.0.0.1:5373](http://127.0.0.1:5373)
 | `npm run typecheck` | `src` + `convex/` |
 | `npm run lint` | ESLint on `src`, `convex`, `scripts` |
 | `npm run check:whitespace` | Fail if tracked text files lack a final newline |
+| `npm run verify:register-schema-lock` | Fail if register-frozen files drift |
+| `npm run register-schema-lock:refresh` | Re-copy lock manifest from sibling register repo |
 | `npm run convex:dev` | Convex dev (watch + codegen) |
 | `npm run convex:push-dev` | One-shot push to standing-manatee-425 |
 | `npm run convex:codegen` | Regenerate `convex/_generated/` |
