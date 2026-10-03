@@ -118,6 +118,9 @@ function collectLockedFiles(sourceRoot) {
     if (!file.endsWith(".ts")) {
       return false;
     }
+    if (file.endsWith("README.md")) {
+      return false;
+    }
     const rel = relative(join(sourceRoot, "convex"), file).replace(/\\/g, "/");
     const top = rel.split("/")[0];
     if (LOCKED_CONVEX_IGNORE.has(rel) || LOCKED_CONVEX_DIR_IGNORE.has(top)) {
@@ -131,7 +134,11 @@ function collectLockedFiles(sourceRoot) {
     files[rel] = sha256(readText(absolute));
   }
 
-  const sharedFiles = walkFiles(join(sourceRoot, "shared"), (file) => file.endsWith(".ts") || file.endsWith(".csv") || file.endsWith(".md"));
+  const sharedFiles = walkFiles(
+    join(sourceRoot, "shared"),
+    (file) =>
+      (file.endsWith(".ts") || file.endsWith(".csv")) && !file.endsWith("README.md"),
+  );
   for (const absolute of sharedFiles) {
     const rel = relative(sourceRoot, absolute).replace(/\\/g, "/");
     files[rel] = sha256(readText(absolute));

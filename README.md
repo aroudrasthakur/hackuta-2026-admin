@@ -13,16 +13,15 @@ Organizer dashboard for HackUTA 2026. This app **owns all Convex deploys** for t
 
 ## Repository layout
 
-| Path | Purpose |
-| --- | --- |
-| `src/` | Admin UI (routes, layouts, pages) |
-| `convex/schema.ts` | Deployment schema (`applicationReviews` + `admins` editable) |
-| `convex/REGISTER_SCHEMA.md` | File-by-file register lock (68 immutable paths) |
-| `shared/` | Registration shared code (register-locked; see doc for each file) |
-| `shared/admin/` | Admin-only shared code (not locked) |
-| `convex/admin/` | Organizer Convex functions |
-| `convex/_generated/` | Local codegen (`npm run convex:codegen`); gitignored |
-| `scripts/` | Convex CI stub helpers |
+| Path | README | Purpose |
+| --- | --- | --- |
+| `src/` | [src/README.md](src/README.md) | Admin UI (routes, layouts, pages) |
+| `convex/` | [convex/README.md](convex/README.md) | Backend — registration modules (locked) + admin modules |
+| `shared/` | [shared/README.md](shared/README.md) | Registration isomorphic code (locked) + `shared/admin/` |
+| `scripts/` | [scripts/README.md](scripts/README.md) | Codegen stub, schema lock, whitespace check |
+| `docs/` | [docs/README.md](docs/README.md) | Architecture and operations docs |
+
+Key files: [convex/schema.ts](convex/schema.ts) (editable: `applicationReviews`, `admins`), [convex/REGISTER_SCHEMA.md](convex/REGISTER_SCHEMA.md) (67 immutable code paths).
 
 ## Routes
 
@@ -93,6 +92,17 @@ See [`.env.example`](.env.example).
 ## Auth (planned)
 
 `AdminProtectedRoute` is currently a pass-through. Organizer sign-in and role checks will replace it in a follow-up.
+
+## Documentation
+
+| Doc | Audience |
+| --- | --- |
+| [docs/README.md](docs/README.md) | Documentation index |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repo layout and deploy ownership |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Deploy checklist and env vars |
+| [convex/REGISTER_SCHEMA.md](convex/REGISTER_SCHEMA.md) | Register lock — file-by-file |
+
+Each major directory has a `README.md` with an overview table, usage, and related links (same style as [hackuta-2026-register](https://github.com/aroudrasthakur/hackuta-2026-register)).
 
 ## Workspace
 

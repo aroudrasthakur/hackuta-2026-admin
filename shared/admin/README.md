@@ -1,8 +1,27 @@
-# Admin-only shared code
+# Admin-only shared code (`shared/admin/`)
 
-Code under `shared/admin/` is **owned by hackuta-2026-admin**, not register.
+Isomorphic TypeScript for the organizer dashboard only. **Not register-locked** — safe to add files here.
 
-- Safe to add new files here for organizer UI, review helpers, and admin-only types.
-- **Do not** add registration behavior here — that belongs in `hackuta-2026-register/shared/` and enters the lock via `npm run register-schema-lock:refresh`.
+Use this namespace for:
 
-See [`../convex/REGISTER_SCHEMA.md`](../convex/REGISTER_SCHEMA.md).
+- Review workflow constants and labels
+- Organizer-facing error copy
+- Types shared between `src/` and `convex/admin/`
+
+Do **not** put registration applicant logic here — that belongs in [hackuta-2026-register/shared/](../../hackuta-2026-register/shared/) and enters this repo via `npm run register-schema-lock:refresh`.
+
+## Overview
+
+| Path | Summary |
+| --- | --- |
+| (empty) | Add modules as review and check-in features land |
+
+## Related
+
+| Location | Role |
+| --- | --- |
+| [../README.md](../README.md) | Shared module index |
+| [convex/admin/README.md](../../convex/admin/README.md) | Organizer Convex functions |
+| [src/README.md](../../src/README.md) | Admin UI |
+
+Parent index: [README.md](../../README.md).

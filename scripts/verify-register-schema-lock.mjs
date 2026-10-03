@@ -138,6 +138,9 @@ function verifyNoUnexpectedSharedFiles(manifest) {
       if (!/\.(ts|tsx|js|mjs|csv|md|json)$/.test(entry)) {
         continue;
       }
+      if (entry === "README.md" || rel.endsWith("/README.md")) {
+        continue;
+      }
       if (rel.startsWith(ADMIN_SHARED_PREFIX)) {
         continue;
       }
@@ -177,7 +180,10 @@ function verifyNoUnexpectedConvexFiles(manifest) {
       if (!entry.endsWith(".ts")) {
         continue;
       }
-      if (CONVEX_EXEMPT.has(rel) || rel.endsWith(".md")) {
+      if (CONVEX_EXEMPT.has(rel) || entry === "README.md" || rel.endsWith("/README.md")) {
+        continue;
+      }
+      if (rel === "convex/REGISTER_SCHEMA.md") {
         continue;
       }
       if (!locked.has(rel)) {

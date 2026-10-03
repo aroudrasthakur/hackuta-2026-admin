@@ -10,7 +10,7 @@ Every path listed in **Register-owned (immutable)** below is frozen at the byte 
 
 | Artifact | Purpose |
 | --- | --- |
-| [`../scripts/register-schema-lock/manifest.json`](../scripts/register-schema-lock/manifest.json) | SHA-256 hash per locked file (68 files) |
+| [`../scripts/register-schema-lock/manifest.json`](../scripts/register-schema-lock/manifest.json) | SHA-256 hash per locked code file (67 `.ts` / `.csv` paths) |
 | [`../scripts/register-schema-lock/schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) | Copy of register `convex/schema.ts` for schema-body checks |
 
 ---
@@ -27,6 +27,7 @@ These paths are **not** in the lock manifest. You may add or change them freely.
 | [`../scripts/`](../scripts/) | Admin tooling (except frozen register snapshots under `register-schema-lock/`) |
 | [`../shared/admin/`](../shared/admin/) | **Future admin-only shared code** — not register-owned |
 | [`README.md`](README.md), [`REGISTER_SCHEMA.md`](REGISTER_SCHEMA.md) | Documentation |
+| Any `**/README.md` under `convex/` or `shared/` | Directory docs (admin-maintained; not hash-locked) |
 | `convex/_generated/` | Local Convex codegen (gitignored) |
 
 ---

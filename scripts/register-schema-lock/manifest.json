@@ -55,7 +55,6 @@
     "shared/hackathon/timeline.ts": "63df65309ebccb614217d3715ac0ff9ffb8299ac2cb0cd112c10790f11099c9b",
     "shared/lib/normalizeEmail.ts": "8373abd49dfde6c7e3b2360d0930bb6b00c63f07c4b37ae7277fa0b716fd691a",
     "shared/lib/sanitizeInput.ts": "96e2d6d1394daa88b6aad9a43de710df96d383fdce9c7b164ade375c5f79aa68",
-    "shared/README.md": "28558b00fd9a3dbc5a520eeba0158277531ded355ebec9535fe9372fa46325ea",
     "shared/registration/allergyMigration.ts": "e687e790c575478e06a0894161222e8c346ef9f316a4ad987fe2b1a517e45f8b",
     "shared/registration/applicantFields.ts": "d50be22528107b86cd4d570019ffd5c27db991be9beeb7838d49caedcaf6bc5c",
     "shared/registration/consentTimestamps.ts": "eec7ade1354c740467e56ee68942cbd328852d664f1b9661ca3982d39239fc9f",
