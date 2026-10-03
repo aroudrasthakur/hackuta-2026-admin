@@ -1,8 +1,10 @@
 # Convex in hackuta-2026-admin
 
-This repository **owns the Convex schema for the admin app** (see [`schema.ts`](schema.ts)). Deploy admin schema and organizer functions from this repo with `npm run convex:dev` / `npm run convex:deploy`.
+This repository **owns the Convex schema for the shared deployment** (see [`schema.ts`](schema.ts)). The schema includes all registration tables from [`hackuta-2026-register`](../hackuta-2026-register) plus admin-only tables (e.g. `admins`). Deploy from this repo with `npm run convex:dev` / `npm run convex:deploy`.
 
-[`hackuta-2026-register`](../hackuta-2026-register) remains the primary registration app and still owns registration, auth, and application tables on the shared Convex project. Coordinate schema changes across both repos when they share a deployment.
+When registration tables or functions change in register, mirror them here before deploying so the shared deployment keeps every table and endpoint.
+
+Registration Convex functions under `convex/` (excluding `convex/admin/`) are copied from register so a deploy from this repo does not remove registration backend code.
 
 ## Generated types
 
@@ -14,7 +16,9 @@ This repository **owns the Convex schema for the admin app** (see [`schema.ts`](
 
 | Path | Purpose |
 | --- | --- |
-| `schema.ts` | Admin tables (e.g. `admins`) |
+| `schema.ts` | Full deployment schema (register tables + `admins`) |
+| `applicationFields.ts` | Application validators (mirrored from register) |
+| `lib/` | Shared Convex helpers (mirrored from register) |
 | `admin/` | Organizer queries, mutations, and actions |
 | `_generated/` | Local codegen output (not committed) |
 

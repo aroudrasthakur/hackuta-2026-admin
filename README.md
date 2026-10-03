@@ -1,8 +1,8 @@
 # hackuta-2026-admin
 
-Organizer dashboard for HackUTA 2026. This app connects to the shared HackUTA Convex project and **owns the admin schema** in [`convex/schema.ts`](convex/schema.ts).
+Organizer dashboard for HackUTA 2026. This app connects to the shared HackUTA Convex project and **owns the deployment schema** in [`convex/schema.ts`](convex/schema.ts)—registration tables from register plus admin-only tables such as `admins`.
 
-[`hackuta-2026-register`](../hackuta-2026-register) remains the registration app (auth, applications, email). Run admin backend work from this repo; run registration backend work from register.
+[`hackuta-2026-register`](../hackuta-2026-register) remains the registration app (auth UI, application flows, email). Registration **functions** still live in register; **schema deploys** run from this repo and must include every register table.
 
 ## Stack
 
@@ -16,7 +16,8 @@ Organizer dashboard for HackUTA 2026. This app connects to the shared HackUTA Co
 | Path | Purpose |
 | --- | --- |
 | `src/` | Admin UI (routes, layouts, pages) |
-| `convex/schema.ts` | Admin tables (source of truth for admin schema) |
+| `convex/schema.ts` | Full deployment schema (register tables + `admins`) |
+| `shared/registration/` | Applicant field lists (keep in sync with register) |
 | `convex/admin/` | Organizer Convex functions |
 | `convex/_generated/` | Local codegen (`npm run convex:codegen`); gitignored |
 | `scripts/` | Convex CI stub helpers |
@@ -37,9 +38,10 @@ Organizer dashboard for HackUTA 2026. This app connects to the shared HackUTA Co
 1. Copy `.env.example` → `.env.local` and set `CONVEX_DEPLOYMENT=dev:standing-manatee-425`.
 2. **Schema / functions:** edit `convex/schema.ts` and `convex/admin/` in this repo.
 3. **Codegen:** `npm run convex:codegen` (or `npm run convex:dev` while developing).
-4. **Deploy admin backend:** `npm run convex:deploy` from this repo when ready.
+4. **Push to shared dev:** `npm run convex:push-dev` (standing-manatee-425).
+5. **Deploy production backend:** `npm run convex:deploy` when ready.
 
-Registration schema and functions are still developed and deployed from `hackuta-2026-register`. When both apps share a deployment, coordinate deploy order and schema so neither repo drops the other's tables.
+Registration **functions** are developed in `hackuta-2026-register` and mirrored under `convex/` for deploy. When register schema or backend changes, copy updates here before `npm run convex:push-dev` so standing-manatee-425 keeps every table and endpoint.
 
 CI does **not** clone register or run `convex:sync`; it uses a stubbed `convex/_generated/server.ts` for typecheck/build.
 
@@ -64,8 +66,9 @@ Dev server: [http://127.0.0.1:5373](http://127.0.0.1:5373)
 | `npm run lint` | ESLint on `src`, `convex`, `scripts` |
 | `npm run check:whitespace` | Fail if tracked text files lack a final newline |
 | `npm run convex:dev` | Convex dev (watch + codegen) |
+| `npm run convex:push-dev` | One-shot push to standing-manatee-425 |
 | `npm run convex:codegen` | Regenerate `convex/_generated/` |
-| `npm run convex:deploy` | Deploy admin convex code |
+| `npm run convex:deploy` | Deploy to production Convex |
 
 ## Environment variables
 
