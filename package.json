@@ -11,7 +11,10 @@
     "pretypecheck": "node scripts/ensure-convex-server-stub.mjs",
     "typecheck": "tsc --noEmit && tsc -p convex/tsconfig.json --noEmit",
     "lint": "eslint src convex scripts",
-    "convex:sync": "node scripts/sync-convex-from-register.mjs"
+    "check:whitespace": "node scripts/check-whitespace.mjs",
+    "convex:dev": "convex dev",
+    "convex:codegen": "convex codegen",
+    "convex:deploy": "convex deploy"
   },
   "dependencies": {
     "convex": "^1.45.0",
