@@ -1,7 +1,7 @@
 /* eslint-disable */
 /**
- * Minimal Convex server stubs for local tests and CI when codegen is unavailable.
- * Copied to convex/_generated/server.ts before unit tests and Convex typechecks.
+ * Minimal Convex server stubs for CI when codegen is unavailable (no CONVEX_DEPLOYMENT).
+ * Copied to convex/_generated/server.ts before typecheck and build.
  */
 import {
   actionGeneric,

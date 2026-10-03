@@ -1,5 +1,5 @@
-# Admin Convex functions (placeholder)
+# Admin Convex functions
 
-Future organizer-only queries, mutations, and tables will live here.
+Organizer-only queries, mutations, and internal actions live here.
 
-Until then, the admin app consumes the shared deployment via synced `_generated` types from `hackuta-2026-register`.
+Registration and applicant data remain in `hackuta-2026-register`; this folder adds admin-specific backend behavior on top of the shared Convex project.
