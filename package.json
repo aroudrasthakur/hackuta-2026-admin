@@ -13,11 +13,14 @@
     "lint": "eslint src convex scripts",
     "check:whitespace": "node scripts/check-whitespace.mjs",
     "convex:dev": "convex dev",
+    "convex:push-dev": "convex dev --once --env-file .env.example",
     "convex:codegen": "convex codegen",
     "convex:deploy": "convex deploy"
   },
   "dependencies": {
+    "@convex-dev/auth": "^0.0.95",
     "convex": "^1.45.0",
+    "libphonenumber-js": "^1.13.14",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4"
