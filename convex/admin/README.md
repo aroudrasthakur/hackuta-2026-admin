@@ -1,5 +1,5 @@
-# Admin Convex functions (placeholder)
+# Admin Convex functions
 
-Future organizer-only queries, mutations, and tables will live here.
+Organizer-only queries and mutations live here. Tables and schema are owned by `hackuta-2026-register` (`convex/schema.ts`).
 
-Until then, the admin app consumes the shared deployment via synced `_generated` types from `hackuta-2026-register`.
+- `applicationReviewLogs.ts`: append-only review history (`logApplicationReviewAction`, and `listApplicationReviewLogs` for `admin` role only). Writes to the register-owned `applicationReviewLogs` table.

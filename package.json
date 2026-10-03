@@ -14,6 +14,7 @@
     "convex:sync": "node scripts/sync-convex-from-register.mjs"
   },
   "dependencies": {
+    "@convex-dev/auth": "^0.0.96",
     "convex": "^1.45.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
