@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { normalizeEmail } from "../lib/normalizeEmail";
 
@@ -41,14 +42,17 @@ export const logApplicationReviewAction = mutation({
 
 /** Full history for an application; restricted to `admin` role. */
 export const listApplicationReviewLogs = query({
-  args: { applicationId: v.id("applications") },
-  handler: async (ctx, { applicationId }) => {
+  args: {
+    applicationId: v.id("applications"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, { applicationId, paginationOpts }) => {
     const admin = await requireActiveStaff(ctx);
     if (admin.role !== "admin") throw new Error("Not authorized");
     return await ctx.db
       .query("applicationReviewLogs")
       .withIndex("by_application_createdAt", (q) => q.eq("applicationId", applicationId))
       .order("desc")
-      .collect();
+      .paginate(paginationOpts);
   },
 });

@@ -96,15 +96,17 @@ sign-in and must only be used with a development deployment.
    and `createdAt` was set by the server. The public mutation does not accept
    `adminId` or `createdAt` as arguments.
 
-6. Test history access using `listApplicationReviewLogs`. An active reviewer
-   identity should be rejected:
+6. Test history access using `listApplicationReviewLogs`. Pass
+   `paginationOpts` with `numItems` and `cursor`; the response includes `page`,
+   `isDone`, and `continueCursor`. Use the returned cursor to request subsequent
+   pages. An active reviewer identity should be rejected:
 
    ```powershell
-   npx.cmd --% convex run --deployment harmless-lobster-530 --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:listApplicationReviewLogs "{\"applicationId\":\"YOUR_APPLICATION_ID\"}"
+   npx.cmd --% convex run --deployment harmless-lobster-530 --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:listApplicationReviewLogs "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"paginationOpts\":{\"numItems\":50,\"cursor\":null}}"
    ```
 
-   Repeat with an active `admin` account's email. It should return the
-   application's events, newest first.
+   Repeat with an active `admin` account's email. It should return one page
+   of the application's events, newest first.
 
 7. Run the append mutation without `--identity`; it should fail as
    unauthenticated and write no row.
