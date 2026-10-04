@@ -63,11 +63,11 @@ sign-in and must only be used with a development deployment.
    once:
 
    ```powershell
-   $env:CONVEX_DEPLOYMENT = "dev:harmless-lobster-530"
+   $env:CONVEX_DEPLOYMENT = "dev:standing-manatee-425"
    npx.cmd convex dev --once
    ```
 
-   Check the CLI output confirms `harmless-lobster-530` before continuing.
+   Check the CLI output confirms `standing-manatee-425` before continuing.
    If it reports access denied or selects a different deployment, stop and
    resolve access/configuration first.
 
