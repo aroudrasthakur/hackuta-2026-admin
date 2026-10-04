@@ -2,6 +2,7 @@ import { internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./lib/dataModel";
 
 type ResettableTable =
+  | "applicationReviewLogs"
   | "applications"
   | "applicationReviews"
   | "applicationReviewLogs"
