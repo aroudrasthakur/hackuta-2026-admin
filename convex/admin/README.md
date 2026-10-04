@@ -30,6 +30,7 @@ Registration reads/writes for applicants remain in register-locked modules ([app
 | Location | Role |
 | --- | --- |
 | [pages/admin/README.md](../../src/pages/admin/README.md) | UI routes that will call these functions |
+| [Application review log guide](../../docs/APPLICATION_REVIEW_LOGS.md) | Call and test the review log API |
 | [REGISTER_SCHEMA.md](../REGISTER_SCHEMA.md) | Lock policy |
 
 Parent index: [../README.md](../README.md).
