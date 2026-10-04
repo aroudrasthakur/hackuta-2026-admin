@@ -6,7 +6,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 
 | Path | Summary |
 | --- | --- |
-| `applicationReviewLogs.ts` | Append-only review history; writes to register-owned `applicationReviewLogs`. |
+| `applicationReviewLogs.ts` | Append-only review history; writes to admin-owned `applicationReviewLogs`. |
 
 ## Planned surface
 
