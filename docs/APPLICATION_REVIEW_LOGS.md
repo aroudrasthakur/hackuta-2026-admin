@@ -17,10 +17,12 @@ Each call to `logApplicationReviewAction` appends one document to
 | `action` | Caller | `viewed`, `started_review`, or `review_ended` |
 | `createdAt` | Server | Event time in milliseconds since Unix epoch |
 
-The mutation only inserts; there is no update/delete log API. It does not
-replace the current decision in `applicationReviews`. Only an active account
-whose role is `admin` can call `listApplicationReviewLogs`. Reviewers may append
-events but cannot retrieve the full history.
+`logApplicationReviewAction` only accepts non-decision events and only inserts;
+there is no update/delete log API. Decisions are recorded by
+`setApplicationDecision`, which updates `applicationReviews` and inserts the
+matching decision event in the same Convex mutation. Only an active account
+whose role is `admin` can call the paginated `listApplicationReviewLogs`.
+Reviewers may append non-decision events but cannot retrieve the full history.
 
 Non-decision events are **not automatic**: the application page must call this
 mutation. Do not call it for dashboard listing or heartbeat/polling. Call
@@ -48,11 +50,13 @@ await logApplicationReviewAction({
 });
 ```
 
-Use `started_review` when review begins and `review_ended` when it ends. Do not
-call this endpoint for a decision; the mutation that changes the review status
-must also insert the matching decision event. Supply only `applicationId` and
-`action`; never send `adminId` or `createdAt`. The backend derives both from
-trusted server context.
+Use the non-decision action after the corresponding event, e.g. `started_review`
+or `review_ended`. Do not use this endpoint for decisions.
+
+When making a decision, call `setApplicationDecision` instead. It accepts
+`applicationId` and `decision` (`accepted`, `rejected`, or `waitlisted`) and
+atomically updates the `applicationReviews` row and appends the decision event.
+It derives `adminId`, `reviewedBy`, and timestamps from trusted server context.
 
 ## Test against a development deployment
 
@@ -89,28 +93,39 @@ sign-in and must only be used with a development deployment.
    npx.cmd --% convex run --deployment harmless-lobster-530 --push --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:logApplicationReviewAction "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"action\":\"viewed\"}"
    ```
 
-   To test all accepted actions, rerun the command using one action per call:
-   `started_review` or `review_ended`.
-   Every successful call should return a new log document ID.
+   The non-decision endpoint accepts `viewed`, `started_review`, and
+   `review_ended`. Each successful call returns a new log document ID.
 
-5. In the dashboard's **Data → applicationReviewLogs**, verify each call made
+5. To test a decision, use the dedicated transaction mutation instead of the
+   activity endpoint:
+
+   ```powershell
+   npx.cmd --% convex run --deployment harmless-lobster-530 --push --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:setApplicationDecision "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"decision\":\"accepted\"}"
+   ```
+
+   Choose `accepted`, `rejected`, or `waitlisted`. The mutation updates the
+   matching `applicationReviews` row and inserts its decision log event
+   atomically. If the review row does not exist or the mutation fails, neither
+   the decision update nor event is committed.
+
+6. In the dashboard's **Data → applicationReviewLogs**, verify each call made
    a separate row. Confirm `adminId` refers to the matching `admins` document
    and `createdAt` was set by the server. The public mutation does not accept
    `adminId` or `createdAt` as arguments.
 
-6. Test history access using `listApplicationReviewLogs`. Pass
-   `paginationOpts` with `numItems` and `cursor`; the response includes `page`,
-   `isDone`, and `continueCursor`. Use the returned cursor to request subsequent
-   pages. An active reviewer identity should be rejected:
+7. Test history access using `listApplicationReviewLogs`. Pass `paginationOpts`
+   (the usual first page is `{\"numItems\":25,\"cursor\":null}`). An active
+   reviewer identity should be rejected:
 
    ```powershell
-   npx.cmd --% convex run --deployment harmless-lobster-530 --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:listApplicationReviewLogs "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"paginationOpts\":{\"numItems\":50,\"cursor\":null}}"
+   npx.cmd --% convex run --deployment harmless-lobster-530 --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:listApplicationReviewLogs "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"paginationOpts\":{\"numItems\":25,\"cursor\":null}}"
    ```
 
-   Repeat with an active `admin` account's email. It should return one page
-   of the application's events, newest first.
+   Repeat with an active `admin` account's email. It should return the
+   application's page of events, newest first. Continue with the returned
+   `continueCursor` until `isDone` is true to read all pages.
 
-7. Run the append mutation without `--identity`; it should fail as
+8. Run the append mutation without `--identity`; it should fail as
    unauthenticated and write no row.
 
 ## Troubleshooting
