@@ -14,7 +14,7 @@ Each call to `logApplicationReviewAction` appends one document to
 | --- | --- | --- |
 | `applicationId` | Caller | Existing application the event belongs to |
 | `adminId` | Server | Active reviewer/admin resolved from the authenticated identity email |
-| `action` | Caller | `viewed`, `started_review`, `review_ended`, `accepted`, `rejected`, or `waitlisted` |
+| `action` | Caller | `viewed`, `started_review`, or `review_ended` |
 | `createdAt` | Server | Event time in milliseconds since Unix epoch |
 
 The mutation only inserts; there is no update/delete log API. It does not
@@ -22,9 +22,12 @@ replace the current decision in `applicationReviews`. Only an active account
 whose role is `admin` can call `listApplicationReviewLogs`. Reviewers may append
 events but cannot retrieve the full history.
 
-Events are **not automatic**: the application page or decision handler must
-call the mutation. Do not call it for dashboard listing or heartbeat/polling.
-Call `viewed` only when the reviewer opens an individual application.
+Non-decision events are **not automatic**: the application page must call this
+mutation. Do not call it for dashboard listing or heartbeat/polling. Call
+`viewed` only when the reviewer opens an individual application. Decision
+events (`accepted`, `rejected`, or `waitlisted`) must be recorded by the same
+mutation that updates `applicationReviews`, so the state change and its audit
+event are atomic.
 
 ## Call from the admin UI
 
@@ -45,12 +48,11 @@ await logApplicationReviewAction({
 });
 ```
 
-Use the corresponding action after the actual review transition, for example
-`started_review` when review begins and `accepted` when an acceptance decision
-is made. Keep using the existing review-state mutation for `applicationReviews`;
-the activity event does not replace that current state. Supply only
-`applicationId` and `action`; never send `adminId` or `createdAt`. The backend
-derives both from trusted server context.
+Use `started_review` when review begins and `review_ended` when it ends. Do not
+call this endpoint for a decision; the mutation that changes the review status
+must also insert the matching decision event. Supply only `applicationId` and
+`action`; never send `adminId` or `createdAt`. The backend derives both from
+trusted server context.
 
 ## Test against a development deployment
 
@@ -88,7 +90,7 @@ sign-in and must only be used with a development deployment.
    ```
 
    To test all accepted actions, rerun the command using one action per call:
-   `started_review`, `review_ended`, `accepted`, `rejected`, or `waitlisted`.
+   `started_review` or `review_ended`.
    Every successful call should return a new log document ID.
 
 5. In the dashboard's **Data → applicationReviewLogs**, verify each call made

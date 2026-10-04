@@ -7,9 +7,6 @@ const logAction = v.union(
   v.literal("viewed"),
   v.literal("started_review"),
   v.literal("review_ended"),
-  v.literal("accepted"),
-  v.literal("rejected"),
-  v.literal("waitlisted"),
 );
 
 async function requireActiveStaff(ctx: QueryCtx | MutationCtx) {
