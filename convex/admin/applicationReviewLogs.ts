@@ -1,15 +1,6 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import type {
-  GenericDataModel,
-  GenericMutationCtx,
-  GenericQueryCtx,
-} from "convex/server";
-import { mutation, query } from "../_generated/server";
-
-// Tables are defined in hackuta-2026-register/convex/schema.ts; this repo has no local schema.
-type Ctx = GenericQueryCtx<GenericDataModel> | GenericMutationCtx<GenericDataModel>;
-type AdminRole = "admin" | "reviewer";
+import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { normalizeEmail } from "../lib/normalizeEmail";
 
 const logAction = v.union(
   v.literal("viewed"),
@@ -20,22 +11,24 @@ const logAction = v.union(
   v.literal("waitlisted"),
 );
 
-async function requireStaff(ctx: Ctx) {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
+async function requireActiveStaff(ctx: QueryCtx | MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  const email = normalizeEmail(identity?.email);
+  if (!email) throw new Error("Not authenticated");
+
   const admin = await ctx.db
     .query("admins")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .withIndex("by_email", (q) => q.eq("email", email))
     .unique();
-  if (!admin) throw new Error("Not authorized");
-  return { _id: admin._id, role: admin.role as AdminRole };
+  if (!admin || !admin.active) throw new Error("Not authorized");
+  return admin;
 }
 
 /** Appends one event. adminId and createdAt are always server-derived. */
 export const logApplicationReviewAction = mutation({
-  args: { applicationId: v.id("profiles"), action: logAction },
+  args: { applicationId: v.id("applications"), action: logAction },
   handler: async (ctx, { applicationId, action }) => {
-    const admin = await requireStaff(ctx);
+    const admin = await requireActiveStaff(ctx);
     if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
     return await ctx.db.insert("applicationReviewLogs", {
       applicationId,
@@ -48,9 +41,9 @@ export const logApplicationReviewAction = mutation({
 
 /** Full history for an application; restricted to `admin` role. */
 export const listApplicationReviewLogs = query({
-  args: { applicationId: v.id("profiles") },
+  args: { applicationId: v.id("applications") },
   handler: async (ctx, { applicationId }) => {
-    const admin = await requireStaff(ctx);
+    const admin = await requireActiveStaff(ctx);
     if (admin.role !== "admin") throw new Error("Not authorized");
     return await ctx.db
       .query("applicationReviewLogs")

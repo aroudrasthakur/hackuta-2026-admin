@@ -12,8 +12,8 @@ import { emailDeliveryKind } from "./lib/emailDeliveries";
  * Deployment schema for standing-manatee-425 / production.
  *
  * Register-owned tables must match hackuta-2026-register/convex/schema.ts
- * (see convex/REGISTER_SCHEMA.md). Only applicationReviews and admins may
- * be edited in this file.
+ * (see convex/REGISTER_SCHEMA.md). Only applicationReviews, admins, and
+ * applicationReviewLogs may be edited in this file.
  */
 export default defineSchema({
   // --- REGISTER-LOCKED (do not edit) ---
@@ -109,4 +109,21 @@ export default defineSchema({
   })
     .index("by_email", ["email"])
     .index("by_role", ["role"]),
+
+  applicationReviewLogs: defineTable({
+    applicationId: v.id("applications"),
+    adminId: v.id("admins"),
+    action: v.union(
+      v.literal("viewed"),
+      v.literal("started_review"),
+      v.literal("review_ended"),
+      v.literal("accepted"),
+      v.literal("rejected"),
+      v.literal("waitlisted"),
+    ),
+    createdAt: v.float64(),
+  })
+    .index("by_application", ["applicationId"])
+    .index("by_admin", ["adminId"])
+    .index("by_application_createdAt", ["applicationId", "createdAt"]),
 });

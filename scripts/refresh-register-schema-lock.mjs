@@ -199,7 +199,7 @@ function main() {
     source: "hackuta-2026-register",
     referenceSchema: "scripts/register-schema-lock/schema.reference.ts",
     registerSchemaPath: "convex/schema.ts",
-    editableTables: ["applicationReviews", "admins"],
+    editableTables: ["applicationReviews", "admins", "applicationReviewLogs"],
     registerSchemaLockedHash,
     files: manifestFiles,
   };

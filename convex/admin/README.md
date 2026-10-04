@@ -19,7 +19,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 
 ## Schema notes
 
-- `applicationReviews` — only register-origin table editable in [schema.ts](../schema.ts).
+- `applicationReviews` — register-origin review state table editable in [schema.ts](../schema.ts).
 - `admins` — admin-only table.
 - `applicationReviewLogs` — append-only activity history; full history is restricted to admins.
 
