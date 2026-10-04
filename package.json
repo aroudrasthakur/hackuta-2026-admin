@@ -11,11 +11,19 @@
     "pretypecheck": "node scripts/ensure-convex-server-stub.mjs",
     "typecheck": "tsc --noEmit && tsc -p convex/tsconfig.json --noEmit",
     "lint": "eslint src convex scripts",
-    "convex:sync": "node scripts/sync-convex-from-register.mjs"
+    "check:whitespace": "node scripts/check-whitespace.mjs",
+    "verify:register-schema-lock": "node scripts/verify-register-schema-lock.mjs",
+    "register-schema-lock:refresh": "node scripts/refresh-register-schema-lock.mjs",
+    "preconvex:push-dev": "node scripts/verify-register-schema-lock.mjs",
+    "convex:dev": "convex dev",
+    "convex:push-dev": "convex dev --once --env-file .env.example",
+    "convex:codegen": "convex codegen",
+    "convex:deploy": "convex deploy"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.96",
     "convex": "^1.45.0",
+    "libphonenumber-js": "^1.13.14",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4"
