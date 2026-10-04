@@ -9,7 +9,7 @@ const manifestPath = join(lockDir, "manifest.json");
 const schemaReferencePath = join(lockDir, "schema.reference.ts");
 const adminSchemaPath = join(root, "convex", "schema.ts");
 
-const ADMIN_EDITABLE_TABLES = ["applicationReviews", "admins"];
+const ADMIN_EDITABLE_TABLES = ["applicationReviews", "admins", "participants"];
 const REFERENCE_EDITABLE_TABLES = ["applicationReviews"];
 
 function sha256(content) {

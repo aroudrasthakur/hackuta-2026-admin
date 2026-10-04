@@ -6,7 +6,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 
 | Path | Summary |
 | --- | --- |
-| (empty) | Functions will be added for application review, roster, and check-in |
+| [participants.ts](participants.ts) | `createParticipantFromAcceptance` — idempotent participant creation for accepted applications |
 
 ## Planned surface
 
@@ -21,6 +21,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 
 - `applicationReviews` — only register-origin table editable in [schema.ts](../schema.ts).
 - `admins` — admin-only table.
+- `participants` — admin-only table; one row per accepted application (reuses `users`, no applicant data copied).
 
 Registration reads/writes for applicants remain in register-locked modules ([applications.ts](../applications.ts), [registrations.ts](../registrations.ts), etc.).
 

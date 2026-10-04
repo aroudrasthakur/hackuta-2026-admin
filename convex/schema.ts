@@ -12,7 +12,7 @@ import { emailDeliveryKind } from "./lib/emailDeliveries";
  * Deployment schema for standing-manatee-425 / production.
  *
  * Register-owned tables must match hackuta-2026-register/convex/schema.ts
- * (see convex/REGISTER_SCHEMA.md). Only applicationReviews and admins may
+ * (see convex/REGISTER_SCHEMA.md). Only applicationReviews, admins, and participants may
  * be edited in this file.
  */
 export default defineSchema({
@@ -109,4 +109,22 @@ export default defineSchema({
   })
     .index("by_email", ["email"])
     .index("by_role", ["role"]),
+
+  /**
+   * Accepted applicants — one row per accepted application, created only after acceptance.
+   * Profile data stays on `applications`; this row reuses the applicant's existing `users` account.
+   */
+  participants: defineTable({
+    applicationId: v.id("applications"),
+    authUserId: v.id("users"),
+    acceptedAt: v.float64(),
+    acceptedBy: v.id("admins"),
+    qrCodeToken: v.string(),
+    checkedInAt: v.optional(v.float64()),
+    createdAt: v.float64(),
+    updatedAt: v.float64(),
+  })
+    .index("by_application", ["applicationId"])
+    .index("by_auth_user", ["authUserId"])
+    .index("by_qr_token", ["qrCodeToken"]),
 });

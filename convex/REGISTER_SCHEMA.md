@@ -21,7 +21,7 @@ These paths are **not** in the lock manifest. You may add or change them freely.
 
 | Path | Purpose |
 | --- | --- |
-| [`schema.ts`](schema.ts) | See [Schema tables](#schema-tables) — only `applicationReviews` and `admins` blocks |
+| [`schema.ts`](schema.ts) | See [Schema tables](#schema-tables) — only `applicationReviews`, `admins`, and `participants` blocks |
 | [`admin/`](admin/) | Organizer Convex queries, mutations, actions |
 | [`../src/`](../src/) | Admin dashboard UI |
 | [`../scripts/`](../scripts/) | Admin tooling (except frozen register snapshots under `register-schema-lock/`) |
