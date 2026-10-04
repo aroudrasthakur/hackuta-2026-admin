@@ -4,6 +4,7 @@ import type { MutationCtx } from "./lib/dataModel";
 type ResettableTable =
   | "applications"
   | "applicationReviews"
+  | "applicationReviewLogs"
   | "resumeUploadSessions"
   | "rateLimits"
   | "authRefreshTokens"
@@ -49,6 +50,7 @@ export const resetAllData = internalMutation({
   handler: async (ctx) => {
     await deleteAllStorage(ctx);
 
+    await deleteAllFromTable(ctx, "applicationReviewLogs");
     await deleteAllFromTable(ctx, "applicationReviews");
     await deleteAllFromTable(ctx, "applications");
     await deleteAllFromTable(ctx, "resumeUploadSessions");
