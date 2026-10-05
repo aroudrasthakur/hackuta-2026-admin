@@ -43,14 +43,14 @@ File: [`convex/schema.ts`](schema.ts)
 | `eventConfig` | Register | **No** |
 | `applications` | Register | **No** |
 | `applicationReviews` | Admin | **Yes** — only register-origin table you may change |
-| `applicationReviewLogs` | Admin | **Yes** — append-only reviewer/admin activity history |
 | `applicationSubmissionLogs` | Register | **No** |
 | `rateLimits` | Register | **No** |
 | `resumeUploadSessions` | Register | **No** |
 | `emailDeliveries` | Register | **No** |
 | `emailDeliveryRecordingFailures` | Register | **No** |
 | `admins` | Admin | **Yes** — does not exist in register repo |
-| `participants` | Admin | **Yes** — one row per accepted application |
+| `applicationReviewLogs` | Admin | **Yes** — append-only reviewer/admin activity history |
+| `participants` | Admin | **Yes** — one row per accepted application (check-in identity) |
 
 All register-owned blocks must remain identical to [`schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) aside from `applicationReviews` and the admin-owned `admins`, `applicationReviewLogs`, and `participants` tables.
 

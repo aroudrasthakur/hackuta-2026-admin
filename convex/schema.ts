@@ -6,6 +6,7 @@ import {
   applicationReviewStatus,
   applicationSubmissionLogRecord,
 } from "./applicationFields";
+import { applicationReviewLogAction } from "./admin/fields";
 import { emailDeliveryKind } from "./lib/emailDeliveries";
 
 /**
@@ -98,7 +99,7 @@ export default defineSchema({
     .index("by_serviceId", ["serviceId"])
     .index("by_recipient", ["recipient"]),
 
-  // --- ADMIN-OWNED (editable) ---
+  // --- ADMIN-OWNED (editable): staff, audit log, accepted roster ---
   admins: defineTable({
     email: v.string(),
     name: v.string(),
@@ -113,15 +114,8 @@ export default defineSchema({
   applicationReviewLogs: defineTable({
     applicationId: v.id("applications"),
     adminId: v.id("admins"),
-    action: v.union(
-      v.literal("viewed"),
-      v.literal("started_review"),
-      v.literal("review_ended"),
-      v.literal("accepted"),
-      v.literal("rejected"),
-      v.literal("waitlisted"),
-    ),
-    createdAt: v.float64(),
+    action: applicationReviewLogAction,
+    createdAt: v.number(),
   })
     .index("by_application", ["applicationId"])
     .index("by_admin", ["adminId"])
@@ -134,12 +128,12 @@ export default defineSchema({
   participants: defineTable({
     applicationId: v.id("applications"),
     authUserId: v.id("users"),
-    acceptedAt: v.float64(),
+    acceptedAt: v.number(),
     acceptedBy: v.id("admins"),
     qrCodeToken: v.string(),
-    checkedInAt: v.optional(v.float64()),
-    createdAt: v.float64(),
-    updatedAt: v.float64(),
+    checkedInAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
   })
     .index("by_application", ["applicationId"])
     .index("by_auth_user", ["authUserId"])

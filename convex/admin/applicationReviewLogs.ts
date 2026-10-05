@@ -1,20 +1,13 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
+import { internal } from "../_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
+import {
+  applicationReviewLogActivityAction,
+  applicationReviewLogDecisionAction,
+} from "./fields";
 import { normalizeEmail } from "../lib/normalizeEmail";
-
-const activityAction = v.union(
-  v.literal("viewed"),
-  v.literal("started_review"),
-  v.literal("review_ended"),
-);
-
-const decisionAction = v.union(
-  v.literal("accepted"),
-  v.literal("rejected"),
-  v.literal("waitlisted"),
-);
 
 async function requireActiveStaff(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
@@ -33,7 +26,10 @@ async function requireActiveStaff(ctx: QueryCtx | MutationCtx) {
 
 /** Appends a non-decision event; decisions are recorded with their state update below. */
 export const logApplicationReviewAction = mutation({
-  args: { applicationId: v.id("applications"), action: activityAction },
+  args: {
+    applicationId: v.id("applications"),
+    action: applicationReviewLogActivityAction,
+  },
   handler: async (ctx, { applicationId, action }) => {
     const { admin } = await requireActiveStaff(ctx);
     if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
@@ -50,7 +46,7 @@ export const logApplicationReviewAction = mutation({
 export const setApplicationDecision = mutation({
   args: {
     applicationId: v.id("applications"),
-    decision: decisionAction,
+    decision: applicationReviewLogDecisionAction,
   },
   handler: async (ctx, { applicationId, decision }) => {
     const { admin, userId } = await requireActiveStaff(ctx);
@@ -70,12 +66,21 @@ export const setApplicationDecision = mutation({
       reviewedBy: userId,
       updatedAt: now,
     });
-    return await ctx.db.insert("applicationReviewLogs", {
+    const logId = await ctx.db.insert("applicationReviewLogs", {
       applicationId,
       adminId: admin._id,
       action: decision,
       createdAt: now,
     });
+
+    if (decision === "accepted") {
+      await ctx.runMutation(
+        internal.admin.participants.createParticipantFromAcceptance,
+        { applicationId, acceptedBy: admin._id },
+      );
+    }
+
+    return logId;
   },
 });
 
