@@ -12,7 +12,7 @@ Generated types live in [_generated/](_generated/) (gitignored). Local typecheck
 | [`schema.ts`](schema.ts) | Deployment schema |
 | [`../hackuta-2026-register/convex/schema.ts`](../hackuta-2026-register/convex/schema.ts) | Live reference in register repo |
 
-**Editable:** `applicationReviews`, `admins`, and `applicationReviewLogs` in `schema.ts`, plus [`admin/`](admin/README.md).
+**Editable:** `applicationReviews`, `admins`, `applicationReviewLogs`, and `participants` in `schema.ts`, plus [`admin/`](admin/README.md).
 
 **Frozen:** all other top-level modules, [`lib/`](lib/README.md), [`email/`](email/README.md), and all of [`shared/`](../shared/README.md).
 

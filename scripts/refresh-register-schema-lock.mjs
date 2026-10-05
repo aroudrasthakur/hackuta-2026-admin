@@ -18,7 +18,12 @@ const lockDir = join(root, "scripts", "register-schema-lock");
 
 const LOCKED_CONVEX_IGNORE = new Set(["schema.ts"]);
 const LOCKED_CONVEX_DIR_IGNORE = new Set(["admin", "_generated"]);
-const EDITABLE_TABLES = ["applicationReviews", "admins", "applicationReviewLogs"];
+const EDITABLE_TABLES = [
+  "applicationReviews",
+  "admins",
+  "applicationReviewLogs",
+  "participants",
+];
 
 function sha256(content) {
   return createHash("sha256").update(content).digest("hex");

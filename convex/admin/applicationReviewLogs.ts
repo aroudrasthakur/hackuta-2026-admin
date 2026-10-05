@@ -2,19 +2,12 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
+import {
+  applicationReviewLogActivityAction,
+  applicationReviewLogDecisionAction,
+} from "./fields";
+import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
 import { normalizeEmail } from "../lib/normalizeEmail";
-
-const activityAction = v.union(
-  v.literal("viewed"),
-  v.literal("started_review"),
-  v.literal("review_ended"),
-);
-
-const decisionAction = v.union(
-  v.literal("accepted"),
-  v.literal("rejected"),
-  v.literal("waitlisted"),
-);
 
 async function requireActiveStaff(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
@@ -33,7 +26,10 @@ async function requireActiveStaff(ctx: QueryCtx | MutationCtx) {
 
 /** Appends a non-decision event; decisions are recorded with their state update below. */
 export const logApplicationReviewAction = mutation({
-  args: { applicationId: v.id("applications"), action: activityAction },
+  args: {
+    applicationId: v.id("applications"),
+    action: applicationReviewLogActivityAction,
+  },
   handler: async (ctx, { applicationId, action }) => {
     const { admin } = await requireActiveStaff(ctx);
     if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
@@ -50,7 +46,7 @@ export const logApplicationReviewAction = mutation({
 export const setApplicationDecision = mutation({
   args: {
     applicationId: v.id("applications"),
-    decision: decisionAction,
+    decision: applicationReviewLogDecisionAction,
   },
   handler: async (ctx, { applicationId, decision }) => {
     const { admin, userId } = await requireActiveStaff(ctx);
@@ -62,6 +58,16 @@ export const setApplicationDecision = mutation({
       .withIndex("by_application", (q) => q.eq("applicationId", applicationId))
       .unique();
     if (!review) throw new Error("Application review not found");
+
+    if (decision === "accepted") {
+      const result = await applyAcceptedApplicationDecision(ctx, {
+        application,
+        review,
+        admin,
+        reviewerUserId: userId,
+      });
+      return result.logId;
+    }
 
     const now = Date.now();
     await ctx.db.patch(review._id, {

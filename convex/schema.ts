@@ -6,14 +6,15 @@ import {
   applicationReviewStatus,
   applicationSubmissionLogRecord,
 } from "./applicationFields";
+import { applicationReviewLogAction } from "./admin/fields";
 import { emailDeliveryKind } from "./lib/emailDeliveries";
 
 /**
  * Deployment schema for standing-manatee-425 / production.
  *
  * Register-owned tables must match hackuta-2026-register/convex/schema.ts
- * (see convex/REGISTER_SCHEMA.md). Only applicationReviews, admins, and
- * applicationReviewLogs may be edited in this file.
+ * (see convex/REGISTER_SCHEMA.md). Only applicationReviews, admins,
+ * applicationReviewLogs, and participants may be edited in this file.
  */
 export default defineSchema({
   // --- REGISTER-LOCKED (do not edit) ---
@@ -98,7 +99,7 @@ export default defineSchema({
     .index("by_serviceId", ["serviceId"])
     .index("by_recipient", ["recipient"]),
 
-  // --- ADMIN-OWNED (editable) ---
+  // --- ADMIN-OWNED (editable): staff, audit log, accepted roster ---
   admins: defineTable({
     email: v.string(),
     name: v.string(),
@@ -113,17 +114,28 @@ export default defineSchema({
   applicationReviewLogs: defineTable({
     applicationId: v.id("applications"),
     adminId: v.id("admins"),
-    action: v.union(
-      v.literal("viewed"),
-      v.literal("started_review"),
-      v.literal("review_ended"),
-      v.literal("accepted"),
-      v.literal("rejected"),
-      v.literal("waitlisted"),
-    ),
-    createdAt: v.float64(),
+    action: applicationReviewLogAction,
+    createdAt: v.number(),
   })
     .index("by_application", ["applicationId"])
     .index("by_admin", ["adminId"])
     .index("by_application_createdAt", ["applicationId", "createdAt"]),
+
+  /**
+   * Accepted applicants — one row per accepted application, created only after acceptance.
+   * Profile data stays on `applications`; this row reuses the applicant's existing `users` account.
+   */
+  participants: defineTable({
+    applicationId: v.id("applications"),
+    authUserId: v.id("users"),
+    acceptedAt: v.number(),
+    acceptedBy: v.id("admins"),
+    qrCodeToken: v.string(),
+    checkedInAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_application", ["applicationId"])
+    .index("by_auth_user", ["authUserId"])
+    .index("by_qr_token", ["qrCodeToken"]),
 });

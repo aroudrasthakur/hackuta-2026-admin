@@ -13,6 +13,7 @@ const ADMIN_EDITABLE_TABLES = [
   "applicationReviews",
   "admins",
   "applicationReviewLogs",
+  "participants",
 ];
 const REFERENCE_EDITABLE_TABLES = ["applicationReviews"];
 
@@ -220,7 +221,7 @@ function verifyRegisterSchemaPortion(manifest) {
     if (sha256(adminNorm) !== manifest.registerSchemaLockedHash) {
       return [
         "convex/schema.ts register-owned tables do not match the frozen reference",
-        "Only applicationReviews, admins, and applicationReviewLogs may differ — see convex/REGISTER_SCHEMA.md",
+        "Only applicationReviews, admins, applicationReviewLogs, and participants may differ — see convex/REGISTER_SCHEMA.md",
       ];
     }
     return [];
@@ -229,7 +230,7 @@ function verifyRegisterSchemaPortion(manifest) {
   if (referenceNorm !== adminNorm) {
     return [
       "convex/schema.ts register-owned tables do not match scripts/register-schema-lock/schema.reference.ts",
-      "Only applicationReviews, admins, and applicationReviewLogs may differ — see convex/REGISTER_SCHEMA.md",
+      "Only applicationReviews, admins, applicationReviewLogs, and participants may differ — see convex/REGISTER_SCHEMA.md",
     ];
   }
   return [];

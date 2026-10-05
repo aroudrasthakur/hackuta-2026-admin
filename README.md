@@ -2,7 +2,7 @@
 
 Organizer dashboard for HackUTA 2026. This app **owns all Convex deploys** for the shared HackUTA project (`standing-manatee-425` and production).
 
-[`hackuta-2026-register`](../hackuta-2026-register) remains the registration frontend; it **does not push** to Convex. Registration tables and backend modules are **frozen** in this repo — see [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md). Only `applicationReviews`, `admins`, and `applicationReviewLogs` schema tables may be edited here.
+[`hackuta-2026-register`](../hackuta-2026-register) remains the registration frontend; it **does not push** to Convex. Registration tables and backend modules are **frozen** in this repo — see [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md). Only `applicationReviews`, `admins`, `applicationReviewLogs`, and `participants` schema tables may be edited here.
 
 ## Stack
 
@@ -21,7 +21,7 @@ Organizer dashboard for HackUTA 2026. This app **owns all Convex deploys** for t
 | `scripts/` | [scripts/README.md](scripts/README.md) | Codegen stub, schema lock, whitespace check |
 | `docs/` | [docs/README.md](docs/README.md) | Architecture and operations docs |
 
-Key files: [convex/schema.ts](convex/schema.ts) (editable: `applicationReviews`, `admins`, `applicationReviewLogs`), [convex/REGISTER_SCHEMA.md](convex/REGISTER_SCHEMA.md) (67 immutable code paths).
+Key files: [convex/schema.ts](convex/schema.ts) (editable: `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`), [convex/REGISTER_SCHEMA.md](convex/REGISTER_SCHEMA.md) (67 immutable code paths).
 
 ## Routes
 
@@ -38,7 +38,7 @@ Key files: [convex/schema.ts](convex/schema.ts) (editable: `applicationReviews`,
 
 1. Copy `.env.example` → `.env.local` and set `CONVEX_DEPLOYMENT=dev:standing-manatee-425`.
 2. Read [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md) — do not edit register-locked files.
-3. **Schema / functions:** edit `applicationReviews`, `admins`, `applicationReviewLogs`, and `convex/admin/` only.
+3. **Schema / functions:** edit `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, and `convex/admin/` only.
 4. **Codegen:** `npm run convex:codegen` (or `npm run convex:dev` while developing).
 5. **Verify lock:** `npm run verify:register-schema-lock` (also runs before `convex:push-dev`).
 6. **Push to shared dev:** `npm run convex:push-dev` (standing-manatee-425).

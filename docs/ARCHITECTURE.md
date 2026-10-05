@@ -32,7 +32,7 @@ Organizer browser ──► admin SPA (Vercel) ──queries──► same Conve
 | Owner | Tables / paths |
 | --- | --- |
 | Register (immutable copy) | Auth tables, `users`, `eventConfig`, `applications`, `applicationSubmissionLogs`, `rateLimits`, `resumeUploadSessions`, `emailDeliveries`, `emailDeliveryRecordingFailures`, all locked `convex/` and `shared/` files |
-| Admin (editable) | `applicationReviews`, `admins`, `applicationReviewLogs`, `convex/admin/`, `src/`, `shared/admin/` |
+| Admin (editable) | `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, `convex/admin/`, `src/`, `shared/admin/` |
 
 Full file list: [convex/REGISTER_SCHEMA.md](../convex/REGISTER_SCHEMA.md).
 
@@ -43,8 +43,10 @@ Full file list: [convex/REGISTER_SCHEMA.md](../convex/REGISTER_SCHEMA.md).
 ```
 /admin/applications → list queue (placeholder UI)
 /admin/applications/:id → single review (placeholder UI)
-         ↓ (future)
-convex/admin/* → applicationReviews + applications reads
+         ↓
+convex/admin/applicationReviewLogs → applicationReviews updates + audit log
+         ↓ (decision: accepted)
+convex/admin/participants → participants row (QR token, check-in identity)
 ```
 
 ### Deploy
