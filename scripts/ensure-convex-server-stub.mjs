@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,4 +8,8 @@ const target = join(targetDir, "server.ts");
 const source = join(root, "scripts", "convex-server-stub.ts");
 
 mkdirSync(targetDir, { recursive: true });
-copyFileSync(source, target);
+const stub = readFileSync(source, "utf8").replace(
+  '"../convex/lib/dataModel.js"',
+  '"../lib/dataModel.js"',
+);
+writeFileSync(target, stub);

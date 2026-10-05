@@ -32,7 +32,7 @@ Organizer browser ──► admin SPA (Vercel) ──queries──► same Conve
 | Owner | Tables / paths |
 | --- | --- |
 | Register (immutable copy) | Auth tables, `users`, `eventConfig`, `applications`, `applicationSubmissionLogs`, `rateLimits`, `resumeUploadSessions`, `emailDeliveries`, `emailDeliveryRecordingFailures`, all locked `convex/` and `shared/` files |
-| Admin (editable) | `applicationReviews`, `admins`, `convex/admin/`, `src/`, `shared/admin/` |
+| Admin (editable) | `applicationReviews`, `admins`, `applicationReviewLogs`, `convex/admin/`, `src/`, `shared/admin/` |
 
 Full file list: [convex/REGISTER_SCHEMA.md](../convex/REGISTER_SCHEMA.md).
 

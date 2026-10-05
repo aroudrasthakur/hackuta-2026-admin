@@ -21,7 +21,7 @@
     "convex:deploy": "convex deploy"
   },
   "dependencies": {
-    "@convex-dev/auth": "^0.0.95",
+    "@convex-dev/auth": "^0.0.96",
     "convex": "^1.45.0",
     "libphonenumber-js": "^1.13.14",
     "react": "^19.2.8",

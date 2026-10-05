@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Developers | Repo layout, deploy ownership, register lock, flows |
 | [OPERATIONS.md](OPERATIONS.md) | Operators | Deploy checklist, env vars, Convex push workflow |
+| [APPLICATION_REVIEW_LOGS.md](APPLICATION_REVIEW_LOGS.md) | Admin contributors | Append review activity and test authorization on dev |
 
 ## Directory READMEs
 
