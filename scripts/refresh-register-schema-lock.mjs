@@ -18,6 +18,12 @@ const lockDir = join(root, "scripts", "register-schema-lock");
 
 const LOCKED_CONVEX_IGNORE = new Set(["schema.ts"]);
 const LOCKED_CONVEX_DIR_IGNORE = new Set(["admin", "_generated"]);
+const EDITABLE_TABLES = [
+  "applicationReviews",
+  "admins",
+  "applicationReviewLogs",
+  "participants",
+];
 
 function sha256(content) {
   return createHash("sha256").update(content).digest("hex");
@@ -191,7 +197,7 @@ function main() {
   const adminSchema = readText(join(root, "convex", "schema.ts"));
   const registerSchemaLockedHash = sha256(
     normalizeSchemaForHash(
-      stripTablesForHash(adminSchema, ["applicationReviews", "admins"]),
+      stripTablesForHash(adminSchema, EDITABLE_TABLES),
     ),
   );
 
@@ -199,7 +205,7 @@ function main() {
     source: "hackuta-2026-register",
     referenceSchema: "scripts/register-schema-lock/schema.reference.ts",
     registerSchemaPath: "convex/schema.ts",
-    editableTables: ["applicationReviews", "admins"],
+    editableTables: EDITABLE_TABLES,
     registerSchemaLockedHash,
     files: manifestFiles,
   };

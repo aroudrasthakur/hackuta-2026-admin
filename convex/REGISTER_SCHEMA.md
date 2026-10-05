@@ -21,7 +21,7 @@ These paths are **not** in the lock manifest. You may add or change them freely.
 
 | Path | Purpose |
 | --- | --- |
-| [`schema.ts`](schema.ts) | See [Schema tables](#schema-tables) — only `applicationReviews`, `admins`, and `participants` blocks |
+| [`schema.ts`](schema.ts) | See [Schema tables](#schema-tables) — admin-owned review and participant tables |
 | [`admin/`](admin/) | Organizer Convex queries, mutations, actions |
 | [`../src/`](../src/) | Admin dashboard UI |
 | [`../scripts/`](../scripts/) | Admin tooling (except frozen register snapshots under `register-schema-lock/`) |
@@ -43,14 +43,16 @@ File: [`convex/schema.ts`](schema.ts)
 | `eventConfig` | Register | **No** |
 | `applications` | Register | **No** |
 | `applicationReviews` | Admin | **Yes** — only register-origin table you may change |
+| `applicationReviewLogs` | Admin | **Yes** — append-only reviewer/admin activity history |
 | `applicationSubmissionLogs` | Register | **No** |
 | `rateLimits` | Register | **No** |
 | `resumeUploadSessions` | Register | **No** |
 | `emailDeliveries` | Register | **No** |
 | `emailDeliveryRecordingFailures` | Register | **No** |
 | `admins` | Admin | **Yes** — does not exist in register repo |
+| `participants` | Admin | **Yes** — one row per accepted application |
 
-All register-owned blocks must remain identical to [`schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) aside from the `applicationReviews` section.
+All register-owned blocks must remain identical to [`schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) aside from `applicationReviews` and the admin-owned `admins`, `applicationReviewLogs`, and `participants` tables.
 
 ---
 

@@ -9,7 +9,12 @@ const manifestPath = join(lockDir, "manifest.json");
 const schemaReferencePath = join(lockDir, "schema.reference.ts");
 const adminSchemaPath = join(root, "convex", "schema.ts");
 
-const ADMIN_EDITABLE_TABLES = ["applicationReviews", "admins", "participants"];
+const ADMIN_EDITABLE_TABLES = [
+  "applicationReviews",
+  "admins",
+  "applicationReviewLogs",
+  "participants",
+];
 const REFERENCE_EDITABLE_TABLES = ["applicationReviews"];
 
 function sha256(content) {
@@ -216,7 +221,7 @@ function verifyRegisterSchemaPortion(manifest) {
     if (sha256(adminNorm) !== manifest.registerSchemaLockedHash) {
       return [
         "convex/schema.ts register-owned tables do not match the frozen reference",
-        "Only applicationReviews and admins may differ — see convex/REGISTER_SCHEMA.md",
+        "Only applicationReviews, admins, applicationReviewLogs, and participants may differ — see convex/REGISTER_SCHEMA.md",
       ];
     }
     return [];
@@ -225,7 +230,7 @@ function verifyRegisterSchemaPortion(manifest) {
   if (referenceNorm !== adminNorm) {
     return [
       "convex/schema.ts register-owned tables do not match scripts/register-schema-lock/schema.reference.ts",
-      "Only applicationReviews and admins may differ — see convex/REGISTER_SCHEMA.md",
+      "Only applicationReviews, admins, applicationReviewLogs, and participants may differ — see convex/REGISTER_SCHEMA.md",
     ];
   }
   return [];

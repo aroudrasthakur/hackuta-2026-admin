@@ -6,8 +6,8 @@ Node scripts invoked from npm lifecycle hooks, local setup, or CI. Not imported 
 
 | Script | When to run | Summary |
 | --- | --- | --- |
-| [ensure-convex-server-stub.mjs](ensure-convex-server-stub.mjs) | pretypecheck, prebuild | Copies [convex-server-stub.ts](convex-server-stub.ts) → convex/_generated/server.ts |
-| [convex-server-stub.ts](convex-server-stub.ts) | (via ensure script) | Minimal Convex server generics for local typecheck when codegen is unavailable |
+| [ensure-convex-server-stub.mjs](ensure-convex-server-stub.mjs) | pretypecheck, prebuild | Writes the typed local stub to convex/_generated/server.ts |
+| [convex-server-stub.ts](convex-server-stub.ts) | (via ensure script) | Convex server builders typed against the local schema for offline typechecks |
 | [check-whitespace.mjs](check-whitespace.mjs) | npm run check:whitespace, CI | Fails if tracked text files lack a final newline |
 | [verify-register-schema-lock.mjs](verify-register-schema-lock.mjs) | npm run verify:register-schema-lock, preconvex:push-dev, CI | Hash-checks register-frozen files and schema body |
 | [refresh-register-schema-lock.mjs](refresh-register-schema-lock.mjs) | npm run register-schema-lock:refresh | Re-copies lock manifest from sibling register repo |

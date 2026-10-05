@@ -31,7 +31,7 @@ Organizer route views. Placeholder UIs until review queue and auth are implement
 | ParticipantsPage | Accepted applicants roster |
 | CheckInPage | Event-day check-in |
 
-Schema note: `applicationReviews` is the only register-origin table editable in [convex/schema.ts](../../../convex/schema.ts).
+Schema note: `applicationReviews` is the only register-origin table editable in [convex/schema.ts](../../../convex/schema.ts). `admins`, `applicationReviewLogs`, and `participants` are admin-owned tables in the same file.
 
 ## Related
 
