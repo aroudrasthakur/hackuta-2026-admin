@@ -23,6 +23,8 @@ const EDITABLE_TABLES = [
   "admins",
   "applicationReviewLogs",
   "participants",
+  "adminAuthAccounts",
+  "adminSessions",
 ];
 
 function sha256(content) {

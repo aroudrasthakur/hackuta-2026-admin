@@ -1,10 +1,24 @@
+import { Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
+import { useAdminAuth } from "../hooks/useAdminAuth";
+import { LoadingState } from "./states/LoadingState";
+import { ADMIN_ROUTES } from "../types/routes";
 
 type AdminProtectedRouteProps = {
   children: ReactNode;
 };
 
-/** Placeholder until organizer auth is wired up. */
 export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
+  const location = useLocation();
+  const { isAuthenticated, isLoading, sessionReady } = useAdminAuth();
+
+  if (!sessionReady || isLoading) {
+    return <LoadingState message="Verifying organizer session…" />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to={ADMIN_ROUTES.login} replace state={{ from: location }} />;
+  }
+
   return children;
 }

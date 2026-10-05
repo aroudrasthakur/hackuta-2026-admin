@@ -51,8 +51,10 @@ File: [`convex/schema.ts`](schema.ts)
 | `admins` | Admin | **Yes** — does not exist in register repo |
 | `applicationReviewLogs` | Admin | **Yes** — append-only reviewer/admin activity history |
 | `participants` | Admin | **Yes** — one row per accepted application (check-in identity) |
+| `adminAuthAccounts` | Admin | **Yes** — organizer password hashes (separate from applicant auth) |
+| `adminSessions` | Admin | **Yes** — organizer session token hashes |
 
-All register-owned blocks must remain identical to [`schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) aside from `applicationReviews` and the admin-owned `admins`, `applicationReviewLogs`, and `participants` tables.
+All register-owned blocks must remain identical to [`schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) aside from `applicationReviews` and admin-owned tables listed above.
 
 ---
 

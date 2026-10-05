@@ -1,5 +1,4 @@
 import type { DocumentByName } from "convex/server";
-import type { GenericId } from "convex/values";
 import type { ApplicationDoc, DataModel, MutationCtx } from "../lib/dataModel";
 import {
   assertParticipantAcceptanceAllowed,
@@ -19,7 +18,6 @@ export async function applyAcceptedApplicationDecision(
     application: ApplicationDoc;
     review: ApplicationReviewDoc;
     admin: AdminDoc;
-    reviewerUserId: GenericId<"users">;
   },
 ) {
   const applicantUser = await ctx.db.get(args.application.authUserId);
@@ -36,7 +34,7 @@ export async function applyAcceptedApplicationDecision(
   await ctx.db.patch(args.review._id, {
     status: "accepted",
     reviewedAt: now,
-    reviewedBy: args.reviewerUserId,
+    reviewedByAdmin: args.admin._id,
     updatedAt: now,
   });
 

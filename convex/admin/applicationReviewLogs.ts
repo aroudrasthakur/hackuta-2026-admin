@@ -1,37 +1,22 @@
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
-import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { mutation, query } from "../_generated/server";
+import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
+import { requireAdminSession, sessionTokenArgs } from "./staffAuth";
 import {
   applicationReviewLogActivityAction,
   applicationReviewLogDecisionAction,
 } from "./fields";
-import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
-import { normalizeEmail } from "../lib/normalizeEmail";
-
-async function requireActiveStaff(ctx: QueryCtx | MutationCtx) {
-  const identity = await ctx.auth.getUserIdentity();
-  const email = normalizeEmail(identity?.email);
-  if (!email) throw new Error("Not authenticated");
-
-  const admin = await ctx.db
-    .query("admins")
-    .withIndex("by_email", (q) => q.eq("email", email))
-    .unique();
-  if (!admin || !admin.active) throw new Error("Not authorized");
-  const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  return { admin, userId };
-}
 
 /** Appends a non-decision event; decisions are recorded with their state update below. */
 export const logApplicationReviewAction = mutation({
   args: {
+    ...sessionTokenArgs,
     applicationId: v.id("applications"),
     action: applicationReviewLogActivityAction,
   },
-  handler: async (ctx, { applicationId, action }) => {
-    const { admin } = await requireActiveStaff(ctx);
+  handler: async (ctx, { sessionToken, applicationId, action }) => {
+    const { admin } = await requireAdminSession(ctx, sessionToken);
     if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
     return await ctx.db.insert("applicationReviewLogs", {
       applicationId,
@@ -45,11 +30,12 @@ export const logApplicationReviewAction = mutation({
 /** Changes the current decision and appends its event atomically. */
 export const setApplicationDecision = mutation({
   args: {
+    ...sessionTokenArgs,
     applicationId: v.id("applications"),
     decision: applicationReviewLogDecisionAction,
   },
-  handler: async (ctx, { applicationId, decision }) => {
-    const { admin, userId } = await requireActiveStaff(ctx);
+  handler: async (ctx, { sessionToken, applicationId, decision }) => {
+    const { admin } = await requireAdminSession(ctx, sessionToken);
     const application = await ctx.db.get(applicationId);
     if (!application) throw new Error("Application not found");
 
@@ -64,7 +50,6 @@ export const setApplicationDecision = mutation({
         application,
         review,
         admin,
-        reviewerUserId: userId,
       });
       return result.logId;
     }
@@ -73,7 +58,7 @@ export const setApplicationDecision = mutation({
     await ctx.db.patch(review._id, {
       status: decision,
       reviewedAt: now,
-      reviewedBy: userId,
+      reviewedByAdmin: admin._id,
       updatedAt: now,
     });
     return await ctx.db.insert("applicationReviewLogs", {
@@ -88,11 +73,12 @@ export const setApplicationDecision = mutation({
 /** Returns one page of history; full history is restricted to `admin` role. */
 export const listApplicationReviewLogs = query({
   args: {
+    ...sessionTokenArgs,
     applicationId: v.id("applications"),
     paginationOpts: paginationOptsValidator,
   },
-  handler: async (ctx, { applicationId, paginationOpts }) => {
-    const { admin } = await requireActiveStaff(ctx);
+  handler: async (ctx, { sessionToken, applicationId, paginationOpts }) => {
+    const { admin } = await requireAdminSession(ctx, sessionToken);
     if (admin.role !== "admin") throw new Error("Not authorized");
     return await ctx.db
       .query("applicationReviewLogs")

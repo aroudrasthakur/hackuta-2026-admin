@@ -10,7 +10,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "pretypecheck": "node scripts/ensure-convex-server-stub.mjs",
     "typecheck": "tsc --noEmit && tsc -p convex/tsconfig.json --noEmit",
-    "lint": "eslint src convex scripts",
+    "lint": "eslint src convex scripts server api tests",
+    "pretest:unit": "node scripts/ensure-convex-server-stub.mjs",
+    "test:unit": "vitest run",
     "check:whitespace": "node scripts/check-whitespace.mjs",
     "verify:register-schema-lock": "node scripts/verify-register-schema-lock.mjs",
     "register-schema-lock:refresh": "node scripts/refresh-register-schema-lock.mjs",
@@ -42,6 +44,8 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.69.0",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "convex-test": "^0.0.58",
+    "vitest": "^5.0.1"
   }
 }

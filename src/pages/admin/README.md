@@ -6,6 +6,7 @@ Organizer route views. Placeholder UIs until review queue and auth are implement
 
 | File | Summary |
 | --- | --- |
+| [AdminLoginPage.tsx](AdminLoginPage.tsx) | `/admin/login` — organizer email + password sign-in |
 | [AdminDashboardPage.tsx](AdminDashboardPage.tsx) | `/admin` — Convex URL and client status |
 | [ApplicationsPage.tsx](ApplicationsPage.tsx) | `/admin/applications` — application queue placeholder |
 | [ApplicationReviewPage.tsx](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` — single review placeholder |
@@ -16,6 +17,7 @@ Organizer route views. Placeholder UIs until review queue and auth are implement
 
 | Path | Component |
 | --- | --- |
+| /admin/login | AdminLoginPage |
 | /admin | AdminDashboardPage |
 | /admin/applications | ApplicationsPage |
 | /admin/applications/:applicationId | ApplicationReviewPage |
