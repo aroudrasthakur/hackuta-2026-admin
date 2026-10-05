@@ -58,11 +58,45 @@ When making a decision, call `setApplicationDecision` instead. It accepts
 atomically updates the `applicationReviews` row and appends the decision event.
 It derives `adminId`, `reviewedBy`, and timestamps from trusted server context.
 
+## CLI identity format (development only)
+
+`convex run --identity` simulates a signed-in caller. It is **not** real
+sign-in — use it only against a development deployment.
+
+Staff mutations call `getAuthUserId()` from `@convex-dev/auth/server`. The
+`subject` must therefore be a real **`users` document `_id`** on the deployment,
+not an arbitrary string like `review-test`.
+
+| Field | Required | Format |
+| --- | --- | --- |
+| `subject` | Yes | Existing `users._id` (Convex document ID, e.g. `jh71abc…`) |
+| `tokenIdentifier` | Recommended | `user\|<users._id>` — matches Convex Auth Password provider tests |
+| `email` | Yes | Must match an `admins.email` row with `active: true` |
+| `issuer` | Optional | Omit for CLI tests, or use your deployment site URL |
+
+Prepare test data:
+
+1. In **Data → users**, copy the `_id` for the account that should act as the
+   reviewer (create one via register sign-up on the same deployment if needed).
+2. In **Data → admins**, ensure a row exists with the same email,
+   `active: true`, and role `reviewer` or `admin`.
+3. For `setApplicationDecision`, the `users._id` is also written to
+   `applicationReviews.reviewedBy`.
+
+Example identity JSON (replace placeholders from your deployment):
+
+```json
+{
+  "subject": "YOUR_USERS_ID",
+  "tokenIdentifier": "user|YOUR_USERS_ID",
+  "email": "reviewer@example.com"
+}
+```
+
 ## Test against a development deployment
 
 Use a development deployment and test data only. Never use `--prod` for this
-walkthrough. The CLI `--identity` flag simulates an identity; it is not a real
-sign-in and must only be used with a development deployment.
+walkthrough.
 
 1. Confirm the deployment contains the current schema and functions. From the
    repository root, select your authorized development deployment and deploy
@@ -81,16 +115,15 @@ sign-in and must only be used with a development deployment.
    `applications` document's `_id`. If there is no test application, create one
    through the registration app connected to the same dev deployment.
 
-3. Confirm there is an `admins` document with the test email, `active: true`,
-   and role `reviewer` or `admin`. The admins table in this deployment is
-   identified by email, not `userId`.
+3. Copy a **`users._id`** and matching **`admins`** row as described in
+   [CLI identity format](#cli-identity-format-development-only) above.
 
-4. In PowerShell, run the append mutation. Replace the sample application ID
-   and email with the values from your test data. `--%` is important: it stops
-   PowerShell from stripping the JSON quotes.
+4. In PowerShell, run the append mutation. Replace `YOUR_USERS_ID`,
+   `YOUR_APPLICATION_ID`, and the email with values from your test data. `--%`
+   stops PowerShell from stripping the JSON quotes.
 
    ```powershell
-   npx.cmd --% convex run --deployment harmless-lobster-530 --push --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:logApplicationReviewAction "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"action\":\"viewed\"}"
+   npx.cmd --% convex run --identity "{\"subject\":\"YOUR_USERS_ID\",\"tokenIdentifier\":\"user|YOUR_USERS_ID\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:logApplicationReviewAction "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"action\":\"viewed\"}"
    ```
 
    The non-decision endpoint accepts `viewed`, `started_review`, and
@@ -100,7 +133,7 @@ sign-in and must only be used with a development deployment.
    activity endpoint:
 
    ```powershell
-   npx.cmd --% convex run --deployment harmless-lobster-530 --push --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:setApplicationDecision "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"decision\":\"accepted\"}"
+   npx.cmd --% convex run --identity "{\"subject\":\"YOUR_USERS_ID\",\"tokenIdentifier\":\"user|YOUR_USERS_ID\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:setApplicationDecision "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"decision\":\"accepted\"}"
    ```
 
    Choose `accepted`, `rejected`, or `waitlisted`. The mutation updates the
@@ -115,15 +148,15 @@ sign-in and must only be used with a development deployment.
 
 7. Test history access using `listApplicationReviewLogs`. Pass `paginationOpts`
    (the usual first page is `{\"numItems\":25,\"cursor\":null}`). An active
-   reviewer identity should be rejected:
+   **reviewer** identity should be rejected:
 
    ```powershell
-   npx.cmd --% convex run --deployment harmless-lobster-530 --identity "{\"subject\":\"review-test\",\"issuer\":\"https://test.local\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:listApplicationReviewLogs "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"paginationOpts\":{\"numItems\":25,\"cursor\":null}}"
+   npx.cmd --% convex run --identity "{\"subject\":\"YOUR_REVIEWER_USERS_ID\",\"tokenIdentifier\":\"user|YOUR_REVIEWER_USERS_ID\",\"email\":\"reviewer@example.com\"}" admin/applicationReviewLogs:listApplicationReviewLogs "{\"applicationId\":\"YOUR_APPLICATION_ID\",\"paginationOpts\":{\"numItems\":25,\"cursor\":null}}"
    ```
 
-   Repeat with an active `admin` account's email. It should return the
-   application's page of events, newest first. Continue with the returned
-   `continueCursor` until `isDone` is true to read all pages.
+   Repeat with an active **`admin` role** account's `users._id` and email. It
+   should return the application's page of events, newest first. Continue with
+   the returned `continueCursor` until `isDone` is true to read all pages.
 
 8. Run the append mutation without `--identity`; it should fail as
    unauthenticated and write no row.
@@ -133,7 +166,8 @@ sign-in and must only be used with a development deployment.
 | Error | Check |
 | --- | --- |
 | JSON/JSON5 parse error | Use the exact `npx.cmd --%` PowerShell form above; keep JSON escaped with `\"`. |
-| Not authenticated | Identity must include an email; the no-identity negative test is expected to fail. |
+| Not authenticated | Identity must include a valid `users._id` as `subject` and an `email`. |
+| Not authenticated (`getAuthUserId`) | `subject` is not a real `users` document ID on this deployment — copy `_id` from **Data → users**. |
 | Not authorized | That email must match an `admins` row with `active: true`. |
 | Invalid application ID / not found | Confirm the ID is an `_id` in `applications` on the selected deployment. |
 | Cannot access deployment | Ask the deployment owner for access; do not switch to production. |
