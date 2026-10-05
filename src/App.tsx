@@ -5,6 +5,7 @@ import { AdminDashboardPage } from "./pages/admin/AdminDashboardPage";
 import { ApplicationReviewPage } from "./pages/admin/ApplicationReviewPage";
 import { ApplicationsPage } from "./pages/admin/ApplicationsPage";
 import { CheckInPage } from "./pages/admin/CheckInPage";
+import { AdminLoginPage } from "./pages/admin/AdminLoginPage";
 import { ParticipantsPage } from "./pages/admin/ParticipantsPage";
 import { ADMIN_ROUTES } from "./types/routes";
 
@@ -12,6 +13,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to={ADMIN_ROUTES.dashboard} replace />} />
+      <Route path={ADMIN_ROUTES.login} element={<AdminLoginPage />} />
       <Route
         path="/admin"
         element={

@@ -1,7 +1,11 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { AdminNav } from "../components/AdminNav";
+import { useAdminAuth } from "../hooks/useAdminAuth";
+import { ADMIN_ROUTES } from "../types/routes";
 
 export function AdminLayout() {
+  const navigate = useNavigate();
+  const { staff, signOut } = useAdminAuth();
   return (
     <div className="min-h-screen bg-light">
       <header className="border-b border-sand bg-clay/50">
@@ -12,13 +16,19 @@ export function AdminLayout() {
           </div>
           <div className="flex flex-col gap-3 sm:items-end">
             <AdminNav />
+            {staff ? (
+              <p className="text-sm text-mist">
+                Signed in as <span className="text-night">{staff.name}</span> ({staff.role})
+              </p>
+            ) : null}
             <button
               type="button"
               className="text-sm text-ocean underline-offset-2 hover:underline"
-              disabled
-              title="Sign-out will be added with organizer auth"
+              onClick={() => {
+                void signOut().then(() => navigate(ADMIN_ROUTES.login, { replace: true }));
+              }}
             >
-              Sign out (coming soon)
+              Sign out
             </button>
           </div>
         </div>

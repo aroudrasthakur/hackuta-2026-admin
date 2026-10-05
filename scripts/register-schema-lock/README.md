@@ -14,7 +14,7 @@ Frozen snapshots used by [verify-register-schema-lock.mjs](../verify-register-sc
 | Field | Purpose |
 | --- | --- |
 | `source` | Upstream repo name (`hackuta-2026-register`) |
-| `editableTables` | `applicationReviews`, `admins`, `applicationReviewLogs`, `participants` — excluded from schema lock comparison |
+| `editableTables` | Admin-owned schema tables — excluded from schema lock comparison |
 | `registerSchemaLockedHash` | Normalized hash of register-owned tables in admin convex/schema.ts |
 | `files` | Path → SHA-256 map for immutable files |
 

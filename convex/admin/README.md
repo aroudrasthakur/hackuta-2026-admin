@@ -6,11 +6,26 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 
 | Path | Summary |
 | --- | --- |
+| [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
+| [staffAuth.ts](staffAuth.ts) | Session token hashing and `requireAdminSession` guard |
+| [passwordHash.ts](passwordHash.ts) | Scrypt password hash + verify |
 | [fields.ts](fields.ts) | Shared Convex validators for admin-owned tables |
 | [participantCreation.ts](participantCreation.ts) | Idempotent participant lookup/insert (`applicationId` + `authUserId`) |
 | [acceptanceDecision.ts](acceptanceDecision.ts) | Atomic accept → review update + audit log + participant row |
-| [applicationReviewLogs.ts](applicationReviewLogs.ts) | Review activity + decisions; delegates acceptance to `acceptanceDecision` |
+| [applicationReviewLogs.ts](applicationReviewLogs.ts) | Review activity + decisions (requires `sessionToken`) |
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
+
+## Authentication
+
+Organizer auth is **independent** from applicant Convex Auth (`convex/auth.ts`).
+
+| Table | Purpose |
+| --- | --- |
+| `admins` | Identity, `role`, `active` — source of truth for authorization |
+| `adminAuthAccounts` | One password hash per admin (`adminId`) |
+| `adminSessions` | Hashed session tokens with `expiresAt` |
+
+Public mutations accept `sessionToken`; `requireAdminSession` resolves the active `admins` row. Role is never accepted from the client.
 
 ## Planned surface
 

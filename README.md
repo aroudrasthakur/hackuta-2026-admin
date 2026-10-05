@@ -2,7 +2,7 @@
 
 Organizer dashboard for HackUTA 2026. This app **owns all Convex deploys** for the shared HackUTA project (`standing-manatee-425` and production).
 
-[`hackuta-2026-register`](../hackuta-2026-register) remains the registration frontend; it **does not push** to Convex. Registration tables and backend modules are **frozen** in this repo — see [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md). Only `applicationReviews`, `admins`, `applicationReviewLogs`, and `participants` schema tables may be edited here.
+[`hackuta-2026-register`](../hackuta-2026-register) remains the registration frontend; it **does not push** to Convex. Registration tables and backend modules are **frozen** in this repo — see [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md). Admin-owned schema tables include `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, `adminAuthAccounts`, and `adminSessions`.
 
 ## Stack
 
@@ -21,14 +21,15 @@ Organizer dashboard for HackUTA 2026. This app **owns all Convex deploys** for t
 | `scripts/` | [scripts/README.md](scripts/README.md) | Codegen stub, schema lock, whitespace check |
 | `docs/` | [docs/README.md](docs/README.md) | Architecture and operations docs |
 
-Key files: [convex/schema.ts](convex/schema.ts) (editable: `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`), [convex/REGISTER_SCHEMA.md](convex/REGISTER_SCHEMA.md) (67 immutable code paths).
+Key files: [convex/schema.ts](convex/schema.ts) (admin-owned tables), [convex/admin/auth.ts](convex/admin/auth.ts) (organizer sign-in), [convex/REGISTER_SCHEMA.md](convex/REGISTER_SCHEMA.md) (67 immutable code paths).
 
 ## Routes
 
 | Path | Page |
 | --- | --- |
 | `/` | Redirects to `/admin` |
-| `/admin` | Dashboard (Convex URL status) |
+| `/admin/login` | Organizer email + password sign-in |
+| `/admin` | Dashboard (requires session) |
 | `/admin/applications` | Application queue (placeholder) |
 | `/admin/applications/:applicationId` | Single application review |
 | `/admin/participants` | Participant roster (placeholder) |
@@ -38,7 +39,7 @@ Key files: [convex/schema.ts](convex/schema.ts) (editable: `applicationReviews`,
 
 1. Copy `.env.example` → `.env.local` and set `CONVEX_DEPLOYMENT=dev:standing-manatee-425`.
 2. Read [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md) — do not edit register-locked files.
-3. **Schema / functions:** edit `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, and `convex/admin/` only.
+3. **Schema / functions:** edit admin-owned schema tables and `convex/admin/` only.
 4. **Codegen:** `npm run convex:codegen` (or `npm run convex:dev` while developing).
 5. **Verify lock:** `npm run verify:register-schema-lock` (also runs before `convex:push-dev`).
 6. **Push to shared dev:** `npm run convex:push-dev` (standing-manatee-425).
@@ -89,9 +90,22 @@ See [`.env.example`](.env.example).
 - Deploy Convex backend from this repo with `npm run convex:deploy`
 - `X-Robots-Tag: noindex` — internal organizer tool
 
-## Auth (planned)
+## Organizer auth
 
-`AdminProtectedRoute` is currently a pass-through. Organizer sign-in and role checks will replace it in a follow-up.
+Organizer accounts are **separate from applicant auth** (no public sign-up). The `admins` table is the source of identity, role, and `active` status. Credentials live in `adminAuthAccounts` (Scrypt password hashes); sessions in `adminSessions` (hashed tokens, 24-hour TTL).
+
+Provision a first account on `standing-manatee-425`:
+
+1. Insert an `admins` row in the Convex dashboard (`email`, `name`, `role`, `active: true`).
+2. Set credentials via internal mutation:
+
+   ```powershell
+   npx.cmd --% convex run --deployment dev:standing-manatee-425 --internal admin/auth:provisionAdminAuthAccount "{\"adminId\":\"YOUR_ADMIN_ID\",\"password\":\"YourSecurePass1\"}"
+   ```
+
+3. Sign in at `/admin/login`.
+
+Protected routes and admin Convex functions require a valid `sessionToken`; role is always resolved server-side from `admins`.
 
 ## Documentation
 

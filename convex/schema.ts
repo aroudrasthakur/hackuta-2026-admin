@@ -14,7 +14,8 @@ import { emailDeliveryKind } from "./lib/emailDeliveries";
  *
  * Register-owned tables must match hackuta-2026-register/convex/schema.ts
  * (see convex/REGISTER_SCHEMA.md). Only applicationReviews, admins,
- * applicationReviewLogs, and participants may be edited in this file.
+ * applicationReviewLogs, participants, adminAuthAccounts, and adminSessions may be
+ * edited in this file.
  */
 export default defineSchema({
   // --- REGISTER-LOCKED (do not edit) ---
@@ -48,12 +49,14 @@ export default defineSchema({
     status: applicationReviewStatus,
     reviewedAt: v.optional(v.number()),
     reviewedBy: v.optional(v.id("users")),
+    reviewedByAdmin: v.optional(v.id("admins")),
     legacyReviewedBy: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_application", ["applicationId"])
     .index("by_reviewer", ["reviewedBy"])
+    .index("by_reviewer_admin", ["reviewedByAdmin"])
     .index("by_status", ["status"]),
 
   // --- REGISTER-LOCKED (do not edit) ---
@@ -138,4 +141,22 @@ export default defineSchema({
     .index("by_application", ["applicationId"])
     .index("by_auth_user", ["authUserId"])
     .index("by_qr_token", ["qrCodeToken"]),
+
+  /** Organizer credentials — separate from applicant Convex Auth. Provisioned internally. */
+  adminAuthAccounts: defineTable({
+    adminId: v.id("admins"),
+    passwordHash: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_admin", ["adminId"]),
+
+  /** Organizer sessions — stores hashed tokens only. */
+  adminSessions: defineTable({
+    adminId: v.id("admins"),
+    sessionTokenHash: v.string(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_token_hash", ["sessionTokenHash"])
+    .index("by_admin", ["adminId"]),
 });

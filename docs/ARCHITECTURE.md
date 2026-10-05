@@ -11,7 +11,11 @@ hackuta-2026-admin (this app)          ──deploys──► Convex (schema + f
                                                       ├── standing-manatee-425 (dev)
                                                       └── production deployment
 
-Organizer browser ──► admin SPA (Vercel) ──queries──► same Convex deployment
+Organizer browser ──► admin SPA (Vercel) ──sessionToken──► admin/auth + convex/admin/*
+```
+
+Organizer auth is separate from applicant Convex Auth. Sessions are stored in `adminSessions`; roles come from `admins` only.
+
 ```
 
 - **Registration frontend** lives in [hackuta-2026-register](../hackuta-2026-register). It does **not** push Convex code.
@@ -32,7 +36,7 @@ Organizer browser ──► admin SPA (Vercel) ──queries──► same Conve
 | Owner | Tables / paths |
 | --- | --- |
 | Register (immutable copy) | Auth tables, `users`, `eventConfig`, `applications`, `applicationSubmissionLogs`, `rateLimits`, `resumeUploadSessions`, `emailDeliveries`, `emailDeliveryRecordingFailures`, all locked `convex/` and `shared/` files |
-| Admin (editable) | `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, `convex/admin/`, `src/`, `shared/admin/` |
+| Admin (editable) | `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, `adminAuthAccounts`, `adminSessions`, `convex/admin/`, `src/`, `shared/admin/` |
 
 Full file list: [convex/REGISTER_SCHEMA.md](../convex/REGISTER_SCHEMA.md).
 
