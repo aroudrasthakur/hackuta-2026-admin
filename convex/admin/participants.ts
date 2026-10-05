@@ -1,11 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
-
-/** 256-bit random hex token used as the participant's QR identity. */
-function createQrCodeToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
+import { ensureParticipantForAcceptance } from "./participantCreation";
 
 /**
  * Create the participant row for a confirmed acceptance.
@@ -18,14 +13,6 @@ export const createParticipantFromAcceptance = internalMutation({
     acceptedBy: v.id("admins"),
   },
   handler: async (ctx, { applicationId, acceptedBy }) => {
-    const existing = await ctx.db
-      .query("participants")
-      .withIndex("by_application", (q) => q.eq("applicationId", applicationId))
-      .unique();
-    if (existing) {
-      return existing._id;
-    }
-
     const application = await ctx.db.get(applicationId);
     if (!application) {
       throw new Error("Application not found.");
@@ -49,25 +36,12 @@ export const createParticipantFromAcceptance = internalMutation({
       throw new Error("Applicant user account not found.");
     }
 
-    let qrCodeToken = createQrCodeToken();
-    while (
-      await ctx.db
-        .query("participants")
-        .withIndex("by_qr_token", (q) => q.eq("qrCodeToken", qrCodeToken))
-        .first()
-    ) {
-      qrCodeToken = createQrCodeToken();
-    }
-
-    const now = Date.now();
-    return await ctx.db.insert("participants", {
+    const { participantId } = await ensureParticipantForAcceptance(ctx, {
       applicationId,
       authUserId: application.authUserId,
-      acceptedAt: review.reviewedAt ?? now,
       acceptedBy,
-      qrCodeToken,
-      createdAt: now,
-      updatedAt: now,
+      acceptedAt: review.reviewedAt ?? Date.now(),
     });
+    return participantId;
   },
 });

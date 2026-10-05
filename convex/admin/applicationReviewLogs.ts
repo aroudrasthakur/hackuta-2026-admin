@@ -1,12 +1,12 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
-import { internal } from "../_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "../_generated/server";
 import {
   applicationReviewLogActivityAction,
   applicationReviewLogDecisionAction,
 } from "./fields";
+import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
 import { normalizeEmail } from "../lib/normalizeEmail";
 
 async function requireActiveStaff(ctx: QueryCtx | MutationCtx) {
@@ -59,6 +59,16 @@ export const setApplicationDecision = mutation({
       .unique();
     if (!review) throw new Error("Application review not found");
 
+    if (decision === "accepted") {
+      const result = await applyAcceptedApplicationDecision(ctx, {
+        application,
+        review,
+        admin,
+        reviewerUserId: userId,
+      });
+      return result.logId;
+    }
+
     const now = Date.now();
     await ctx.db.patch(review._id, {
       status: decision,
@@ -66,21 +76,12 @@ export const setApplicationDecision = mutation({
       reviewedBy: userId,
       updatedAt: now,
     });
-    const logId = await ctx.db.insert("applicationReviewLogs", {
+    return await ctx.db.insert("applicationReviewLogs", {
       applicationId,
       adminId: admin._id,
       action: decision,
       createdAt: now,
     });
-
-    if (decision === "accepted") {
-      await ctx.runMutation(
-        internal.admin.participants.createParticipantFromAcceptance,
-        { applicationId, acceptedBy: admin._id },
-      );
-    }
-
-    return logId;
   },
 });
 
