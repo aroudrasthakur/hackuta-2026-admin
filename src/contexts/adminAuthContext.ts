@@ -9,10 +9,10 @@ export type StaffProfile = {
 };
 
 export type AdminAuthContextValue = {
-  sessionToken: string | null;
   staff: StaffProfile | null | undefined;
   isLoading: boolean;
   isAuthenticated: boolean;
+  sessionReady: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };

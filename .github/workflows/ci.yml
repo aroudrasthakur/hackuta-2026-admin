@@ -42,6 +42,9 @@ jobs:
       - name: Lint application and Convex code
         run: npm run lint
 
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Typecheck application and Convex schema
         run: npm run typecheck
 

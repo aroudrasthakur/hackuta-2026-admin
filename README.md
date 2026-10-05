@@ -92,7 +92,7 @@ See [`.env.example`](.env.example).
 
 ## Organizer auth
 
-Organizer accounts are **separate from applicant auth** (no public sign-up). The `admins` table is the source of identity, role, and `active` status. Credentials live in `adminAuthAccounts` (Scrypt password hashes); sessions in `adminSessions` (hashed tokens, 24-hour TTL).
+Organizer accounts are **separate from applicant auth** (no public sign-up). The `admins` table is the source of identity, role, and `active` status. Credentials live in `adminAuthAccounts` (Scrypt password hashes); sessions in `adminSessions` (hashed tokens, 24-hour TTL). The browser stores the raw session token in an **HttpOnly, SameSite=Strict** cookie (`/api/admin/*`); it is never written to `sessionStorage` or `localStorage`.
 
 Provision a first account on `standing-manatee-425`:
 

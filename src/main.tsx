@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { ConvexProvider } from "convex/react";
 import App from "./App";
-import { AdminAuthProvider } from "./contexts/AdminAuthContext";
+import { AdminAuthProvider } from "./contexts/AdminAuthProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ErrorState } from "./components/states/ErrorState";
 import { convexClient } from "./lib/convexClient";

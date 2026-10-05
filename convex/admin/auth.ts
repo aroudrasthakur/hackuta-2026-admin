@@ -3,13 +3,8 @@ import { internalMutation, mutation, query } from "../_generated/server";
 import { normalizeEmail } from "../lib/normalizeEmail";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { hashPassword, verifyPassword } from "./passwordHash";
-import {
-  ADMIN_SESSION_TTL_MS,
-  generateSessionToken,
-  hashSessionToken,
-  resolveAdminSession,
-  sessionTokenArgs,
-} from "./staffAuth";
+import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
+import { hashSessionToken, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
 
 const INVALID_CREDENTIALS = "Invalid email or password.";
 const INACTIVE_ACCOUNT = "This account is inactive.";
@@ -50,18 +45,7 @@ export const signIn = mutation({
       throw new Error(INVALID_CREDENTIALS);
     }
 
-    const sessionToken = generateSessionToken();
-    const sessionTokenHash = await hashSessionToken(sessionToken);
-    const now = Date.now();
-
-    await ctx.db.insert("adminSessions", {
-      adminId: admin._id,
-      sessionTokenHash,
-      expiresAt: now + ADMIN_SESSION_TTL_MS,
-      createdAt: now,
-    });
-
-    return { sessionToken, expiresAt: now + ADMIN_SESSION_TTL_MS };
+    return await createAdminSession(ctx, admin._id);
   },
 });
 
@@ -132,14 +116,7 @@ export const provisionAdminAuthAccount = internalMutation({
       });
     }
 
-    const sessions = await ctx.db
-      .query("adminSessions")
-      .withIndex("by_admin", (q) => q.eq("adminId", adminId))
-      .collect();
-    for (const session of sessions) {
-      await ctx.db.delete(session._id);
-    }
-
+    await invalidateAdminSessions(ctx, adminId);
     return { ok: true as const };
   },
 });

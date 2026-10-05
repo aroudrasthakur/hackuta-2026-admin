@@ -25,7 +25,7 @@ Organizer auth is **independent** from applicant Convex Auth (`convex/auth.ts`).
 | `adminAuthAccounts` | One password hash per admin (`adminId`) |
 | `adminSessions` | Hashed session tokens with `expiresAt` |
 
-Public mutations accept `sessionToken`; `requireAdminSession` resolves the active `admins` row. Role is never accepted from the client.
+Public mutations accept `sessionToken`; `requireAdminSession` resolves the active `admins` row. Role is never accepted from the client. The SPA obtains the token from `/api/admin/session-token`, which reads an HttpOnly cookie set by `/api/admin/sign-in`. Sign-in clears any prior sessions for that admin.
 
 ## Planned surface
 

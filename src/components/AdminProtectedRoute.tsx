@@ -10,13 +10,9 @@ type AdminProtectedRouteProps = {
 
 export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
   const location = useLocation();
-  const { isAuthenticated, isLoading, sessionToken } = useAdminAuth();
+  const { isAuthenticated, isLoading, sessionReady } = useAdminAuth();
 
-  if (!sessionToken) {
-    return <Navigate to={ADMIN_ROUTES.login} replace state={{ from: location }} />;
-  }
-
-  if (isLoading) {
+  if (!sessionReady || isLoading) {
     return <LoadingState message="Verifying organizer session…" />;
   }
 
