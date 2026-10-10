@@ -8,6 +8,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | --- | --- |
 | [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
 | [staffAuth.ts](staffAuth.ts) | Session resolution and reusable reviewer/admin authorization helpers |
+| [applications.ts](applications.ts) | Read-only submitted application detail, review status, and resume availability |
 | [passwordHash.ts](passwordHash.ts) | Scrypt password hash + verify |
 | [fields.ts](fields.ts) | Shared Convex validators for admin-owned tables |
 | [participantCreation.ts](participantCreation.ts) | Idempotent participant lookup/insert (`applicationId` + `authUserId`) |
@@ -35,12 +36,14 @@ Each protected request resolves the current stored role and active status. Actin
 
 The SPA obtains the token from `/api/admin/session-token`, which reads an HttpOnly cookie set by `/api/admin/sign-in`. Sign-in clears any prior sessions for that admin. These functions use the existing `standing-manatee-425` deployment configured in `.env.example`.
 
+`getApplication` uses `requireReviewerAccess` before reading applicant data. It returns `null` for malformed, missing, or unsubmitted applications, and returns resume availability separately from the application. A missing review record remains missing; reading detail never creates review rows, audit events, or participants. No historical reviewer logs are returned.
+
 ## Planned surface
 
 | Area | Expected functions |
 | --- | --- |
 | Application queue | List/filter `applications` with `applicationReviews` status |
-| Single review | Read application; create/update `applicationReviews` rows |
+| Single review | Read-only detail is implemented; active review claiming is a follow-up |
 | Organizers | Read/write `admins` table for role checks |
 | Check-in | Participant lookup mutations (TBD) |
 
