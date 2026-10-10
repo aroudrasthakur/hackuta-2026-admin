@@ -35,7 +35,7 @@ function ApplicationReviewContent({ applicationId, sessionToken }: { application
     <>
       {loggingFailed && (
         <p role="alert" className="rounded-lg border border-sand bg-clay/30 p-3 text-sm">
-          We couldn’t record this application view. Please wait about a minute, then reopen the application to try again.
+          We couldn’t record this application view. Please reopen the application to try again.
         </p>
       )}
       <ApplicationDetail detail={detail} />

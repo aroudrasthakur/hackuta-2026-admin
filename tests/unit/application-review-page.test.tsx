@@ -272,7 +272,7 @@ describe("read-only application review page", () => {
     mocks.recordView.mockRejectedValueOnce(new Error("Private logging error"));
     await renderPage({ navigation: true });
     expect(container.querySelector('[role="alert"]')?.textContent)
-      .toContain("Please wait about a minute, then reopen the application to try again.");
+      .toContain("Please reopen the application to try again.");
     expect(container.textContent).toContain("Taylor Student");
     expect(container.textContent).not.toContain("Private logging error");
     await renderPage({ navigation: true });
