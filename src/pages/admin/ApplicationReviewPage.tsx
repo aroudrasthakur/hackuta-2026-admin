@@ -1,22 +1,42 @@
-import { useParams } from "react-router-dom";
+import { useQuery } from "convex/react";
+import { Link, useParams } from "react-router-dom";
+import { ApplicationDetail } from "../../components/ApplicationDetail";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
+import { LoadingState } from "../../components/states/LoadingState";
+import { getApplicationRef } from "../../convex/adminApi";
+import { useAdminAuth } from "../../hooks/useAdminAuth";
+import { ADMIN_ROUTES } from "../../types/routes";
+
+function ApplicationReviewContent({ applicationId, sessionToken }: { applicationId: string; sessionToken: string }) {
+  const detail = useQuery(getApplicationRef, { sessionToken, applicationId });
+  if (detail === undefined) return <LoadingState message="Loading application…" />;
+  if (detail === null) {
+    return <EmptyState title="Application not found" description="This link does not identify a submitted application." />;
+  }
+  return <ApplicationDetail detail={detail} />;
+}
 
 export function ApplicationReviewPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
+  const { sessionToken } = useAdminAuth();
 
   return (
-    <section className="space-y-4">
-      <h2 className="font-display text-xl text-night">Application review</h2>
-      <p className="text-sm text-mist">
-        Application ID:{" "}
-        <code className="rounded bg-clay px-1.5 py-0.5 text-ink">
-          {applicationId ?? "—"}
-        </code>
-      </p>
-      <EmptyState
-        title="Review workspace"
-        description="Detailed applicant data and actions will appear here."
-      />
-    </section>
+    <div className="space-y-5">
+      <Link className="inline-block text-sm underline" to={ADMIN_ROUTES.applications}>Back to Applications</Link>
+      {sessionToken && applicationId ? (
+        <ErrorBoundary
+          key={applicationId}
+          fallback={
+            <div role="alert" className="rounded-lg border border-sand bg-clay/30 p-5">
+              <h2 className="font-display text-lg text-night">Unable to load application</h2>
+              <p className="mt-2 text-sm">Return to Applications and try again.</p>
+            </div>
+          }
+        >
+          <ApplicationReviewContent applicationId={applicationId} sessionToken={sessionToken} />
+        </ErrorBoundary>
+      ) : <LoadingState message="Verifying organizer session…" />}
+    </div>
   );
 }

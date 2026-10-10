@@ -57,6 +57,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AdminAuthContextValue>(() => {
     const isLoading = !sessionReady || (sessionToken !== null && staff === undefined);
     return {
+      sessionToken,
       staff: staff ?? null,
       isLoading,
       isAuthenticated: !!staff,

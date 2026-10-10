@@ -3,6 +3,7 @@ import { ErrorState } from "./states/ErrorState";
 
 type Props = {
   children: ReactNode;
+  fallback?: ReactNode;
 };
 
 type State = {
@@ -22,6 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      if (this.props.fallback) return this.props.fallback;
       return (
         <ErrorState
           title="Something went wrong"
