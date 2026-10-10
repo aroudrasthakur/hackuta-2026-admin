@@ -7,11 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
 import { AdminProtectedRoute } from "../../src/components/AdminProtectedRoute";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
-import { getApplicationRef, type ApplicationDetail } from "../../src/convex/adminApi";
+import { getApplicationRef, logApplicationReviewActionRef, type ApplicationDetail } from "../../src/convex/adminApi";
 import { ApplicationReviewPage } from "../../src/pages/admin/ApplicationReviewPage";
 import { ApplicationsPage } from "../../src/pages/admin/ApplicationsPage";
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), mutationHook: vi.fn(), actionHook: vi.fn() }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), mutationHook: vi.fn(), recordView: vi.fn(), actionHook: vi.fn() }));
 vi.mock("convex/react", () => ({
   useQuery: mocks.query, useMutation: mocks.mutationHook, useAction: mocks.actionHook,
 }));
@@ -54,7 +54,8 @@ describe("read-only application review page", () => {
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     mocks.query.mockReset().mockReturnValue(applicationDetail());
-    mocks.mutationHook.mockReset();
+    mocks.mutationHook.mockReset().mockReturnValue(mocks.recordView);
+    mocks.recordView.mockReset().mockResolvedValue("view-log");
     mocks.actionHook.mockReset();
     container = document.createElement("div");
     document.body.append(container);
@@ -65,7 +66,6 @@ describe("read-only application review page", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.restoreAllMocks();
-    expect(mocks.mutationHook).not.toHaveBeenCalled();
     expect(mocks.actionHook).not.toHaveBeenCalled();
   });
 
@@ -76,7 +76,10 @@ describe("read-only application review page", () => {
       <StrictMode>
         <AdminAuthContext.Provider value={context}>
           <MemoryRouter key={path} initialEntries={[path]}>
-            {navigation && <Link to="/admin/applications/application-b" data-testid="next">Next application</Link>}
+            {navigation && <>
+              <Link to="/admin/applications/application-b" data-testid="next">Next application</Link>
+              <Link to="/admin/applications/application-a" data-testid="reopen">Reopen application</Link>
+            </>}
             <Routes>
               <Route path="/admin/applications/:applicationId" element={
                 <AdminProtectedRoute><ApplicationReviewPage /></AdminProtectedRoute>
@@ -111,6 +114,10 @@ describe("read-only application review page", () => {
     await renderPage({ context });
     expect(mocks.query).toHaveBeenCalledWith(getApplicationRef, {
       sessionToken: "internal-session", applicationId: "application-a",
+    });
+    expect(mocks.mutationHook).toHaveBeenCalledWith(logApplicationReviewActionRef);
+    expect(mocks.recordView).toHaveBeenCalledExactlyOnceWith({
+      sessionToken: "internal-session", applicationId: "application-a", action: "viewed",
     });
     expect(container.textContent).toContain("Taylor Student");
     for (const title of ["Personal and contact information", "Education", "Technical and hackathon background",
@@ -183,6 +190,7 @@ describe("read-only application review page", () => {
     await renderDetail(detail);
     expect(container.textContent).toContain(detail === undefined ? "Loading application" : "Application not found");
     expect(backLink()?.getAttribute("href")).toBe("/admin/applications");
+    expect(mocks.recordView).not.toHaveBeenCalled();
   });
 
   it("contains query errors within the page and recovers on another application", async () => {
@@ -194,6 +202,7 @@ describe("read-only application review page", () => {
     await renderPage({ navigation: true });
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to load application");
     expect(container.textContent).not.toContain("Private backend error");
+    expect(mocks.recordView).not.toHaveBeenCalled();
     expect(backLink()).toBeDefined();
     await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="next"]')!.click());
     expect(container.querySelector('[role="alert"]')).toBeNull();
@@ -204,28 +213,84 @@ describe("read-only application review page", () => {
     await renderPage({ context: staffContext({ isLoading: true }) });
     expect(container.textContent).toContain("Verifying organizer session");
     expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.recordView).not.toHaveBeenCalled();
   });
 
   it("redirects unauthenticated visitors before loading application data", async () => {
     await renderPage({ context: staffContext({ staff: null, sessionToken: null, isAuthenticated: false }) });
     expect(container.textContent).toContain("Organizer sign-in");
     expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.recordView).not.toHaveBeenCalled();
   });
 
-  it("supports the Back to Applications link without generating logs", async () => {
+  it("supports the Back to Applications link without generating another log", async () => {
     await renderPage();
     await act(async () => backLink()!.click());
     expect(container.textContent).toContain("Application queue");
+    expect(mocks.recordView).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps dashboard loading and Strict Mode rerenders free of mutations", async () => {
-    await renderPage({ path: "/admin/applications" });
-    expect(mocks.query).not.toHaveBeenCalled();
-    // Changing the route mounts detail; updating its query result rerenders it.
+  it.each(["/admin/applications", "/admin/applications?search=taylor&status=accepted&sort=name"])(
+    "keeps dashboard route %s free of view events", async (path) => {
+      await renderPage({ path });
+      expect(mocks.query).not.toHaveBeenCalled();
+      expect(mocks.mutationHook).not.toHaveBeenCalled();
+      expect(mocks.recordView).not.toHaveBeenCalled();
+    },
+  );
+
+  it("records once after loading and ignores Strict Mode, rerenders, and query updates", async () => {
+    await renderDetail(undefined);
+    expect(mocks.recordView).not.toHaveBeenCalled();
+    mocks.query.mockReturnValue(applicationDetail());
     await renderPage();
     const detail = applicationDetail();
     detail.reviewStatus = "accepted";
     await renderDetail(detail);
     expect(container.textContent).toContain("Review status: Accepted");
+    await renderPage();
+    expect(mocks.recordView).toHaveBeenCalledTimes(1);
+  });
+
+  it("records new visits to the same application and other applications", async () => {
+    mocks.query.mockImplementation((_ref, args: { applicationId: string }) => {
+      const detail = applicationDetail();
+      detail.application._id = args.applicationId as GenericId<"applications">;
+      return detail;
+    });
+    await renderPage({ navigation: true });
+    await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="next"]')!.click());
+    await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="reopen"]')!.click());
+    await act(async () => backLink()!.click());
+    await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="reopen"]')!.click());
+    await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="reopen"]')!.click());
+    expect(mocks.recordView.mock.calls.map(([args]) => args.applicationId))
+      .toEqual(["application-a", "application-b", "application-a", "application-a", "application-a"]);
+  });
+
+  it("shows a failure notice without retrying, and retries on a later visit", async () => {
+    mocks.recordView.mockRejectedValueOnce(new Error("Private logging error"));
+    await renderPage({ navigation: true });
+    expect(container.querySelector('[role="alert"]')?.textContent)
+      .toContain("Please wait about a minute, then reopen the application to try again.");
+    expect(container.textContent).toContain("Taylor Student");
+    expect(container.textContent).not.toContain("Private logging error");
+    await renderPage({ navigation: true });
+    expect(mocks.recordView).toHaveBeenCalledTimes(1);
+    await act(async () => backLink()!.click());
+    await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="reopen"]')!.click());
+    expect(mocks.recordView).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("ignores a logging failure that arrives after leaving the application", async () => {
+    let reject!: (reason: Error) => void;
+    mocks.recordView.mockReturnValueOnce(new Promise((_resolve, rejectPromise) => { reject = rejectPromise; }));
+    await renderPage({ navigation: true });
+    await act(async () => backLink()!.click());
+    await act(async () => reject(new Error("Late failure")));
+    expect(container.textContent).toContain("Application queue");
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(mocks.recordView).toHaveBeenCalledTimes(1);
   });
 });
