@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { Link, useParams } from "react-router-dom";
 import { ApplicationDetail } from "../../components/ApplicationDetail";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
 import { getApplicationRef } from "../../convex/adminApi";
@@ -24,7 +25,17 @@ export function ApplicationReviewPage() {
     <div className="space-y-5">
       <Link className="inline-block text-sm underline" to={ADMIN_ROUTES.applications}>Back to Applications</Link>
       {!isLoading && isAuthenticated && sessionToken && applicationId ? (
-        <ApplicationReviewContent applicationId={applicationId} sessionToken={sessionToken} />
+        <ErrorBoundary
+          key={applicationId}
+          fallback={
+            <div role="alert" className="rounded-lg border border-sand bg-clay/30 p-5">
+              <h2 className="font-display text-lg text-night">Unable to load application</h2>
+              <p className="mt-2 text-sm">Return to Applications and try again.</p>
+            </div>
+          }
+        >
+          <ApplicationReviewContent applicationId={applicationId} sessionToken={sessionToken} />
+        </ErrorBoundary>
       ) : <LoadingState message="Verifying organizer session…" />}
     </div>
   );
