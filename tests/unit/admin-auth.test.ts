@@ -100,6 +100,7 @@ async function seedApplication(t: TestInstance) {
       authUserId: userId,
       email: "applicant@example.com",
       createdAt: 1,
+      formSubmitted: true,
     }),
   );
   await t.run((ctx) =>
