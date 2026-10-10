@@ -121,6 +121,7 @@ describe("read-only application review page", () => {
     expect(answer("Hackathons attended")).toBe("0");
     expect(answer("International student")).toBe("No");
     expect(answer("Race / ethnicity")).toBe("Chinese, White");
+    expect(answer("Dietary restrictions")).toBe("Vegan");
     expect(answer("MLH code of conduct agreement")).toBe("Yes");
     expect(answer("MLH communications consent")).toBe("No");
     expect(answer("Code of conduct agreed at")).toBe(new Date(1_700_000_000_000).toLocaleString());
@@ -144,9 +145,19 @@ describe("read-only application review page", () => {
     expect(container.textContent).toContain("Review status: Unreviewed");
     expect(container.textContent).toContain("Submitted: Not recorded");
     expect(answer("First name")).toBe("Not provided");
+    expect(answer("Dietary restrictions")).toBe("Not provided");
     expect(answer("Code of conduct agreed at")).toBe("Not recorded");
     expect(container.textContent).toContain("No resume was attached.");
     expect(container.textContent).not.toMatch(/undefined|null/);
+  });
+
+  it("distinguishes an empty dietary selection from missing answers", async () => {
+    const detail = applicationDetail();
+    detail.application.dietaryRestrictions = [];
+    detail.application.raceEthnicity = [];
+    await renderDetail(detail);
+    expect(answer("Dietary restrictions")).toBe("None selected");
+    expect(answer("Race / ethnicity")).toBe("Not provided");
   });
 
   it("opens the resume in another tab and uses a fallback filename", async () => {
