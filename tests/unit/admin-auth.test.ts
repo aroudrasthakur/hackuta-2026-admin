@@ -115,6 +115,23 @@ async function seedApplication(t: TestInstance) {
   return applicationId;
 }
 
+async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer") {
+  const t = createTest();
+  const sessionToken = "a".repeat(64);
+  const sessionTokenHash = await hashSessionToken(sessionToken);
+  const records = await t.run(async (ctx) => {
+    const adminId = await ctx.db.insert("admins", {
+      email: "staff@hackuta.org", name: "Test Organizer", role, active: true,
+      createdAt: 1, updatedAt: 1,
+    });
+    const sessionId = await ctx.db.insert("adminSessions", {
+      adminId, sessionTokenHash, createdAt: Date.now(), expiresAt: Date.now() + 60_000,
+    });
+    return { adminId, sessionId };
+  });
+  return { t, ...records, sessionToken, applicationId: await seedApplication(t) };
+}
+
 describe("organizer auth boundary", () => {
   it("signs in with valid credentials and resolves staff from session token", async () => {
     const t = createTest();
@@ -271,12 +288,7 @@ describe("centralized staff authorization", () => {
     it.each(["accepted", "rejected", "waitlisted"] as const)(
       "rejects %s without changing application, review, logs, or participants",
       async (decision) => {
-        const t = createTest();
-        await seedAdmin(t, { email: "staff@hackuta.org", role, active: true });
-        const applicationId = await seedApplication(t);
-        const { sessionToken } = await t.mutation(ref.signIn, {
-          email: "staff@hackuta.org", password: TEST_PASSWORD,
-        });
+        const { t, applicationId, sessionToken } = await createAuthorizationFixture(role);
         await t.run((ctx) => ctx.db.patch(applicationId, { formSubmitted: undefined, submittedAt: undefined }));
         const snapshot = () => t.run(async (ctx) => ({
           application: await ctx.db.get(applicationId),
@@ -294,12 +306,7 @@ describe("centralized staff authorization", () => {
   });
 
   it.each(["flag", "timestamp"] as const)("allows acceptance with only the submission %s", async (marker) => {
-    const t = createTest();
-    await seedAdmin(t, { email: "staff@hackuta.org", role: "reviewer", active: true });
-    const applicationId = await seedApplication(t);
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "staff@hackuta.org", password: TEST_PASSWORD,
-    });
+    const { t, applicationId, sessionToken } = await createAuthorizationFixture();
     await t.run((ctx) => ctx.db.patch(applicationId, {
       formSubmitted: marker === "flag" ? true : undefined,
       submittedAt: marker === "timestamp" ? 2 : undefined,
@@ -311,12 +318,7 @@ describe("centralized staff authorization", () => {
   it.each(["reviewer", "admin"] as const)(
     "allows %s review activity and decisions with session-derived attribution",
     async (role) => {
-      const t = createTest();
-      const adminId = await seedAdmin(t, { email: "staff@hackuta.org", role, active: true });
-      const applicationId = await seedApplication(t);
-      const { sessionToken } = await t.mutation(ref.signIn, {
-        email: "staff@hackuta.org", password: TEST_PASSWORD,
-      });
+      const { t, adminId, applicationId, sessionToken } = await createAuthorizationFixture(role);
       expect(await t.run((ctx) => getCurrentAdmin(ctx, sessionToken))).toMatchObject({
         _id: adminId, role, active: true,
       });
@@ -342,12 +344,8 @@ describe("centralized staff authorization", () => {
     it.each(["missing", "fake", "expired", "revoked", "orphaned", "inactive"] as const)(
       "denies %s sessions before reading history or changing application state",
       async (condition) => {
-        const t = createTest();
-        const adminId = await seedAdmin(t, { email: "staff@hackuta.org", role, active: true });
-        const applicationId = await seedApplication(t);
-        let { sessionToken } = await t.mutation(ref.signIn, {
-          email: "staff@hackuta.org", password: TEST_PASSWORD,
-        });
+        const { t, adminId, sessionId, applicationId, sessionToken: validToken } = await createAuthorizationFixture(role);
+        let sessionToken = validToken;
         if (condition === "missing") sessionToken = "";
         if (condition === "fake") sessionToken = "0".repeat(64);
         if (condition === "revoked") await t.mutation(ref.signOut, { sessionToken });
@@ -355,8 +353,7 @@ describe("centralized staff authorization", () => {
           if (condition === "inactive") await ctx.db.patch(adminId, { active: false });
           if (condition === "orphaned") await ctx.db.delete(adminId);
           if (condition === "expired") {
-            const session = await ctx.db.query("adminSessions").unique();
-            await ctx.db.patch(session!._id, { expiresAt: Date.now() - 1 });
+            await ctx.db.patch(sessionId, { expiresAt: Date.now() - 1 });
           }
         });
         expect(await t.run((ctx) => getCurrentAdmin(ctx, sessionToken))).toBeNull();
@@ -379,9 +376,8 @@ describe("centralized staff authorization", () => {
   });
 
   it("denies applicant identity even when its email matches an active admin", async () => {
-    const t = createTest();
-    await seedAdmin(t, { email: "applicant@example.com", role: "admin", active: true });
-    const applicationId = await seedApplication(t);
+    const { t, adminId, applicationId } = await createAuthorizationFixture("admin");
+    await t.run((ctx) => ctx.db.patch(adminId, { email: "applicant@example.com" }));
     const application = await t.run((ctx) => ctx.db.get(applicationId));
     const applicant = t.withIdentity({
       subject: application!.authUserId, email: "applicant@example.com",
@@ -396,12 +392,7 @@ describe("centralized staff authorization", () => {
   });
 
   it("applies role changes to existing sessions", async () => {
-    const t = createTest();
-    const adminId = await seedAdmin(t, { email: "staff@hackuta.org", role: "admin", active: true });
-    const applicationId = await seedApplication(t);
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "staff@hackuta.org", password: TEST_PASSWORD,
-    });
+    const { t, adminId, applicationId, sessionToken } = await createAuthorizationFixture("admin");
     await t.run((ctx) => ctx.db.patch(adminId, { role: "reviewer" }));
     await expect(t.query(ref.listApplicationReviewLogs, {
       sessionToken, applicationId, paginationOpts: { numItems: 25, cursor: null },
@@ -410,13 +401,11 @@ describe("centralized staff authorization", () => {
   });
 
   it("rejects forged acting admin IDs and role escalation arguments", async () => {
-    const t = createTest();
-    await seedAdmin(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
-    const otherAdminId = await seedAdmin(t, { email: "admin@hackuta.org", role: "admin", active: true });
-    const applicationId = await seedApplication(t);
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "reviewer@hackuta.org", password: TEST_PASSWORD,
-    });
+    const { t, applicationId, sessionToken } = await createAuthorizationFixture();
+    const otherAdminId = await t.run((ctx) => ctx.db.insert("admins", {
+      email: "admin@hackuta.org", name: "Other Organizer", role: "admin", active: true,
+      createdAt: 1, updatedAt: 1,
+    }));
     for (const forged of [{ adminId: otherAdminId }, { role: "admin" }]) {
       await expect(t.mutation(ref.setApplicationDecision, {
         sessionToken, applicationId, decision: "accepted", ...forged,
