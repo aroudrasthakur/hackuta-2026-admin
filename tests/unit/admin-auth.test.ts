@@ -100,6 +100,8 @@ async function seedApplication(t: TestInstance) {
       authUserId: userId,
       email: "applicant@example.com",
       createdAt: 1,
+      formSubmitted: true,
+      submittedAt: 2,
     }),
   );
   await t.run((ctx) =>
@@ -265,6 +267,47 @@ describe("organizer session lifetime", () => {
 });
 
 describe("centralized staff authorization", () => {
+  describe.each(["reviewer", "admin"] as const)("%s decisions on drafts", (role) => {
+    it.each(["accepted", "rejected", "waitlisted"] as const)(
+      "rejects %s without changing application, review, logs, or participants",
+      async (decision) => {
+        const t = createTest();
+        await seedAdmin(t, { email: "staff@hackuta.org", role, active: true });
+        const applicationId = await seedApplication(t);
+        const { sessionToken } = await t.mutation(ref.signIn, {
+          email: "staff@hackuta.org", password: TEST_PASSWORD,
+        });
+        await t.run((ctx) => ctx.db.patch(applicationId, { formSubmitted: undefined, submittedAt: undefined }));
+        const snapshot = () => t.run(async (ctx) => ({
+          application: await ctx.db.get(applicationId),
+          reviews: await ctx.db.query("applicationReviews").collect(),
+          logs: await ctx.db.query("applicationReviewLogs").collect(),
+          participants: await ctx.db.query("participants").collect(),
+        }));
+        const before = await snapshot();
+        await expect(t.mutation(ref.setApplicationDecision, {
+          sessionToken, applicationId, decision,
+        })).rejects.toThrow(/application has not been submitted/i);
+        expect(await snapshot()).toEqual(before);
+      },
+    );
+  });
+
+  it.each(["flag", "timestamp"] as const)("allows acceptance with only the submission %s", async (marker) => {
+    const t = createTest();
+    await seedAdmin(t, { email: "staff@hackuta.org", role: "reviewer", active: true });
+    const applicationId = await seedApplication(t);
+    const { sessionToken } = await t.mutation(ref.signIn, {
+      email: "staff@hackuta.org", password: TEST_PASSWORD,
+    });
+    await t.run((ctx) => ctx.db.patch(applicationId, {
+      formSubmitted: marker === "flag" ? true : undefined,
+      submittedAt: marker === "timestamp" ? 2 : undefined,
+    }));
+    await t.mutation(ref.setApplicationDecision, { sessionToken, applicationId, decision: "accepted" });
+    expect(await t.run((ctx) => ctx.db.query("participants").unique())).not.toBeNull();
+  });
+
   it.each(["reviewer", "admin"] as const)(
     "allows %s review activity and decisions with session-derived attribution",
     async (role) => {

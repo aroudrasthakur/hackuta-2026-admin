@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { mutation, query } from "../_generated/server";
+import { applicationFormWasSubmitted } from "../lib/applications";
 import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
 import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 import {
@@ -38,6 +39,7 @@ export const setApplicationDecision = mutation({
     const admin = await requireReviewerAccess(ctx, sessionToken);
     const application = await ctx.db.get(applicationId);
     if (!application) throw new Error("Application not found");
+    if (!applicationFormWasSubmitted(application)) throw new Error("Application has not been submitted.");
 
     const review = await ctx.db
       .query("applicationReviews")
