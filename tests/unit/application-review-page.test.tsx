@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
@@ -47,11 +47,6 @@ function staffContext(overrides: Partial<AdminAuthContextValue> = {}): AdminAuth
   };
 }
 
-function NavigationControls() {
-  const navigate = useNavigate();
-  return <button onClick={() => navigate("/admin/applications/application-b")}>Next application</button>;
-}
-
 describe("read-only application review page", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -70,6 +65,8 @@ describe("read-only application review page", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.restoreAllMocks();
+    expect(mocks.mutationHook).not.toHaveBeenCalled();
+    expect(mocks.actionHook).not.toHaveBeenCalled();
   });
 
   async function renderPage({
@@ -78,8 +75,8 @@ describe("read-only application review page", () => {
     await act(async () => root.render(
       <StrictMode>
         <AdminAuthContext.Provider value={context}>
-          <MemoryRouter initialEntries={[path]}>
-            {navigation && <NavigationControls />}
+          <MemoryRouter key={path} initialEntries={[path]}>
+            {navigation && <Link to="/admin/applications/application-b" data-testid="next">Next application</Link>}
             <Routes>
               <Route path="/admin/applications/:applicationId" element={
                 <AdminProtectedRoute><ApplicationReviewPage /></AdminProtectedRoute>
@@ -91,6 +88,11 @@ describe("read-only application review page", () => {
         </AdminAuthContext.Provider>
       </StrictMode>,
     ));
+  }
+
+  async function renderDetail(detail: ApplicationDetail | null | undefined) {
+    mocks.query.mockReturnValue(detail);
+    await renderPage();
   }
 
   function answer(label: string) {
@@ -128,8 +130,6 @@ describe("read-only application review page", () => {
     expect(answer("Contact name")).toBe("Jordan Student");
     expect(container.textContent).toContain("Review status: Under Review");
     expect(container.querySelectorAll("input, textarea, select, button")).toHaveLength(0);
-    expect(mocks.mutationHook).not.toHaveBeenCalled();
-    expect(mocks.actionHook).not.toHaveBeenCalled();
   });
 
   it("handles sparse and older applications without raw missing values", async () => {
@@ -140,8 +140,7 @@ describe("read-only application review page", () => {
     };
     detail.reviewStatus = null;
     detail.resume = { status: "none", url: null, filename: null };
-    mocks.query.mockReturnValue(detail);
-    await renderPage();
+    await renderDetail(detail);
     expect(container.textContent).toContain("Review status: Unreviewed");
     expect(container.textContent).toContain("Submitted: Not recorded");
     expect(answer("First name")).toBe("Not provided");
@@ -153,8 +152,7 @@ describe("read-only application review page", () => {
   it("opens the resume in another tab and uses a fallback filename", async () => {
     const detail = applicationDetail();
     detail.resume.filename = null;
-    mocks.query.mockReturnValue(detail);
-    await renderPage();
+    await renderDetail(detail);
     const resume = container.querySelector('a[href="https://files.example.com/resume.pdf"]');
     expect(resume?.textContent).toBe("Open resume (PDF)");
     expect(resume?.getAttribute("target")).toBe("_blank");
@@ -164,8 +162,7 @@ describe("read-only application review page", () => {
   it("explains an unavailable attached resume without a broken link", async () => {
     const detail = applicationDetail();
     detail.resume = { status: "missing", url: null, filename: "missing.pdf" };
-    mocks.query.mockReturnValue(detail);
-    await renderPage();
+    await renderDetail(detail);
     const section = container.querySelector('section[aria-label="Resume"]');
     expect(section?.textContent).toContain("The attached resume is no longer available.");
     expect(section?.querySelector("a")).toBeNull();
@@ -175,8 +172,7 @@ describe("read-only application review page", () => {
     const detail = applicationDetail();
     detail.application.builtOrWantToBuild = "<img src=x onerror=alert(1)>";
     detail.application.portfolio = "javascript:alert(1)";
-    mocks.query.mockReturnValue(detail);
-    await renderPage();
+    await renderDetail(detail);
     expect(answer(APPLICATION_QUESTIONS.builtOrWantToBuild)).toBe("<img src=x onerror=alert(1)>");
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
@@ -184,11 +180,9 @@ describe("read-only application review page", () => {
   });
 
   it.each([undefined, null])("preserves navigation when application data is %s", async (detail) => {
-    mocks.query.mockReturnValue(detail);
-    await renderPage();
+    await renderDetail(detail);
     expect(container.textContent).toContain(detail === undefined ? "Loading application" : "Application not found");
     expect(backLink()?.getAttribute("href")).toBe("/admin/applications");
-    expect(mocks.mutationHook).not.toHaveBeenCalled();
   });
 
   it("contains query errors within the page and recovers on another application", async () => {
@@ -201,7 +195,7 @@ describe("read-only application review page", () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to load application");
     expect(container.textContent).not.toContain("Private backend error");
     expect(backLink()).toBeDefined();
-    await act(async () => container.querySelector("button")!.click());
+    await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="next"]')!.click());
     expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(container.textContent).toContain("Taylor Student");
   });
@@ -222,22 +216,16 @@ describe("read-only application review page", () => {
     await renderPage();
     await act(async () => backLink()!.click());
     expect(container.textContent).toContain("Application queue");
-    expect(mocks.mutationHook).not.toHaveBeenCalled();
   });
 
   it("keeps dashboard loading and Strict Mode rerenders free of mutations", async () => {
     await renderPage({ path: "/admin/applications" });
     expect(mocks.query).not.toHaveBeenCalled();
-    // A fresh detail-page mount followed by a reactive data update remains read-only.
-    await act(async () => root.unmount());
-    root = createRoot(container);
+    // Changing the route mounts detail; updating its query result rerenders it.
     await renderPage();
     const detail = applicationDetail();
     detail.reviewStatus = "accepted";
-    mocks.query.mockReturnValue(detail);
-    await renderPage();
+    await renderDetail(detail);
     expect(container.textContent).toContain("Review status: Accepted");
-    expect(mocks.mutationHook).not.toHaveBeenCalled();
-    expect(mocks.actionHook).not.toHaveBeenCalled();
   });
 });
