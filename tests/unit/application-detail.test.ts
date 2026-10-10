@@ -2,7 +2,7 @@ import { convexTest } from "convex-test";
 import {
   makeFunctionReference,
   type FunctionArgs,
-  type FunctionReferenceFromExport,
+  type ApiFromModules,
   type FunctionReturnType,
 } from "convex/server";
 import { describe, expect, it } from "vitest";
@@ -13,7 +13,9 @@ import { hashSessionToken } from "../../convex/admin/staffAuth";
 const modules = import.meta.glob("../../convex/**/*.ts", { eager: false });
 const createTest = () => convexTest(schema, modules);
 type TestInstance = ReturnType<typeof createTest>;
-type ApplicationQuery = FunctionReferenceFromExport<typeof getApplication>;
+type ApplicationQuery = ApiFromModules<{
+  applications: { getApplication: typeof getApplication };
+}>["applications"]["getApplication"];
 const detailRef = makeFunctionReference<
   "query", FunctionArgs<ApplicationQuery>, FunctionReturnType<ApplicationQuery>
 >("admin/applications:getApplication");
