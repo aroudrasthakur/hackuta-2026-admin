@@ -4,7 +4,11 @@ import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
 import schema from "../../convex/schema";
 import { hashPassword } from "../../convex/admin/passwordHash";
-import { ADMIN_SESSION_TTL_MS, hashSessionToken } from "../../convex/admin/staffAuth";
+import {
+  ADMIN_SESSION_TTL_MS,
+  getCurrentAdmin,
+  hashSessionToken,
+} from "../../convex/admin/staffAuth";
 
 const modules = import.meta.glob("../../convex/**/*.ts", { eager: false });
 
@@ -31,6 +35,15 @@ const ref = {
     { sessionToken: string; applicationId: GenericId<"applications">; action: "viewed" },
     GenericId<"applicationReviewLogs">
   >("admin/applicationReviewLogs:logApplicationReviewAction"),
+  setApplicationDecision: makeFunctionReference<
+    "mutation",
+    {
+      sessionToken: string;
+      applicationId: GenericId<"applications">;
+      decision: "accepted" | "rejected" | "waitlisted";
+    },
+    GenericId<"applicationReviewLogs">
+  >("admin/applicationReviewLogs:setApplicationDecision"),
   listApplicationReviewLogs: makeFunctionReference<
     "query",
     {
@@ -248,5 +261,130 @@ describe("organizer auth boundary", () => {
 describe("organizer session lifetime", () => {
   it("uses a 24-hour session TTL", () => {
     expect(ADMIN_SESSION_TTL_MS).toBe(24 * 60 * 60 * 1000);
+  });
+});
+
+describe("centralized staff authorization", () => {
+  it.each(["reviewer", "admin"] as const)(
+    "allows %s review activity and decisions with session-derived attribution",
+    async (role) => {
+      const t = createTest();
+      const adminId = await seedAdmin(t, { email: "staff@hackuta.org", role, active: true });
+      const applicationId = await seedApplication(t);
+      const { sessionToken } = await t.mutation(ref.signIn, {
+        email: "staff@hackuta.org", password: TEST_PASSWORD,
+      });
+      expect(await t.run((ctx) => getCurrentAdmin(ctx, sessionToken))).toMatchObject({
+        _id: adminId, role, active: true,
+      });
+      const activityId = await t.mutation(ref.logApplicationReviewAction, {
+        sessionToken, applicationId, action: "viewed",
+      });
+      expect(await t.run((ctx) => ctx.db.get(activityId))).toMatchObject({ adminId });
+
+      for (const decision of ["rejected", "waitlisted", "accepted"] as const) {
+        const logId = await t.mutation(ref.setApplicationDecision, {
+          sessionToken, applicationId, decision,
+        });
+        expect(await t.run((ctx) => ctx.db.get(logId))).toMatchObject({ adminId, action: decision });
+        const review = await t.run((ctx) => ctx.db.query("applicationReviews").unique());
+        expect(review).toMatchObject({ status: decision, reviewedByAdmin: adminId });
+      }
+      const participant = await t.run((ctx) => ctx.db.query("participants").unique());
+      expect(participant).toMatchObject({ acceptedBy: adminId });
+    },
+  );
+
+  describe.each(["reviewer", "admin"] as const)("%s session rejection", (role) => {
+    it.each(["missing", "fake", "expired", "revoked", "orphaned", "inactive"] as const)(
+      "denies %s sessions before reading history or changing application state",
+      async (condition) => {
+        const t = createTest();
+        const adminId = await seedAdmin(t, { email: "staff@hackuta.org", role, active: true });
+        const applicationId = await seedApplication(t);
+        let { sessionToken } = await t.mutation(ref.signIn, {
+          email: "staff@hackuta.org", password: TEST_PASSWORD,
+        });
+        if (condition === "missing") sessionToken = "";
+        if (condition === "fake") sessionToken = "0".repeat(64);
+        if (condition === "revoked") await t.mutation(ref.signOut, { sessionToken });
+        await t.run(async (ctx) => {
+          if (condition === "inactive") await ctx.db.patch(adminId, { active: false });
+          if (condition === "orphaned") await ctx.db.delete(adminId);
+          if (condition === "expired") {
+            const session = await ctx.db.query("adminSessions").unique();
+            await ctx.db.patch(session!._id, { expiresAt: Date.now() - 1 });
+          }
+        });
+        expect(await t.run((ctx) => getCurrentAdmin(ctx, sessionToken))).toBeNull();
+        await expect(t.mutation(ref.logApplicationReviewAction, {
+          sessionToken, applicationId, action: "viewed",
+        })).rejects.toThrow(/not authenticated/i);
+        await expect(t.mutation(ref.setApplicationDecision, {
+          sessionToken, applicationId, decision: "accepted",
+        })).rejects.toThrow(/not authenticated/i);
+        await expect(t.query(ref.listApplicationReviewLogs, {
+          sessionToken, applicationId, paginationOpts: { numItems: 25, cursor: null },
+        })).rejects.toThrow(/not authenticated/i);
+        expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
+        expect(await t.run((ctx) => ctx.db.query("participants").collect())).toEqual([]);
+        const review = await t.run((ctx) => ctx.db.query("applicationReviews").unique());
+        expect(review?.status).toBe("under_review");
+        expect(review?.reviewedByAdmin).toBeUndefined();
+      },
+    );
+  });
+
+  it("denies applicant identity even when its email matches an active admin", async () => {
+    const t = createTest();
+    await seedAdmin(t, { email: "applicant@example.com", role: "admin", active: true });
+    const applicationId = await seedApplication(t);
+    const application = await t.run((ctx) => ctx.db.get(applicationId));
+    const applicant = t.withIdentity({
+      subject: application!.authUserId, email: "applicant@example.com",
+    });
+    expect(await applicant.run((ctx) => getCurrentAdmin(ctx, ""))).toBeNull();
+    await expect(applicant.mutation(ref.setApplicationDecision, {
+      sessionToken: "", applicationId, decision: "accepted",
+    })).rejects.toThrow(/not authenticated/i);
+    await expect(applicant.query(ref.listApplicationReviewLogs, {
+      sessionToken: "", applicationId, paginationOpts: { numItems: 25, cursor: null },
+    })).rejects.toThrow(/not authenticated/i);
+  });
+
+  it("applies role changes to existing sessions", async () => {
+    const t = createTest();
+    const adminId = await seedAdmin(t, { email: "staff@hackuta.org", role: "admin", active: true });
+    const applicationId = await seedApplication(t);
+    const { sessionToken } = await t.mutation(ref.signIn, {
+      email: "staff@hackuta.org", password: TEST_PASSWORD,
+    });
+    await t.run((ctx) => ctx.db.patch(adminId, { role: "reviewer" }));
+    await expect(t.query(ref.listApplicationReviewLogs, {
+      sessionToken, applicationId, paginationOpts: { numItems: 25, cursor: null },
+    })).rejects.toThrow(/not authorized/i);
+    await t.mutation(ref.logApplicationReviewAction, { sessionToken, applicationId, action: "viewed" });
+  });
+
+  it("rejects forged acting admin IDs and role escalation arguments", async () => {
+    const t = createTest();
+    await seedAdmin(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
+    const otherAdminId = await seedAdmin(t, { email: "admin@hackuta.org", role: "admin", active: true });
+    const applicationId = await seedApplication(t);
+    const { sessionToken } = await t.mutation(ref.signIn, {
+      email: "reviewer@hackuta.org", password: TEST_PASSWORD,
+    });
+    for (const forged of [{ adminId: otherAdminId }, { role: "admin" }]) {
+      await expect(t.mutation(ref.setApplicationDecision, {
+        sessionToken, applicationId, decision: "accepted", ...forged,
+      })).rejects.toThrow(/unexpected field/i);
+    }
+    const forgedHistoryArgs = {
+      sessionToken, applicationId,
+      paginationOpts: { numItems: 25, cursor: null }, role: "admin",
+    };
+    await expect(t.query(ref.listApplicationReviewLogs, forgedHistoryArgs)).rejects.toThrow(/unexpected field/i);
+    expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.query("participants").collect())).toEqual([]);
   });
 });
