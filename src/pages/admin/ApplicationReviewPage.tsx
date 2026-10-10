@@ -19,12 +19,12 @@ function ApplicationReviewContent({ applicationId, sessionToken }: { application
 
 export function ApplicationReviewPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
-  const { sessionToken, isAuthenticated, isLoading } = useAdminAuth();
+  const { sessionToken } = useAdminAuth();
 
   return (
     <div className="space-y-5">
       <Link className="inline-block text-sm underline" to={ADMIN_ROUTES.applications}>Back to Applications</Link>
-      {!isLoading && isAuthenticated && sessionToken && applicationId ? (
+      {sessionToken && applicationId ? (
         <ErrorBoundary
           key={applicationId}
           fallback={
