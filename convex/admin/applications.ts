@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import { applicationFormWasSubmitted } from "../lib/applications";
+import { applicationFormWasSubmitted, getApplicationReview } from "../lib/applications";
 import { requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 
 /** Loads a submitted application without changing applicant or review state. */
@@ -16,14 +16,8 @@ export const getApplication = query({
     const application = await ctx.db.get(id);
     if (!application || !applicationFormWasSubmitted(application)) return null;
 
-    const review = await ctx.db
-      .query("applicationReviews")
-      .withIndex("by_application", (q) => q.eq("applicationId", id))
-      .unique();
-    const resumeExists = application.resumeStorageId
-      ? await ctx.db.system.get("_storage", application.resumeStorageId)
-      : null;
-    const resumeUrl = resumeExists && application.resumeStorageId
+    const review = await getApplicationReview(ctx, id);
+    const resumeUrl = application.resumeStorageId
       ? await ctx.storage.getUrl(application.resumeStorageId)
       : null;
     const resumeStatus: "none" | "available" | "missing" = !application.resumeStorageId
