@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { mutation, query } from "../_generated/server";
 import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
+import { applicationFormWasSubmitted } from "../lib/applications";
 import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 import {
   applicationReviewLogActivityAction,
@@ -17,7 +18,10 @@ export const logApplicationReviewAction = mutation({
   },
   handler: async (ctx, { sessionToken, applicationId, action }) => {
     const admin = await requireReviewerAccess(ctx, sessionToken);
-    if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
+    const application = await ctx.db.get(applicationId);
+    if (!application || (action === "viewed" && !applicationFormWasSubmitted(application))) {
+      throw new Error("Application not found");
+    }
     return await ctx.db.insert("applicationReviewLogs", {
       applicationId,
       adminId: admin._id,
