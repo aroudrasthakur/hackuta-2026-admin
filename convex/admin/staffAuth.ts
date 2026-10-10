@@ -43,13 +43,38 @@ export async function resolveAdminSession(
   return { admin, session };
 }
 
-export async function requireAdminSession(
+/** Resolves only internal staff sessions; applicant authentication is never used. */
+export async function getCurrentAdmin(
   ctx: QueryCtx | MutationCtx,
   sessionToken: string,
 ) {
   const resolved = await resolveAdminSession(ctx, sessionToken);
-  if (!resolved) {
+  return resolved?.admin ?? null;
+}
+
+/** Both active reviewers and admins can review applications and make decisions. */
+export async function requireReviewerAccess(
+  ctx: QueryCtx | MutationCtx,
+  sessionToken: string,
+) {
+  const admin = await getCurrentAdmin(ctx, sessionToken);
+  if (!admin) {
     throw new Error("Not authenticated");
   }
-  return resolved;
+  if (admin.role !== "reviewer" && admin.role !== "admin") {
+    throw new Error("Not authorized");
+  }
+  return admin;
+}
+
+/** Historical review logs and other admin-only operations require the admin role. */
+export async function requireAdminRole(
+  ctx: QueryCtx | MutationCtx,
+  sessionToken: string,
+) {
+  const admin = await requireReviewerAccess(ctx, sessionToken);
+  if (admin.role !== "admin") {
+    throw new Error("Not authorized");
+  }
+  return admin;
 }
