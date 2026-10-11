@@ -38,7 +38,7 @@ Public mutations accept `sessionToken`; `requireAdminSession` resolves the activ
 
 ## Schema notes
 
-- `applicationReviews` — register-origin review state table editable in [schema.ts](../schema.ts).
+- `applicationReviews` — register-origin table editable in [schema.ts](../schema.ts); holds the current or final review state per application. `reviewedBy` (an `admins` id) is always set from the session, never from client args. `started_review` claims the review (takeover allowed) and sets `startedAt`/`lastActiveAt`; `viewed` is log-only; decisions set `completedAt`. Patches live in [reviewState.ts](reviewState.ts).
 - `admins` — admin-only table.
 - `applicationReviewLogs` — append-only activity history; full history is restricted to admins.
 - `participants` — admin-only table; one row per accepted application (reuses `users`, no applicant data copied).

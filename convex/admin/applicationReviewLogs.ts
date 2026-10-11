@@ -7,8 +7,13 @@ import {
   applicationReviewLogActivityAction,
   applicationReviewLogDecisionAction,
 } from "./fields";
+import { decisionPatch, startReviewPatch } from "./reviewState";
 
-/** Appends a non-decision event; decisions are recorded with their state update below. */
+/**
+ * Appends a non-decision event; decisions are recorded with their state update below.
+ * `viewed` is log-only. `started_review` claims the review (takeover allowed);
+ * `review_ended` counts as activity only for the admin currently reviewing.
+ */
 export const logApplicationReviewAction = mutation({
   args: {
     ...sessionTokenArgs,
@@ -18,11 +23,27 @@ export const logApplicationReviewAction = mutation({
   handler: async (ctx, { sessionToken, applicationId, action }) => {
     const { admin } = await requireAdminSession(ctx, sessionToken);
     if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
+
+    const now = Date.now();
+    if (action !== "viewed") {
+      const review = await ctx.db
+        .query("applicationReviews")
+        .withIndex("by_application", (q) => q.eq("applicationId", applicationId))
+        .unique();
+      if (!review) throw new Error("Application review not found");
+
+      if (action === "started_review") {
+        await ctx.db.patch(review._id, startReviewPatch(review, admin._id, now));
+      } else if (review.reviewedBy === admin._id) {
+        await ctx.db.patch(review._id, { lastActiveAt: now, updatedAt: now });
+      }
+    }
+
     return await ctx.db.insert("applicationReviewLogs", {
       applicationId,
       adminId: admin._id,
       action,
-      createdAt: Date.now(),
+      createdAt: now,
     });
   },
 });
@@ -55,12 +76,7 @@ export const setApplicationDecision = mutation({
     }
 
     const now = Date.now();
-    await ctx.db.patch(review._id, {
-      status: decision,
-      reviewedAt: now,
-      reviewedByAdmin: admin._id,
-      updatedAt: now,
-    });
+    await ctx.db.patch(review._id, decisionPatch(review, admin._id, decision, now));
     return await ctx.db.insert("applicationReviewLogs", {
       applicationId,
       adminId: admin._id,
