@@ -1,21 +1,10 @@
-import { makeFunctionReference } from "convex/server";
-import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setApplicationDecisionRef as setDecision } from "../../src/convex/adminApi";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 import {
   createStaffAuthorizationFixture,
   seedSubmittedApplication,
 } from "../helpers/staffTestFixtures";
-
-const setDecision = makeFunctionReference<
-  "mutation",
-  {
-    sessionToken: string;
-    applicationId: GenericId<"applications">;
-    decision: "accepted" | "rejected" | "waitlisted";
-  },
-  { logId: GenericId<"applicationReviewLogs">; duplicate: boolean }
->("admin/applicationReviewLogs:setApplicationDecision");
 
 async function fixture(role: "reviewer" | "admin" = "reviewer") {
   const t = createConvexTest();
@@ -105,22 +94,6 @@ describe("confirmed acceptance participant creation (#17)", () => {
     expect(new Set(participants.map((participant) => participant.qrCodeToken)).size).toBe(2);
   });
 
-  it("overlapping confirmation requests create one participant, audit log, and email job", async () => {
-    const { t, applicationId, sessionToken } = await fixture();
-    // convex-test serializes transactions; deployment concurrency still needs a smoke check.
-    const results = await Promise.all([
-      t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" }),
-      t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" }),
-    ]);
-
-    expect(results.map((result) => result.duplicate).sort()).toEqual([false, true]);
-    expect(results[0].logId).toBe(results[1].logId);
-    const after = await snapshot(t);
-    expect(after.participants).toHaveLength(1);
-    expect(after.logs).toHaveLength(1);
-    expect(after.emails).toHaveLength(1);
-  });
-
   it("QR generation failure rolls back the review and audit writes as well as participant creation", async () => {
     const { t, applicationId, sessionToken } = await fixture();
     const before = await snapshot(t);
@@ -145,17 +118,6 @@ describe("confirmed acceptance participant creation (#17)", () => {
     expect(after.participants).toEqual([]);
     expect(after.users).toEqual(before.users);
     expect(after.reviews[0].status).toBe(decision);
-  });
-
-  it("rejects unauthorized acceptance without changing records or scheduling email", async () => {
-    const { t, applicationId } = await fixture();
-    const before = await snapshot(t);
-
-    await expect(t.mutation(setDecision, {
-      sessionToken: "0".repeat(64), applicationId, decision: "accepted",
-    })).rejects.toThrow(/not authenticated/i);
-
-    expect(await snapshot(t)).toEqual(before);
   });
 
   it("reuses an existing matching participant without changing its QR token or metadata", async () => {

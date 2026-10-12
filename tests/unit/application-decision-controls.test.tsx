@@ -83,10 +83,13 @@ describe("ApplicationDecisionControls", () => {
 
   it("finalizes only after confirmation and supports cancel", async () => {
     await renderControls();
-    await act(async () => button("Reject")!.click());
-    await act(async () => button("Cancel")!.click());
-    expect(container.textContent).toContain("Accept");
-    expect(mocks.finalize).not.toHaveBeenCalled();
+    for (const decision of ["Accept", "Reject"]) {
+      await act(async () => button(decision)!.click());
+      await act(async () => button("Cancel")!.click());
+      expect(button(decision)).toBeDefined();
+      expect(button("Cancel")).toBeUndefined();
+      expect(mocks.finalize).not.toHaveBeenCalled();
+    }
 
     await act(async () => button("Waitlist")!.click());
     await act(async () => button("Confirm waitlist")!.click());
@@ -95,15 +98,6 @@ describe("ApplicationDecisionControls", () => {
       applicationId: "application-a",
       decision: "waitlisted",
     });
-  });
-
-  it("cancels acceptance without calling the backend", async () => {
-    await renderControls();
-    await act(async () => button("Accept")!.click());
-    await act(async () => button("Cancel")!.click());
-    expect(button("Accept")).toBeDefined();
-    expect(button("Confirm acceptance")).toBeUndefined();
-    expect(mocks.finalize).not.toHaveBeenCalled();
   });
 
   it("confirms acceptance once and blocks repeated clicks while pending", async () => {
