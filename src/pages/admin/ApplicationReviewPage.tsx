@@ -43,7 +43,9 @@ export function ApplicationReviewContent({
       };
       setLoggingFailed(false);
     }
-    void viewRequest.current.promise.catch(() => {
+    const promise = viewRequest.current?.promise;
+    if (!promise) return;
+    void promise.catch(() => {
       if (active) setLoggingFailed(true);
     });
     return () => { active = false; };

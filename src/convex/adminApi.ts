@@ -1,5 +1,6 @@
 import {
   makeFunctionReference,
+  type DefaultFunctionArgs,
   type FunctionArgs,
   type ApiFromModules,
   type FunctionReturnType,
@@ -11,6 +12,15 @@ import type {
   setApplicationDecision,
 } from "../../convex/admin/applicationReviewLogs";
 
+/** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
+function adminModuleRef<
+  Kind extends "query" | "mutation",
+  Args extends DefaultFunctionArgs,
+  Returns,
+>(path: string) {
+  return makeFunctionReference<Kind, Args, Returns>(path);
+}
+
 export const getCurrentStaffRef = makeFunctionReference<"query">("admin/auth:getCurrentStaff");
 
 type SubmittedApplicationsQuery = ApiFromModules<{
@@ -18,7 +28,7 @@ type SubmittedApplicationsQuery = ApiFromModules<{
 }>["applications"]["listSubmittedApplications"];
 export type SubmittedApplicationSummary = FunctionReturnType<SubmittedApplicationsQuery>[number];
 
-export const listSubmittedApplicationsRef = makeFunctionReference<
+export const listSubmittedApplicationsRef = adminModuleRef<
   "query",
   FunctionArgs<SubmittedApplicationsQuery>,
   FunctionReturnType<SubmittedApplicationsQuery>
@@ -29,7 +39,7 @@ type ApplicationQuery = ApiFromModules<{
 }>["applications"]["getApplication"];
 export type ApplicationDetail = NonNullable<FunctionReturnType<ApplicationQuery>>;
 
-export const getApplicationRef = makeFunctionReference<
+export const getApplicationRef = adminModuleRef<
   "query",
   FunctionArgs<ApplicationQuery>,
   FunctionReturnType<ApplicationQuery>
@@ -40,7 +50,7 @@ type ReviewHistoryQuery = ApiFromModules<{
 }>["logs"]["listApplicationReviewLogs"];
 export type ReviewHistoryEvent = FunctionReturnType<ReviewHistoryQuery>["page"][number];
 
-export const listApplicationReviewLogsRef = makeFunctionReference<
+export const listApplicationReviewLogsRef = adminModuleRef<
   "query",
   FunctionArgs<ReviewHistoryQuery>,
   FunctionReturnType<ReviewHistoryQuery>
@@ -50,7 +60,7 @@ type ReviewActivityMutation = ApiFromModules<{
   logs: { logApplicationReviewAction: typeof logApplicationReviewAction };
 }>["logs"]["logApplicationReviewAction"];
 
-export const logApplicationReviewActionRef = makeFunctionReference<
+export const logApplicationReviewActionRef = adminModuleRef<
   "mutation",
   FunctionArgs<ReviewActivityMutation>,
   FunctionReturnType<ReviewActivityMutation>
@@ -60,7 +70,7 @@ type SetApplicationDecisionMutation = ApiFromModules<{
   logs: { setApplicationDecision: typeof setApplicationDecision };
 }>["logs"]["setApplicationDecision"];
 
-export const setApplicationDecisionRef = makeFunctionReference<
+export const setApplicationDecisionRef = adminModuleRef<
   "mutation",
   FunctionArgs<SetApplicationDecisionMutation>,
   FunctionReturnType<SetApplicationDecisionMutation>

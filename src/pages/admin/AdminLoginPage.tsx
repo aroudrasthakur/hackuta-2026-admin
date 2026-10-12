@@ -17,7 +17,7 @@ export function AdminLoginPage() {
   }
 
   if (isAuthenticated && staff) {
-    return <Navigate to={ADMIN_ROUTES.dashboard} replace />;
+    return <Navigate to={ADMIN_ROUTES.applications} replace />;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -26,7 +26,7 @@ export function AdminLoginPage() {
     setPending(true);
     try {
       await signIn(email.trim(), password);
-      navigate(ADMIN_ROUTES.dashboard, { replace: true });
+      navigate(ADMIN_ROUTES.applications, { replace: true });
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : "Sign-in failed. Please try again.";

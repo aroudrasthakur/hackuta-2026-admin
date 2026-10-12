@@ -46,15 +46,6 @@ The SPA obtains the token from `/api/admin/session-token`, which reads an HttpOn
 
 After detail loads, the page calls `logApplicationReviewAction` with `action: "viewed"`. The mutation requires a submitted application and appends an event with the session-derived admin ID and server timestamp. Repeated visits remain separate events; viewing never claims the application or changes review state.
 
-## Planned surface
-
-| Area | Expected functions |
-| --- | --- |
-| Application queue | `listSubmittedApplications` — submitted rows + current `applicationReviews` state |
-| Single review | Read-only detail is implemented; active review claiming is a follow-up |
-| Organizers | Read/write `admins` table for role checks |
-| Check-in | Participant lookup mutations (TBD) |
-
 ## Schema notes
 
 - `applicationReviews` — register-origin table editable in [schema.ts](../schema.ts); holds the current or final review state per application. `reviewedBy` (an `admins` id) is always set from the session, never from client args. `started_review` claims the review via [reviewClaim.ts](reviewClaim.ts): active claims block silent takeover, stale claims reset `startedAt`, and final decisions cannot restart review. `viewed` is log-only; decisions set `completedAt`. Decision patches live in [reviewState.ts](reviewState.ts).

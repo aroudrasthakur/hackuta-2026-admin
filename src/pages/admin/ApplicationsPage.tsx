@@ -3,7 +3,10 @@ import { Link } from "react-router-dom";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
-import { listSubmittedApplicationsRef } from "../../convex/adminApi";
+import {
+  listSubmittedApplicationsRef,
+  type SubmittedApplicationSummary,
+} from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import {
   dashboardReviewStatusLabel,
@@ -29,7 +32,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {applications.map((application) => (
+      {applications.map((application: SubmittedApplicationSummary) => (
         <li key={application.applicationId}>
           <article className="flex h-full flex-col rounded-lg border border-sand bg-white/60 p-5 shadow-sm">
             <header className="space-y-1">
