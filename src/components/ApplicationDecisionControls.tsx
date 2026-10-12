@@ -2,6 +2,9 @@ import { useMutation } from "convex/react";
 import { useState } from "react";
 import type { GenericId } from "convex/values";
 import { setApplicationDecisionRef, type ApplicationDetail } from "../convex/adminApi";
+import { formatMutationError } from "../lib/formatMutationError";
+import { reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../lib/reviewButtonClasses";
+import { ReviewPanelSection } from "./ReviewPanelSection";
 
 type PendingDecision = "accepted" | "rejected" | "waitlisted";
 
@@ -76,7 +79,7 @@ export function ApplicationDecisionControls({
       );
       setPendingDecision(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to finalize decision.");
+      setError(formatMutationError(caught, "Unable to finalize decision."));
     } finally {
       setConfirming(false);
     }
@@ -89,17 +92,11 @@ export function ApplicationDecisionControls({
   const pendingCopy = pendingDecision ? confirmCopy[pendingDecision] : null;
 
   return (
-    <section
+    <ReviewPanelSection
       aria-label="Application decision"
-      className="rounded-lg border border-sand bg-white/60 p-4 space-y-3"
+      title="Decision"
+      description="Choose accept, reject, or waitlist. Nothing is saved until you confirm on the next step."
     >
-      <div className="space-y-1">
-        <h3 className="font-display text-lg text-night">Decision</h3>
-        <p className="text-sm text-mist">
-          Choose accept, reject, or waitlist. Nothing is saved until you confirm on the next step.
-        </p>
-      </div>
-
       {error && (
         <p role="alert" className="text-sm text-ink">
           {error}
@@ -115,21 +112,21 @@ export function ApplicationDecisionControls({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className="rounded-md border border-ocean bg-ocean px-4 py-2 text-sm font-medium text-light hover:bg-ink"
+            className={reviewPrimaryButtonClass}
             onClick={() => selectDecision("accepted")}
           >
             Accept
           </button>
           <button
             type="button"
-            className="rounded-md border border-sand bg-white px-4 py-2 text-sm font-medium text-night hover:bg-clay/40"
+            className={reviewSecondaryButtonClass}
             onClick={() => selectDecision("rejected")}
           >
             Reject
           </button>
           <button
             type="button"
-            className="rounded-md border border-sand bg-white px-4 py-2 text-sm font-medium text-night hover:bg-clay/40"
+            className={reviewSecondaryButtonClass}
             onClick={() => selectDecision("waitlisted")}
           >
             Waitlist
@@ -145,7 +142,7 @@ export function ApplicationDecisionControls({
             <button
               type="button"
               disabled={confirming}
-              className="rounded-md border border-ocean bg-ocean px-4 py-2 text-sm font-medium text-light hover:bg-ink disabled:opacity-60"
+              className={reviewPrimaryButtonClass}
               onClick={() => void confirmDecision()}
             >
               {confirming ? "Finalizing…" : pendingCopy.confirmLabel}
@@ -153,7 +150,7 @@ export function ApplicationDecisionControls({
             <button
               type="button"
               disabled={confirming}
-              className="rounded-md border border-sand bg-white px-4 py-2 text-sm font-medium text-night hover:bg-clay/40 disabled:opacity-60"
+              className={reviewSecondaryButtonClass}
               onClick={cancelPending}
             >
               Cancel
@@ -161,6 +158,6 @@ export function ApplicationDecisionControls({
           </div>
         </div>
       )}
-    </section>
+    </ReviewPanelSection>
   );
 }

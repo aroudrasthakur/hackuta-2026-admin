@@ -1,16 +1,18 @@
-import { convexTest } from "convex-test";
 import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
-import schema from "../../convex/schema";
-import { hashPassword } from "../../convex/admin/passwordHash";
+import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import {
+  createStaffAuthorizationFixture,
+  ORGANIZER_TEST_PASSWORD,
+  seedAdminAccount,
+  seedSubmittedApplication,
+} from "../helpers/staffTestFixtures";
 import {
   ADMIN_SESSION_TTL_MS,
   getCurrentAdmin,
   hashSessionToken,
 } from "../../convex/admin/staffAuth";
-
-const modules = import.meta.glob("../../convex/**/*.ts", { eager: false });
 
 const ref = {
   signIn: makeFunctionReference<
@@ -59,91 +61,23 @@ const ref = {
   >("admin/applicationReviewLogs:listApplicationReviewLogs"),
 };
 
-const createTest = () => convexTest(schema, modules);
-type TestInstance = ReturnType<typeof createTest>;
-
-const TEST_PASSWORD = "SecurePass1";
-
-async function seedAdmin(
-  t: TestInstance,
-  fields: {
-    email: string;
-    role: "reviewer" | "admin";
-    active: boolean;
-    password?: string;
-  },
-) {
-  const adminId = await t.run((ctx) =>
-    ctx.db.insert("admins", {
-      email: fields.email,
-      name: "Test Organizer",
-      role: fields.role,
-      active: fields.active,
-      createdAt: 1,
-      updatedAt: 1,
-    }),
-  );
-  const passwordHash = await hashPassword(fields.password ?? TEST_PASSWORD);
-  await t.run((ctx) =>
-    ctx.db.insert("adminAuthAccounts", {
-      adminId,
-      passwordHash,
-      createdAt: 1,
-      updatedAt: 1,
-    }),
-  );
-  return adminId;
-}
-
-async function seedApplication(t: TestInstance, email = "applicant@example.com") {
-  const userId = await t.run((ctx) =>
-    ctx.db.insert("users", { email, name: "Applicant" }),
-  );
-  const applicationId = await t.run((ctx) =>
-    ctx.db.insert("applications", {
-      authUserId: userId,
-      email,
-      createdAt: 1,
-      formSubmitted: true,
-      submittedAt: 2,
-    }),
-  );
-  await t.run((ctx) =>
-    ctx.db.insert("applicationReviews", {
-      applicationId,
-      status: "under_review",
-      createdAt: 1,
-      updatedAt: 1,
-    }),
-  );
-  return applicationId;
-}
+const createTest = createConvexTest;
+type TestInstance = ConvexTestInstance;
 
 async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer") {
   const t = createTest();
-  const sessionToken = "a".repeat(64);
-  const sessionTokenHash = await hashSessionToken(sessionToken);
-  const records = await t.run(async (ctx) => {
-    const adminId = await ctx.db.insert("admins", {
-      email: "staff@hackuta.org", name: "Test Organizer", role, active: true,
-      createdAt: 1, updatedAt: 1,
-    });
-    const sessionId = await ctx.db.insert("adminSessions", {
-      adminId, sessionTokenHash, createdAt: Date.now(), expiresAt: Date.now() + 60_000,
-    });
-    return { adminId, sessionId };
-  });
-  return { t, ...records, sessionToken, applicationId: await seedApplication(t) };
+  const fixture = await createStaffAuthorizationFixture(t, role);
+  return { t, ...fixture };
 }
 
 describe("organizer auth boundary", () => {
   it("signs in with valid credentials and resolves staff from session token", async () => {
     const t = createTest();
-    await seedAdmin(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
+    await seedAdminAccount(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
 
     const { sessionToken } = await t.mutation(ref.signIn, {
       email: "reviewer@hackuta.org",
-      password: TEST_PASSWORD,
+      password: ORGANIZER_TEST_PASSWORD,
     });
 
     const staff = await t.query(ref.getCurrentStaff, { sessionToken });
@@ -156,7 +90,7 @@ describe("organizer auth boundary", () => {
 
   it("rejects wrong password without revealing account existence details", async () => {
     const t = createTest();
-    await seedAdmin(t, { email: "admin@hackuta.org", role: "admin", active: true });
+    await seedAdminAccount(t, { email: "admin@hackuta.org", role: "admin", active: true });
 
     await expect(
       t.mutation(ref.signIn, { email: "admin@hackuta.org", password: "WrongPass1" }),
@@ -165,10 +99,10 @@ describe("organizer auth boundary", () => {
 
   it("rejects inactive accounts at sign-in", async () => {
     const t = createTest();
-    await seedAdmin(t, { email: "inactive@hackuta.org", role: "admin", active: false });
+    await seedAdminAccount(t, { email: "inactive@hackuta.org", role: "admin", active: false });
 
     await expect(
-      t.mutation(ref.signIn, { email: "inactive@hackuta.org", password: TEST_PASSWORD }),
+      t.mutation(ref.signIn, { email: "inactive@hackuta.org", password: ORGANIZER_TEST_PASSWORD }),
     ).rejects.toThrow(/inactive/i);
   });
 
@@ -180,7 +114,7 @@ describe("organizer auth boundary", () => {
 
   it("returns null for expired session tokens", async () => {
     const t = createTest();
-    const adminId = await seedAdmin(t, {
+    const adminId = await seedAdminAccount(t, {
       email: "expired@hackuta.org",
       role: "admin",
       active: true,
@@ -202,15 +136,15 @@ describe("organizer auth boundary", () => {
 
   it("invalidates previous sessions when the same admin signs in again", async () => {
     const t = createTest();
-    await seedAdmin(t, { email: "rotate@hackuta.org", role: "admin", active: true });
+    await seedAdminAccount(t, { email: "rotate@hackuta.org", role: "admin", active: true });
 
     const first = await t.mutation(ref.signIn, {
       email: "rotate@hackuta.org",
-      password: TEST_PASSWORD,
+      password: ORGANIZER_TEST_PASSWORD,
     });
     const second = await t.mutation(ref.signIn, {
       email: "rotate@hackuta.org",
-      password: TEST_PASSWORD,
+      password: ORGANIZER_TEST_PASSWORD,
     });
 
     expect(first.sessionToken).not.toEqual(second.sessionToken);
@@ -222,11 +156,11 @@ describe("organizer auth boundary", () => {
 
   it("blocks reviewer role from admin-only review history", async () => {
     const t = createTest();
-    await seedAdmin(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
-    const applicationId = await seedApplication(t);
+    await seedAdminAccount(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
+    const applicationId = await seedSubmittedApplication(t);
     const { sessionToken } = await t.mutation(ref.signIn, {
       email: "reviewer@hackuta.org",
-      password: TEST_PASSWORD,
+      password: ORGANIZER_TEST_PASSWORD,
     });
 
     await expect(
@@ -240,11 +174,11 @@ describe("organizer auth boundary", () => {
 
   it("allows admin role to read review history", async () => {
     const t = createTest();
-    await seedAdmin(t, { email: "admin@hackuta.org", role: "admin", active: true });
-    const applicationId = await seedApplication(t);
+    await seedAdminAccount(t, { email: "admin@hackuta.org", role: "admin", active: true });
+    const applicationId = await seedSubmittedApplication(t);
     const { sessionToken } = await t.mutation(ref.signIn, {
       email: "admin@hackuta.org",
-      password: TEST_PASSWORD,
+      password: ORGANIZER_TEST_PASSWORD,
     });
 
     const page = await t.query(ref.listApplicationReviewLogs, {
@@ -257,7 +191,7 @@ describe("organizer auth boundary", () => {
 
   it("requires a valid session for protected organizer mutations", async () => {
     const t = createTest();
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await expect(
       t.mutation(ref.logApplicationReviewAction, {
@@ -270,10 +204,10 @@ describe("organizer auth boundary", () => {
 
   it("sign-out removes the active session token", async () => {
     const t = createTest();
-    await seedAdmin(t, { email: "logout@hackuta.org", role: "admin", active: true });
+    await seedAdminAccount(t, { email: "logout@hackuta.org", role: "admin", active: true });
     const { sessionToken } = await t.mutation(ref.signIn, {
       email: "logout@hackuta.org",
-      password: TEST_PASSWORD,
+      password: ORGANIZER_TEST_PASSWORD,
     });
 
     await t.mutation(ref.signOut, { sessionToken });
@@ -282,8 +216,8 @@ describe("organizer auth boundary", () => {
 });
 
 async function signInAs(t: TestInstance, email: string, role: "reviewer" | "admin" = "reviewer") {
-  const adminId = await seedAdmin(t, { email, role, active: true });
-  const { sessionToken } = await t.mutation(ref.signIn, { email, password: TEST_PASSWORD });
+  const adminId = await seedAdminAccount(t, { email, role, active: true });
+  const { sessionToken } = await t.mutation(ref.signIn, { email, password: ORGANIZER_TEST_PASSWORD });
   return { adminId, sessionToken };
 }
 
@@ -300,7 +234,7 @@ describe("application review state", () => {
   it("does not treat viewing as review activity", async () => {
     const t = createTest();
     const { sessionToken } = await signInAs(t, "viewer@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.logApplicationReviewAction, {
       sessionToken,
@@ -348,7 +282,7 @@ describe("application review state", () => {
   it("assigns the session admin and timestamps when a review is started", async () => {
     const t = createTest();
     const { adminId, sessionToken } = await signInAs(t, "starter@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.logApplicationReviewAction, {
       sessionToken,
@@ -368,7 +302,7 @@ describe("application review state", () => {
     const t = createTest();
     const first = await signInAs(t, "first@hackuta.org");
     const second = await signInAs(t, "second@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.logApplicationReviewAction, {
       sessionToken: first.sessionToken,
@@ -393,7 +327,7 @@ describe("application review state", () => {
     const t = createTest();
     const first = await signInAs(t, "first@hackuta.org");
     const second = await signInAs(t, "second@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.logApplicationReviewAction, {
       sessionToken: first.sessionToken,
@@ -428,7 +362,7 @@ describe("application review state", () => {
   it("refreshes activity without a duplicate started_review log for the same reviewer", async () => {
     const t = createTest();
     const { adminId, sessionToken } = await signInAs(t, "owner@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.logApplicationReviewAction, {
       sessionToken,
@@ -456,7 +390,7 @@ describe("application review state", () => {
   it("rejects starting review after a final decision", async () => {
     const t = createTest();
     const { sessionToken } = await signInAs(t, "decider@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.setApplicationDecision, {
       sessionToken,
@@ -477,7 +411,7 @@ describe("application review state", () => {
     const t = createTest();
     const reviewer = await signInAs(t, "owner@hackuta.org");
     const other = await signInAs(t, "other@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.logApplicationReviewAction, {
       sessionToken: reviewer.sessionToken,
@@ -500,7 +434,7 @@ describe("application review state", () => {
   it("records reviewer, completion, and activity on a decision", async () => {
     const t = createTest();
     const { adminId, sessionToken } = await signInAs(t, "decider@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.setApplicationDecision, {
       sessionToken,
@@ -518,7 +452,7 @@ describe("application review state", () => {
   it("sets completedAt and reviewedBy on acceptance", async () => {
     const t = createTest();
     const { adminId, sessionToken } = await signInAs(t, "accepter@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.mutation(ref.setApplicationDecision, {
       sessionToken,
@@ -534,7 +468,7 @@ describe("application review state", () => {
   it("returns duplicate without adding another decision log on repeated confirmation", async () => {
     const t = createTest();
     const { sessionToken } = await signInAs(t, "double@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     const first = await t.mutation(ref.setApplicationDecision, {
       sessionToken,
@@ -560,7 +494,7 @@ describe("application review state", () => {
   it("returns duplicate when more than ten activity logs precede the final decision", async () => {
     const t = createTest();
     const { adminId, sessionToken } = await signInAs(t, "busy@hackuta.org");
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await t.run(async (ctx) => {
       for (let i = 0; i < 12; i += 1) {
@@ -596,7 +530,7 @@ describe("application review state", () => {
 
   it("rejects review mutations without a valid admin session", async () => {
     const t = createTest();
-    const applicationId = await seedApplication(t);
+    const applicationId = await seedSubmittedApplication(t);
 
     await expect(
       t.mutation(ref.setApplicationDecision, {
@@ -660,7 +594,7 @@ describe("centralized staff authorization", () => {
       expect(await t.run((ctx) => ctx.db.get(activityId))).toMatchObject({ adminId });
 
       for (const [index, decision] of ["rejected", "waitlisted", "accepted"].entries()) {
-        const appId = await seedApplication(t, `applicant-${role}-${index}@example.com`);
+        const appId = await seedSubmittedApplication(t, `applicant-${role}-${index}@example.com`);
         const { logId, duplicate } = await t.mutation(ref.setApplicationDecision, {
           sessionToken, applicationId: appId, decision,
         });

@@ -1,16 +1,13 @@
-import { convexTest } from "convex-test";
 import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
-import schema from "../../convex/schema";
 import { hashSessionToken } from "../../convex/admin/staffAuth";
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../../src/convex/adminApi";
-
-const modules = import.meta.glob("../../convex/**/*.ts", { eager: false });
+import { createConvexTest } from "../helpers/convexTestContext";
 const tokens = { admin: "a".repeat(64), reviewer: "b".repeat(64) };
 const firstPage = { numItems: 25, cursor: null };
 
 async function createFixture() {
-  const t = convexTest(schema, modules);
+  const t = createConvexTest();
   const hashes = {
     admin: await hashSessionToken(tokens.admin),
     reviewer: await hashSessionToken(tokens.reviewer),

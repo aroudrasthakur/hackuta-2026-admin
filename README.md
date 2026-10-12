@@ -1,123 +1,40 @@
 # hackuta-2026-admin
 
-Organizer dashboard for HackUTA 2026. This app **owns all Convex deploys** for the shared HackUTA project (`standing-manatee-425` and production).
+Organizer app for HackUTA 2026. **Owns Convex deploys** for the shared project (`standing-manatee-425` and production).
 
-[`hackuta-2026-register`](../hackuta-2026-register) remains the registration frontend; it **does not push** to Convex. Registration tables and backend modules are **frozen** in this repo — see [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md). Admin-owned schema tables include `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, `adminAuthAccounts`, and `adminSessions`.
+[`hackuta-2026-register`](../hackuta-2026-register) is the applicant frontend; it does not push to Convex. Register-owned backend files are frozen here — see [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md).
 
 ## Stack
 
-- [Vite](https://vitejs.dev/) + React 19 + TypeScript
-- [React Router](https://reactrouter.com/) for client routing
-- [Convex](https://www.convex.dev/) (schema + functions in `convex/`)
-- [Tailwind CSS v4](https://tailwindcss.com/) with HackUTA design tokens
-
-## Repository layout
-
-| Path | README | Purpose |
-| --- | --- | --- |
-| `src/` | [src/README.md](src/README.md) | Admin UI (routes, layouts, pages) |
-| `convex/` | [convex/README.md](convex/README.md) | Backend — registration modules (locked) + admin modules |
-| `shared/` | [shared/README.md](shared/README.md) | Registration isomorphic code (locked) + `shared/admin/` |
-| `scripts/` | [scripts/README.md](scripts/README.md) | Codegen stub, schema lock, whitespace check |
-| `docs/` | [docs/README.md](docs/README.md) | Architecture and operations docs |
-
-Key files: [convex/schema.ts](convex/schema.ts) (admin-owned tables), [convex/admin/auth.ts](convex/admin/auth.ts) (organizer sign-in), [convex/REGISTER_SCHEMA.md](convex/REGISTER_SCHEMA.md) (67 immutable code paths).
+Vite, React 19, TypeScript, React Router, Convex, Tailwind CSS v4.
 
 ## Routes
 
-| Path | Page |
+| Path | Purpose |
 | --- | --- |
-| `/` | Redirects to `/admin` |
-| `/admin/login` | Organizer email + password sign-in |
-| `/admin` | Dashboard (requires session) |
-| `/admin/applications` | Application queue (placeholder) |
-| `/admin/applications/:applicationId` | Single application review |
-| `/admin/participants` | Participant roster (placeholder) |
-| `/admin/check-in` | Check-in tools (placeholder) |
+| `/admin/login` | Organizer sign-in |
+| `/admin/applications` | Submitted application queue |
+| `/admin/applications/:id` | Application review, decisions, history (admin) |
 
-## Convex workflow
+`/admin` redirects to the applications queue.
 
-1. Copy `.env.example` → `.env.local` and set `CONVEX_DEPLOYMENT=dev:standing-manatee-425`.
-2. Read [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md) — do not edit register-locked files.
-3. **Schema / functions:** edit admin-owned schema tables and `convex/admin/` only.
-4. **Codegen:** `npm run convex:codegen` (or `npm run convex:dev` while developing).
-5. **Verify lock:** `npm run verify:register-schema-lock` (also runs before `convex:push-dev`).
-6. **Push to shared dev:** `npm run convex:push-dev` (standing-manatee-425).
-7. **Deploy production backend:** `npm run convex:deploy` when ready.
+## Commands
 
-If register source files change upstream, run `npm run register-schema-lock:refresh` (requires sibling register repo) and commit the updated manifest.
-
-## Local development
-
-```bash
-cp .env.example .env.local
-npm install
-npm run convex:codegen   # after schema/function changes, when .env.local is configured
-npm run dev
-```
-
-Dev server: [http://127.0.0.1:5373](http://127.0.0.1:5373)
-
-## Scripts
-
-| Script | Description |
+| Script | Purpose |
 | --- | --- |
-| `npm run dev` | Vite dev server |
-| `npm run build` | Typecheck + production build |
-| `npm run typecheck` | `src` + `convex/` |
-| `npm run lint` | ESLint on `src`, `convex`, `scripts` |
-| `npm run check:whitespace` | Fail if tracked text files lack a final newline |
-| `npm run verify:register-schema-lock` | Fail if register-frozen files drift |
-| `npm run register-schema-lock:refresh` | Re-copy lock manifest from sibling register repo |
-| `npm run convex:dev` | Convex dev (watch + codegen) |
-| `npm run convex:push-dev` | One-shot push to standing-manatee-425 |
-| `npm run convex:codegen` | Regenerate `convex/_generated/` |
-| `npm run convex:deploy` | Deploy to production Convex |
+| `npm run dev` | Vite + local API |
+| `npm run convex:push-dev` | Push to standing-manatee-425 (runs schema lock verify) |
+| `npm run test:unit` | Vitest |
+| `npm run verify:register-schema-lock` | Fail if register-locked files drift |
 
-## Environment variables
+Copy `.env.example` → `.env.local` with `CONVEX_DEPLOYMENT=dev:standing-manatee-425`.
 
-| Variable | Where | Notes |
-| --- | --- | --- |
-| `VITE_CONVEX_URL` | Vite / Vercel Config | Convex deployment URL (browser) |
-| `CONVEX_DEPLOYMENT` | Local CLI only | e.g. `dev:standing-manatee-425` for `convex dev` / deploy |
+## Layout
 
-See [`.env.example`](.env.example).
-
-## Deployment (Vercel)
-
-- SPA rewrites in `vercel.json`
-- Set `VITE_CONVEX_URL` for production
-- Deploy Convex backend from this repo with `npm run convex:deploy`
-- `X-Robots-Tag: noindex` — internal organizer tool
-
-## Organizer auth
-
-Organizer accounts are **separate from applicant auth** (no public sign-up). The `admins` table is the source of identity, role, and `active` status. Credentials live in `adminAuthAccounts` (Scrypt password hashes); sessions in `adminSessions` (hashed tokens, 24-hour TTL). The browser stores the raw session token in an **HttpOnly, SameSite=Strict** cookie (`/api/admin/*`); it is never written to `sessionStorage` or `localStorage`.
-
-Provision a first account on `standing-manatee-425`:
-
-1. Insert an `admins` row in the Convex dashboard (`email`, `name`, `role`, `active: true`).
-2. Set credentials via internal mutation:
-
-   ```powershell
-   npx.cmd --% convex run admin/auth:provisionAdminAuthAccount "{\"adminId\":\"YOUR_ADMIN_ID\",\"password\":\"YourSecurePass1\"}"
-   ```
-
-3. Sign in at `/admin/login`.
-
-Protected routes and admin Convex functions require a valid `sessionToken`; role is always resolved server-side from `admins`.
-
-## Documentation
-
-| Doc | Audience |
+| Path | Notes |
 | --- | --- |
-| [docs/README.md](docs/README.md) | Documentation index |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repo layout and deploy ownership |
-| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Deploy checklist and env vars |
-| [convex/REGISTER_SCHEMA.md](convex/REGISTER_SCHEMA.md) | Register lock — file-by-file |
+| [`src/`](src/README.md) | Admin UI |
+| [`convex/admin/`](convex/admin/README.md) | Organizer Convex functions |
+| [`convex/REGISTER_SCHEMA.md`](convex/REGISTER_SCHEMA.md) | Lock policy |
 
-Each major directory has a `README.md` with an overview table, usage, and related links (same style as [hackuta-2026-register](https://github.com/aroudrasthakur/hackuta-2026-register)).
-
-## Workspace
-
-Included in [`hackuta-2026-repository/hackuta.code-workspace`](../hackuta-2026-repository/hackuta.code-workspace) alongside register and the marketing site.
+Provision organizer accounts: insert `admins`, then `npx convex run admin/auth:provisionAdminAuthAccount '{"adminId":"<id>","password":"..."}'` (see [`convex/admin/README.md`](convex/admin/README.md)).
