@@ -446,7 +446,10 @@ describe("application review state", () => {
     const after = await getReview(t, applicationId);
     expect(after?.reviewedBy).toBe(adminId);
     expect(after?.startedAt).toBe(before?.startedAt);
-    expect(after?.lastActiveAt).toBeGreaterThan(before?.lastActiveAt!);
+    if (before?.lastActiveAt === undefined || after?.lastActiveAt === undefined) {
+      throw new Error("expected review activity timestamps");
+    }
+    expect(after.lastActiveAt).toBeGreaterThan(before.lastActiveAt);
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toHaveLength(1);
   });
 
