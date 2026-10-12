@@ -7,7 +7,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | Path | Summary |
 | --- | --- |
 | [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
-| [staffAuth.ts](staffAuth.ts) | Session token hashing and `requireAdminSession` guard |
+| [staffAuth.ts](staffAuth.ts) | Session resolution and reusable reviewer/admin authorization helpers |
 | [passwordHash.ts](passwordHash.ts) | Scrypt password hash + verify |
 | [fields.ts](fields.ts) | Shared Convex validators for admin-owned tables |
 | [participantCreation.ts](participantCreation.ts) | Idempotent participant lookup/insert (`applicationId` + `authUserId`) |
@@ -25,7 +25,17 @@ Organizer auth is **independent** from applicant Convex Auth (`convex/auth.ts`).
 | `adminAuthAccounts` | One password hash per admin (`adminId`) |
 | `adminSessions` | Hashed session tokens with `expiresAt` |
 
-Public mutations accept `sessionToken`; `requireAdminSession` resolves the active `admins` row. Role is never accepted from the client. The SPA obtains the token from `/api/admin/session-token`, which reads an HttpOnly cookie set by `/api/admin/sign-in`. Sign-in clears any prior sessions for that admin.
+Protected queries and mutations accept `sessionToken`. The helpers take `(ctx, sessionToken)` because internal authentication uses explicit session tokens:
+
+- `getCurrentAdmin` returns the active `admins` record, or `null` for an invalid, expired, revoked, or orphaned session.
+- `requireReviewerAccess` allows active reviewers and admins; activity logging and application decisions use it.
+- `requireAdminRole` allows only active admins; historical review log queries use it.
+
+Each protected request resolves the current stored role and active status. Acting identity always comes from the returned `admin._id`, including `applicationReviews.reviewedByAdmin`, `applicationReviewLogs.adminId`, and `participants.acceptedBy`; public operations never accept an acting admin ID or role. Applicant authentication cannot satisfy these guards.
+
+Application decisions require a submitted application, even if a draft already has a review row. Both the submission flag and legacy submission timestamp are supported. Draft rejection leaves the application, review, audit logs, and participants unchanged.
+
+The SPA obtains the token from `/api/admin/session-token`, which reads an HttpOnly cookie set by `/api/admin/sign-in`. Sign-in clears any prior sessions for that admin. These functions use the existing `standing-manatee-425` deployment configured in `.env.example`.
 
 ## Planned surface
 
