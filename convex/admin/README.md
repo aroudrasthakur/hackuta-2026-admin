@@ -13,7 +13,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [fields.ts](fields.ts) | Shared Convex validators for admin-owned tables |
 | [participantCreation.ts](participantCreation.ts) | Idempotent participant lookup/insert (`applicationId` + `authUserId`) |
 | [acceptanceDecision.ts](acceptanceDecision.ts) | Atomic accept → review update + audit log + participant row |
-| [applicationReviewLogs.ts](applicationReviewLogs.ts) | Review activity + decisions (requires `sessionToken`) |
+| [applicationReviewLogs.ts](applicationReviewLogs.ts) | Review activity + decisions; admin-only history, newest first with organizer names (requires `sessionToken`) |
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
 
 ## Authentication

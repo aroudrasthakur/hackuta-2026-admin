@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, StrictMode } from "react";
+import { act, StrictMode, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import type { GenericId } from "convex/values";
@@ -9,16 +9,23 @@ import { AdminProtectedRoute } from "../../src/components/AdminProtectedRoute";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
   getApplicationRef,
+  listApplicationReviewLogsRef,
   listSubmittedApplicationsRef,
   logApplicationReviewActionRef,
   type ApplicationDetail,
 } from "../../src/convex/adminApi";
-import { ApplicationReviewPage } from "../../src/pages/admin/ApplicationReviewPage";
+import {
+  ApplicationReviewContent,
+  ApplicationReviewPage,
+} from "../../src/pages/admin/ApplicationReviewPage";
 import { ApplicationsPage } from "../../src/pages/admin/ApplicationsPage";
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), mutationHook: vi.fn(), recordView: vi.fn(), actionHook: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  query: vi.fn(), paginatedQuery: vi.fn(), mutationHook: vi.fn(), recordView: vi.fn(), actionHook: vi.fn(),
+}));
 vi.mock("convex/react", () => ({
-  useQuery: mocks.query, useMutation: mocks.mutationHook, useAction: mocks.actionHook,
+  useQuery: mocks.query, usePaginatedQuery: mocks.paginatedQuery,
+  useMutation: mocks.mutationHook, useAction: mocks.actionHook,
 }));
 
 function applicationDetail(): ApplicationDetail {
@@ -71,6 +78,7 @@ describe("read-only application review page", () => {
       if (ref === listSubmittedApplicationsRef) return [];
       return applicationDetail();
     });
+    mocks.paginatedQuery.mockReset().mockReturnValue({ results: [], status: "Exhausted", loadMore: vi.fn() });
     mocks.mutationHook.mockReset().mockReturnValue(mocks.recordView);
     mocks.recordView.mockReset().mockResolvedValue("view-log");
     mocks.actionHook.mockReset();
@@ -159,6 +167,24 @@ describe("read-only application review page", () => {
     expect(container.textContent).toContain("Review status: Under Review");
     expect(container.querySelectorAll("input, textarea, select")).toHaveLength(0);
     expect(container.textContent).toContain("Start review");
+  });
+
+  it.each(["reviewer", "admin"] as const)("shows review history only to admin accounts (%s)", async (role) => {
+    const context = staffContext();
+    context.staff = { ...context.staff!, role };
+    await renderPage({ context });
+    const history = container.querySelector('section[aria-label="Review history"]');
+    if (role === "admin") {
+      expect(history).not.toBeNull();
+      expect(mocks.paginatedQuery).toHaveBeenCalledWith(
+        listApplicationReviewLogsRef,
+        { sessionToken: "internal-session", applicationId: "application-a" },
+        { initialNumItems: 50 },
+      );
+    } else {
+      expect(history).toBeNull();
+      expect(mocks.paginatedQuery).not.toHaveBeenCalled();
+    }
   });
 
   it("handles sparse and older applications without raw missing values", async () => {
@@ -289,6 +315,53 @@ describe("read-only application review page", () => {
     expect(container.textContent).toContain("Review status: Accepted");
     await renderPage();
     expect(mocks.recordView).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs viewed for each application when the review content stays mounted", async () => {
+    mocks.query.mockImplementation((ref, args: { applicationId: string }) => {
+      if (ref === listSubmittedApplicationsRef) return [];
+      const detail = applicationDetail();
+      detail.application._id = args.applicationId as GenericId<"applications">;
+      return detail;
+    });
+
+    function Harness() {
+      const [applicationId, setApplicationId] = useState("application-a");
+      return (
+        <>
+          <button type="button" data-testid="switch-app" onClick={() => setApplicationId("application-b")}>
+            Switch application
+          </button>
+          <ApplicationReviewContent
+            applicationId={applicationId}
+            sessionToken="internal-session"
+            staffAdminId="staff"
+            isAdmin={false}
+          />
+        </>
+      );
+    }
+
+    await act(async () =>
+      root.render(
+        <StrictMode>
+          <AdminAuthContext.Provider value={staffContext()}>
+            <Harness />
+          </AdminAuthContext.Provider>
+        </StrictMode>,
+      ),
+    );
+    expect(mocks.recordView).toHaveBeenCalledExactlyOnceWith({
+      sessionToken: "internal-session",
+      applicationId: "application-a",
+      action: "viewed",
+    });
+
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="switch-app"]')!.click());
+    expect(mocks.recordView.mock.calls.map(([args]) => args.applicationId)).toEqual([
+      "application-a",
+      "application-b",
+    ]);
   });
 
   it("records new visits to the same application and other applications", async () => {

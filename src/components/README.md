@@ -9,6 +9,7 @@ Shared React UI for the organizer admin app: navigation, staff route guard, appl
 | [AdminNav.tsx](AdminNav.tsx) | Primary nav links — dashboard, applications, participants, check-in |
 | [AdminProtectedRoute.tsx](AdminProtectedRoute.tsx) | Waits for staff authentication; redirects unauthenticated visitors |
 | [ApplicationDetail.tsx](ApplicationDetail.tsx) | Grouped read-only applicant answers, review status, and resume |
+| [ApplicationReviewHistory.tsx](ApplicationReviewHistory.tsx) | Admin-only, read-only review timeline from `applicationReviewLogs` |
 | [ErrorBoundary.tsx](ErrorBoundary.tsx) | Catches render errors; accepts a page fallback or shows ErrorState |
 | [states/](states/README.md) | LoadingState, ErrorState, EmptyState |
 
@@ -19,6 +20,7 @@ Shared React UI for the organizer admin app: navigation, staff route guard, appl
 | AdminNav | [AdminLayout](../layouts/AdminLayout.tsx) |
 | AdminProtectedRoute | [App.tsx](../App.tsx) — wraps `/admin` layout |
 | ApplicationDetail | [ApplicationReviewPage](../pages/admin/ApplicationReviewPage.tsx) |
+| ApplicationReviewHistory | ApplicationReviewPage — rendered for `admin` role only |
 | ErrorBoundary | [main.tsx](../main.tsx), ApplicationReviewPage |
 | states/* | Pages and ErrorBoundary |
 
