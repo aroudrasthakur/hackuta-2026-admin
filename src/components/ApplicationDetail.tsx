@@ -80,15 +80,18 @@ export function ApplicationDetail({ detail }: { detail: ApplicationDetailData })
             {fields.map(([field, label]) => {
               const value: unknown = application[field];
               const href = linkFields.includes(field) ? applicationLink(value) : null;
+              const answer = field === "dietaryRestrictions" && Array.isArray(value) && value.length === 0
+                ? "None selected"
+                : formatApplicationAnswer(value);
               return (
                 <div key={field} className={`min-w-0 ${wideFields.includes(field) ? "sm:col-span-2" : ""}`}>
                   <dt className="text-sm font-semibold text-ocean">{label}</dt>
                   <dd className="mt-1 whitespace-pre-wrap break-words text-sm">
                     {href ? (
                       <a href={href} target="_blank" rel="noreferrer" className="underline">
-                        {formatApplicationAnswer(value)}
+                        {answer}
                       </a>
-                    ) : field.endsWith("At") ? formatApplicationDate(value) : formatApplicationAnswer(value)}
+                    ) : field.endsWith("At") ? formatApplicationDate(value) : answer}
                   </dd>
                 </div>
               );
