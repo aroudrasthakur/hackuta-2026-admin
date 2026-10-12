@@ -51,7 +51,7 @@ async function findLatestDecisionLog(
     .query("applicationReviewLogs")
     .withIndex("by_application_createdAt", (q) => q.eq("applicationId", applicationId))
     .order("desc")
-    .take(10);
+    .collect();
   return logs.find((log) => log.action === decision) ?? null;
 }
 

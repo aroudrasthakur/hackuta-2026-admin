@@ -557,6 +557,43 @@ describe("application review state", () => {
     expect(logs.filter((log) => log.action === "rejected")).toHaveLength(1);
   });
 
+  it("returns duplicate when more than ten activity logs precede the final decision", async () => {
+    const t = createTest();
+    const { adminId, sessionToken } = await signInAs(t, "busy@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 12; i += 1) {
+        await ctx.db.insert("applicationReviewLogs", {
+          applicationId,
+          adminId,
+          action: "viewed",
+          createdAt: i + 1,
+        });
+      }
+    });
+
+    const first = await t.mutation(ref.setApplicationDecision, {
+      sessionToken,
+      applicationId,
+      decision: "waitlisted",
+    });
+    const second = await t.mutation(ref.setApplicationDecision, {
+      sessionToken,
+      applicationId,
+      decision: "waitlisted",
+    });
+
+    expect(second).toMatchObject({ duplicate: true, logId: first.logId });
+    const logs = await t.run((ctx) =>
+      ctx.db
+        .query("applicationReviewLogs")
+        .withIndex("by_application_createdAt", (q) => q.eq("applicationId", applicationId))
+        .collect(),
+    );
+    expect(logs.filter((log) => log.action === "waitlisted")).toHaveLength(1);
+  });
+
   it("rejects review mutations without a valid admin session", async () => {
     const t = createTest();
     const applicationId = await seedApplication(t);
