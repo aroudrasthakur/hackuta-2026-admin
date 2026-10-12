@@ -2,7 +2,7 @@ import { convexTest } from "convex-test";
 import { beforeEach, describe, expect, it } from "vitest";
 import schema from "../../convex/schema";
 import { hashSessionToken } from "../../convex/admin/staffAuth";
-import { getApplicationRef } from "../../src/convex/adminApi";
+import { getApplicationRef, logApplicationReviewActionRef } from "../../src/convex/adminApi";
 
 const modules = import.meta.glob("../../convex/**/*.ts", { eager: false });
 const sessionToken = "a".repeat(64);
@@ -32,6 +32,69 @@ async function createFixture() {
 describe("read-only submitted application detail", () => {
   let fixture: Awaited<ReturnType<typeof createFixture>>;
   beforeEach(async () => { fixture = await createFixture(); });
+
+  it.each(["reviewer", "admin"] as const)("records repeated %s views without claiming or changing the application", async (role) => {
+    const { t, adminId, applicationId } = fixture;
+    await t.run((ctx) => ctx.db.patch(adminId, { role }));
+    const before = await t.run((ctx) => ctx.db.get(applicationId));
+    const earliest = Date.now();
+    const ids = [];
+    for (let visit = 0; visit < 2; visit++) {
+      ids.push(await t.mutation(logApplicationReviewActionRef, { sessionToken, applicationId, action: "viewed" }));
+    }
+    expect(ids[0]).not.toBe(ids[1]);
+    const latest = Date.now();
+    const logs = await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect());
+    expect(logs).toHaveLength(2);
+    for (const log of logs) {
+      expect(log).toMatchObject({ applicationId, adminId, action: "viewed" });
+      expect(log.createdAt).toBeGreaterThanOrEqual(earliest);
+      expect(log.createdAt).toBeLessThanOrEqual(latest);
+    }
+    expect(await t.run((ctx) => ctx.db.get(applicationId))).toEqual(before);
+    expect(await t.run((ctx) => ctx.db.query("applicationReviews").collect())).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.query("participants").collect())).toEqual([]);
+  });
+
+  it("keeps separate reviewers' views and preserves existing review state", async () => {
+    const { t, adminId, applicationId } = fixture;
+    const otherToken = "b".repeat(64);
+    const sessionTokenHash = await hashSessionToken(otherToken);
+    const { otherAdminId, reviewId } = await t.run(async (ctx) => {
+      const otherAdminId = await ctx.db.insert("admins", {
+        email: "other@hackuta.org", name: "Other", role: "reviewer", active: true, createdAt: 1, updatedAt: 1,
+      });
+      await ctx.db.insert("adminSessions", {
+        adminId: otherAdminId, sessionTokenHash, createdAt: 1, expiresAt: Date.now() + 60_000,
+      });
+      const reviewId = await ctx.db.insert("applicationReviews", {
+        applicationId, status: "under_review", reviewedByAdmin: adminId, createdAt: 1, updatedAt: 1,
+      });
+      return { otherAdminId, reviewId };
+    });
+    const before = await t.run((ctx) => ctx.db.get(reviewId));
+    for (const token of [sessionToken, otherToken]) {
+      await t.mutation(logApplicationReviewActionRef, { sessionToken: token, applicationId, action: "viewed" });
+    }
+    const logs = await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect());
+    expect(logs.map((log) => log.adminId)).toEqual([adminId, otherAdminId]);
+    expect(await t.run((ctx) => ctx.db.get(reviewId))).toEqual(before);
+  });
+
+  it("rejects malformed, wrong-table, deleted, and draft applications without logging", async () => {
+    const { t, applicationId, userId } = fixture;
+    await t.run((ctx) => ctx.db.patch(applicationId, { formSubmitted: undefined, submittedAt: undefined }));
+    for (const id of ["bad-id", userId, applicationId]) {
+      await expect(t.mutation(logApplicationReviewActionRef, {
+        sessionToken, applicationId: id as typeof applicationId, action: "viewed",
+      })).rejects.toThrow();
+    }
+    await t.run((ctx) => ctx.db.delete(applicationId));
+    await expect(t.mutation(logApplicationReviewActionRef, {
+      sessionToken, applicationId, action: "viewed",
+    })).rejects.toThrow(/application not found/i);
+    expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
+  });
 
   it.each(["reviewer", "admin"] as const)("allows active %s accounts without writes or history", async (role) => {
     const { t, adminId, applicationId } = fixture;
