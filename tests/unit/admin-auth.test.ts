@@ -46,7 +46,7 @@ const ref = {
       applicationId: GenericId<"applications">;
       decision: "accepted" | "rejected" | "waitlisted";
     },
-    GenericId<"applicationReviewLogs">
+    { logId: GenericId<"applicationReviewLogs">; duplicate: boolean }
   >("admin/applicationReviewLogs:setApplicationDecision"),
   listApplicationReviewLogs: makeFunctionReference<
     "query",
@@ -95,14 +95,14 @@ async function seedAdmin(
   return adminId;
 }
 
-async function seedApplication(t: TestInstance) {
+async function seedApplication(t: TestInstance, email = "applicant@example.com") {
   const userId = await t.run((ctx) =>
-    ctx.db.insert("users", { email: "applicant@example.com", name: "Applicant" }),
+    ctx.db.insert("users", { email, name: "Applicant" }),
   );
   const applicationId = await t.run((ctx) =>
     ctx.db.insert("applications", {
       authUserId: userId,
-      email: "applicant@example.com",
+      email,
       createdAt: 1,
       formSubmitted: true,
       submittedAt: 2,
@@ -531,6 +531,32 @@ describe("application review state", () => {
     expect(review?.completedAt).toBeGreaterThan(1);
   });
 
+  it("returns duplicate without adding another decision log on repeated confirmation", async () => {
+    const t = createTest();
+    const { sessionToken } = await signInAs(t, "double@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    const first = await t.mutation(ref.setApplicationDecision, {
+      sessionToken,
+      applicationId,
+      decision: "rejected",
+    });
+    const second = await t.mutation(ref.setApplicationDecision, {
+      sessionToken,
+      applicationId,
+      decision: "rejected",
+    });
+
+    expect(second).toMatchObject({ duplicate: true, logId: first.logId });
+    const logs = await t.run((ctx) =>
+      ctx.db
+        .query("applicationReviewLogs")
+        .withIndex("by_application_createdAt", (q) => q.eq("applicationId", applicationId))
+        .collect(),
+    );
+    expect(logs.filter((log) => log.action === "rejected")).toHaveLength(1);
+  });
+
   it("rejects review mutations without a valid admin session", async () => {
     const t = createTest();
     const applicationId = await seedApplication(t);
@@ -596,12 +622,19 @@ describe("centralized staff authorization", () => {
       });
       expect(await t.run((ctx) => ctx.db.get(activityId))).toMatchObject({ adminId });
 
-      for (const decision of ["rejected", "waitlisted", "accepted"] as const) {
-        const logId = await t.mutation(ref.setApplicationDecision, {
-          sessionToken, applicationId, decision,
+      for (const [index, decision] of ["rejected", "waitlisted", "accepted"].entries()) {
+        const appId = await seedApplication(t, `applicant-${role}-${index}@example.com`);
+        const { logId, duplicate } = await t.mutation(ref.setApplicationDecision, {
+          sessionToken, applicationId: appId, decision,
         });
+        expect(duplicate).toBe(false);
         expect(await t.run((ctx) => ctx.db.get(logId))).toMatchObject({ adminId, action: decision });
-        const review = await t.run((ctx) => ctx.db.query("applicationReviews").unique());
+        const review = await t.run((ctx) =>
+          ctx.db
+            .query("applicationReviews")
+            .withIndex("by_application", (q) => q.eq("applicationId", appId))
+            .unique(),
+        );
         expect(review).toMatchObject({ status: decision, reviewedBy: adminId });
       }
       const participant = await t.run((ctx) => ctx.db.query("participants").unique());

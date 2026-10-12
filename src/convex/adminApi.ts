@@ -5,7 +5,10 @@ import {
   type FunctionReturnType,
 } from "convex/server";
 import type { getApplication, listSubmittedApplications } from "../../convex/admin/applications";
-import type { logApplicationReviewAction } from "../../convex/admin/applicationReviewLogs";
+import type {
+  logApplicationReviewAction,
+  setApplicationDecision,
+} from "../../convex/admin/applicationReviewLogs";
 
 export const getCurrentStaffRef = makeFunctionReference<"query">("admin/auth:getCurrentStaff");
 
@@ -40,3 +43,13 @@ export const logApplicationReviewActionRef = makeFunctionReference<
   FunctionArgs<ReviewActivityMutation>,
   FunctionReturnType<ReviewActivityMutation>
 >("admin/applicationReviewLogs:logApplicationReviewAction");
+
+type SetApplicationDecisionMutation = ApiFromModules<{
+  logs: { setApplicationDecision: typeof setApplicationDecision };
+}>["logs"]["setApplicationDecision"];
+
+export const setApplicationDecisionRef = makeFunctionReference<
+  "mutation",
+  FunctionArgs<SetApplicationDecisionMutation>,
+  FunctionReturnType<SetApplicationDecisionMutation>
+>("admin/applicationReviewLogs:setApplicationDecision");

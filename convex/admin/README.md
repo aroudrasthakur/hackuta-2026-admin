@@ -13,7 +13,10 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [fields.ts](fields.ts) | Shared Convex validators for admin-owned tables |
 | [participantCreation.ts](participantCreation.ts) | Idempotent participant lookup/insert (`applicationId` + `authUserId`) |
 | [acceptanceDecision.ts](acceptanceDecision.ts) | Atomic accept → review update + audit log + participant row |
-| [applicationReviewLogs.ts](applicationReviewLogs.ts) | Review activity + decisions (requires `sessionToken`) |
+| [applicationReviewLogs.ts](applicationReviewLogs.ts) | Review activity + confirmed decisions (requires `sessionToken`) |
+| [decisionFinalize.ts](decisionFinalize.ts) | Idempotent final decision: review patch, audit log, decision email schedule |
+| [decisionEmailTemplates.ts](decisionEmailTemplates.ts) | Plain-text copy for acceptance, rejection, and waitlist emails |
+| [sendDecisionEmails.ts](sendDecisionEmails.ts) | Internal action that sends decision notifications |
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
 
 ## Authentication
