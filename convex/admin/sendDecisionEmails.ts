@@ -2,18 +2,8 @@
 
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
-import { sendTrackedEmail } from "../email/emailService";
-import type { EmailDeliveryKind } from "../lib/emailDeliveries";
 import { buildDecisionEmailContent } from "./decisionEmailTemplates";
-
-const decisionEmailKind: Record<
-  "accepted" | "rejected" | "waitlisted",
-  EmailDeliveryKind
-> = {
-  accepted: "application_accepted",
-  rejected: "application_rejected",
-  waitlisted: "application_waitlisted",
-};
+import { sendDecisionEmailMessage } from "./decisionEmailService";
 
 /** Sends a single decision notification (acceptance, rejection, or waitlist). */
 export const sendDecisionEmail = internalAction({
@@ -25,7 +15,7 @@ export const sendDecisionEmail = internalAction({
   },
   handler: async (ctx, args) => {
     const content = buildDecisionEmailContent(args);
-    await sendTrackedEmail(ctx, decisionEmailKind[args.decision], {
+    await sendDecisionEmailMessage(ctx, args.decision, {
       to: args.email,
       subject: content.subject,
       text: content.text,

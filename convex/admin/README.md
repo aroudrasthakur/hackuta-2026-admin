@@ -16,7 +16,8 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [applicationReviewLogs.ts](applicationReviewLogs.ts) | Review activity + confirmed decisions (requires `sessionToken`) |
 | [decisionFinalize.ts](decisionFinalize.ts) | Idempotent final decision: review patch, audit log, decision email schedule |
 | [decisionEmailTemplates.ts](decisionEmailTemplates.ts) | Plain-text copy for acceptance, rejection, and waitlist emails |
-| [sendDecisionEmails.ts](sendDecisionEmails.ts) | Internal action — `sendTrackedEmail` + `application_*` delivery kinds (same as register mail actions) |
+| [decisionEmailService.ts](decisionEmailService.ts) | Decision mail via register-locked `sendMailMessage` (same email service HTTP client) |
+| [sendDecisionEmails.ts](sendDecisionEmails.ts) | Internal action that sends decision notifications |
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
 
 ## Authentication
