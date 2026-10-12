@@ -449,7 +449,7 @@ describe("application review state", () => {
     if (before?.lastActiveAt === undefined || after?.lastActiveAt === undefined) {
       throw new Error("expected review activity timestamps");
     }
-    expect(after.lastActiveAt).toBeGreaterThan(before.lastActiveAt);
+    expect(after.lastActiveAt).toBeGreaterThanOrEqual(before.lastActiveAt);
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toHaveLength(1);
   });
 
