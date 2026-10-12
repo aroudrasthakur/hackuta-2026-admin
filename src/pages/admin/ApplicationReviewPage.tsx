@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ApplicationDetail } from "../../components/ApplicationDetail";
 import { ApplicationReviewControls } from "../../components/ApplicationReviewControls";
+import { ApplicationReviewHistory } from "../../components/ApplicationReviewHistory";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
@@ -14,10 +15,12 @@ function ApplicationReviewContent({
   applicationId,
   sessionToken,
   staffAdminId,
+  isAdmin,
 }: {
   applicationId: string;
   sessionToken: string;
   staffAdminId: string;
+  isAdmin: boolean;
 }) {
   const detail = useQuery(getApplicationRef, { sessionToken, applicationId });
   const recordView = useMutation(logApplicationReviewActionRef);
@@ -53,6 +56,9 @@ function ApplicationReviewContent({
         staffAdminId={staffAdminId}
       />
       <ApplicationDetail detail={detail} />
+      {isAdmin && (
+        <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />
+      )}
     </>
   );
 }
@@ -79,6 +85,7 @@ export function ApplicationReviewPage() {
             applicationId={applicationId}
             sessionToken={sessionToken}
             staffAdminId={staff.adminId}
+            isAdmin={staff.role === "admin"}
           />
         </ErrorBoundary>
       ) : <LoadingState message="Verifying organizer session…" />}

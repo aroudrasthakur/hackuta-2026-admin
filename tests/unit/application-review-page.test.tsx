@@ -9,6 +9,7 @@ import { AdminProtectedRoute } from "../../src/components/AdminProtectedRoute";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
   getApplicationRef,
+  listApplicationReviewLogsRef,
   listSubmittedApplicationsRef,
   logApplicationReviewActionRef,
   type ApplicationDetail,
@@ -16,9 +17,12 @@ import {
 import { ApplicationReviewPage } from "../../src/pages/admin/ApplicationReviewPage";
 import { ApplicationsPage } from "../../src/pages/admin/ApplicationsPage";
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), mutationHook: vi.fn(), recordView: vi.fn(), actionHook: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  query: vi.fn(), paginatedQuery: vi.fn(), mutationHook: vi.fn(), recordView: vi.fn(), actionHook: vi.fn(),
+}));
 vi.mock("convex/react", () => ({
-  useQuery: mocks.query, useMutation: mocks.mutationHook, useAction: mocks.actionHook,
+  useQuery: mocks.query, usePaginatedQuery: mocks.paginatedQuery,
+  useMutation: mocks.mutationHook, useAction: mocks.actionHook,
 }));
 
 function applicationDetail(): ApplicationDetail {
@@ -71,6 +75,7 @@ describe("read-only application review page", () => {
       if (ref === listSubmittedApplicationsRef) return [];
       return applicationDetail();
     });
+    mocks.paginatedQuery.mockReset().mockReturnValue({ results: [], status: "Exhausted", loadMore: vi.fn() });
     mocks.mutationHook.mockReset().mockReturnValue(mocks.recordView);
     mocks.recordView.mockReset().mockResolvedValue("view-log");
     mocks.actionHook.mockReset();
@@ -159,6 +164,24 @@ describe("read-only application review page", () => {
     expect(container.textContent).toContain("Review status: Under Review");
     expect(container.querySelectorAll("input, textarea, select")).toHaveLength(0);
     expect(container.textContent).toContain("Start review");
+  });
+
+  it.each(["reviewer", "admin"] as const)("shows review history only to admin accounts (%s)", async (role) => {
+    const context = staffContext();
+    context.staff = { ...context.staff!, role };
+    await renderPage({ context });
+    const history = container.querySelector('section[aria-label="Review history"]');
+    if (role === "admin") {
+      expect(history).not.toBeNull();
+      expect(mocks.paginatedQuery).toHaveBeenCalledWith(
+        listApplicationReviewLogsRef,
+        { sessionToken: "internal-session", applicationId: "application-a" },
+        { initialNumItems: 50 },
+      );
+    } else {
+      expect(history).toBeNull();
+      expect(mocks.paginatedQuery).not.toHaveBeenCalled();
+    }
   });
 
   it("handles sparse and older applications without raw missing values", async () => {
