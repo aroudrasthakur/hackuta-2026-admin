@@ -34,7 +34,7 @@
     "convex/lib/dataModel.ts": "d2d8b242dbdb563a92b01d4cb96546bf4780cc85bc1a86b6fa1ce6a54eca49e4",
     "convex/lib/draftPatch.ts": "2d8d2b712dbeda8c4b93a3c572d8fd9a4af252a9f869d7fc11c0eaacb996718f",
     "convex/lib/draftResume.ts": "4adfc3d5afb397b150f3db680e012b3ce80f4b753ccf87a866eec89285f0c5ad",
-    "convex/lib/emailDeliveries.ts": "ee639d113fbd54505d9440d250c36a8a8386e48752cc050aeaa0dd685188f4db",
+    "convex/lib/emailDeliveries.ts": "cf2f1a7f8c462b6a1191e90ac68996fcb05a9647e240e19a15dda83417387e06",
     "convex/lib/eventConfig.ts": "c150ee0ca43b5fdf99b2a83cf888e2be0d85f393cadd19878a2ed18bf412b904",
     "convex/lib/hackutaPassword.ts": "b3cc94e9308bbd231db384ef6b502ff346e5152be859a2d9022bb4791a08e2a5",
     "convex/lib/invalidateAuthSessions.ts": "e82a30dabda89939056893ac7947f1fce87b67406a28f1331cbf2743797618d2",
