@@ -4,6 +4,7 @@ import {
   assertParticipantAcceptanceAllowed,
   ensureParticipantForAcceptance,
 } from "./participantCreation";
+import { decisionPatch } from "./reviewState";
 
 type ApplicationReviewDoc = DocumentByName<DataModel, "applicationReviews">;
 type AdminDoc = DocumentByName<DataModel, "admins">;
@@ -31,12 +32,10 @@ export async function applyAcceptedApplicationDecision(
   });
 
   const now = Date.now();
-  await ctx.db.patch(args.review._id, {
-    status: "accepted",
-    reviewedAt: now,
-    reviewedByAdmin: args.admin._id,
-    updatedAt: now,
-  });
+  await ctx.db.patch(
+    args.review._id,
+    decisionPatch(args.review, args.admin._id, "accepted", now),
+  );
 
   const logId = await ctx.db.insert("applicationReviewLogs", {
     applicationId: args.application._id,

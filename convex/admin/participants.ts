@@ -40,7 +40,7 @@ export const createParticipantFromAcceptance = internalMutation({
       applicationId,
       authUserId: application.authUserId,
       acceptedBy,
-      acceptedAt: review.reviewedAt ?? Date.now(),
+      acceptedAt: review.completedAt ?? Date.now(),
     });
     return participantId;
   },

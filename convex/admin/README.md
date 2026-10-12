@@ -32,7 +32,7 @@ Protected queries and mutations accept `sessionToken`. The helpers take `(ctx, s
 - `requireReviewerAccess` allows active reviewers and admins; activity logging and application decisions use it.
 - `requireAdminRole` allows only active admins; historical review log queries use it.
 
-Each protected request resolves the current stored role and active status. Acting identity always comes from the returned `admin._id`, including `applicationReviews.reviewedByAdmin`, `applicationReviewLogs.adminId`, and `participants.acceptedBy`; public operations never accept an acting admin ID or role. Applicant authentication cannot satisfy these guards.
+Each protected request resolves the current stored role and active status. Acting identity always comes from the returned `admin._id`, including `applicationReviews.reviewedBy`, `applicationReviewLogs.adminId`, and `participants.acceptedBy`; public operations never accept an acting admin ID or role. Applicant authentication cannot satisfy these guards.
 
 Application decisions require a submitted application, even if a draft already has a review row. Both the submission flag and legacy submission timestamp are supported. Draft rejection leaves the application, review, audit logs, and participants unchanged.
 
@@ -53,7 +53,7 @@ After detail loads, the page calls `logApplicationReviewAction` with `action: "v
 
 ## Schema notes
 
-- `applicationReviews` — register-origin review state table editable in [schema.ts](../schema.ts).
+- `applicationReviews` — register-origin table editable in [schema.ts](../schema.ts); holds the current or final review state per application. `reviewedBy` (an `admins` id) is always set from the session, never from client args. `started_review` claims the review (takeover allowed) and sets `startedAt`/`lastActiveAt`; `viewed` is log-only; decisions set `completedAt`. Patches live in [reviewState.ts](reviewState.ts).
 - `admins` — admin-only table.
 - `applicationReviewLogs` — append-only activity history; full history is restricted to admins.
 - `participants` — admin-only table; one row per accepted application (reuses `users`, no applicant data copied).

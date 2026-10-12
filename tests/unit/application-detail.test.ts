@@ -68,7 +68,7 @@ describe("read-only submitted application detail", () => {
         adminId: otherAdminId, sessionTokenHash, createdAt: 1, expiresAt: Date.now() + 60_000,
       });
       const reviewId = await ctx.db.insert("applicationReviews", {
-        applicationId, status: "under_review", reviewedByAdmin: adminId, createdAt: 1, updatedAt: 1,
+        applicationId, status: "under_review", reviewedBy: adminId, createdAt: 1, updatedAt: 1,
       });
       return { otherAdminId, reviewId };
     });
@@ -101,7 +101,7 @@ describe("read-only submitted application detail", () => {
     await t.run(async (ctx) => {
       await ctx.db.patch(adminId, { role });
       await ctx.db.insert("applicationReviews", {
-        applicationId, status: "accepted", reviewedByAdmin: adminId, createdAt: 2, updatedAt: 3,
+        applicationId, status: "accepted", reviewedBy: adminId, createdAt: 2, updatedAt: 3,
       });
       await ctx.db.insert("applicationReviewLogs", {
         applicationId, adminId, action: "accepted", createdAt: 3,

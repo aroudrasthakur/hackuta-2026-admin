@@ -44,19 +44,26 @@ export default defineSchema({
     .index("by_resume", ["resumeStorageId"]),
 
   // --- ADMIN-OWNED (editable) ---
+  /**
+   * Current or final review state — one row per application.
+   * Historical reviewer activity lives in `applicationReviewLogs`.
+   */
   applicationReviews: defineTable({
     applicationId: v.id("applications"),
+    /** Current reviewer; always the session admin, never client-supplied. */
+    reviewedBy: v.optional(v.id("admins")),
     status: applicationReviewStatus,
-    reviewedAt: v.optional(v.number()),
-    reviewedBy: v.optional(v.id("users")),
-    reviewedByAdmin: v.optional(v.id("admins")),
-    legacyReviewedBy: v.optional(v.string()),
+    /** First `started_review` (or decision, if review was never started explicitly). */
+    startedAt: v.optional(v.number()),
+    /** Latest active review event: `started_review`, `review_ended`, or a decision. */
+    lastActiveAt: v.optional(v.number()),
+    /** When the current final decision was made. */
+    completedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_application", ["applicationId"])
     .index("by_reviewer", ["reviewedBy"])
-    .index("by_reviewer_admin", ["reviewedByAdmin"])
     .index("by_status", ["status"]),
 
   // --- REGISTER-LOCKED (do not edit) ---

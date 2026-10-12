@@ -32,7 +32,11 @@ const ref = {
   >("admin/auth:getCurrentStaff"),
   logApplicationReviewAction: makeFunctionReference<
     "mutation",
-    { sessionToken: string; applicationId: GenericId<"applications">; action: "viewed" },
+    {
+      sessionToken: string;
+      applicationId: GenericId<"applications">;
+      action: "viewed" | "started_review" | "review_ended";
+    },
     GenericId<"applicationReviewLogs">
   >("admin/applicationReviewLogs:logApplicationReviewAction"),
   setApplicationDecision: makeFunctionReference<
@@ -277,6 +281,156 @@ describe("organizer auth boundary", () => {
   });
 });
 
+async function signInAs(t: TestInstance, email: string, role: "reviewer" | "admin" = "reviewer") {
+  const adminId = await seedAdmin(t, { email, role, active: true });
+  const { sessionToken } = await t.mutation(ref.signIn, { email, password: TEST_PASSWORD });
+  return { adminId, sessionToken };
+}
+
+async function getReview(t: TestInstance, applicationId: GenericId<"applications">) {
+  return t.run((ctx) =>
+    ctx.db
+      .query("applicationReviews")
+      .withIndex("by_application", (q) => q.eq("applicationId", applicationId))
+      .unique(),
+  );
+}
+
+describe("application review state", () => {
+  it("does not treat viewing as review activity", async () => {
+    const t = createTest();
+    const { sessionToken } = await signInAs(t, "viewer@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken,
+      applicationId,
+      action: "viewed",
+    });
+
+    const review = await getReview(t, applicationId);
+    expect(review?.reviewedBy).toBeUndefined();
+    expect(review?.startedAt).toBeUndefined();
+    expect(review?.lastActiveAt).toBeUndefined();
+    expect(review?.updatedAt).toBe(1);
+  });
+
+  it("assigns the session admin and timestamps when a review is started", async () => {
+    const t = createTest();
+    const { adminId, sessionToken } = await signInAs(t, "starter@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+
+    const review = await getReview(t, applicationId);
+    expect(review?.reviewedBy).toBe(adminId);
+    expect(review?.startedAt).toBeGreaterThan(1);
+    expect(review?.lastActiveAt).toBe(review?.startedAt);
+    expect(review?.completedAt).toBeUndefined();
+    expect(review?.status).toBe("under_review");
+  });
+
+  it("lets another admin take over without resetting startedAt", async () => {
+    const t = createTest();
+    const first = await signInAs(t, "first@hackuta.org");
+    const second = await signInAs(t, "second@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken: first.sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+    const startedAt = (await getReview(t, applicationId))?.startedAt;
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken: second.sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+
+    const review = await getReview(t, applicationId);
+    expect(review?.reviewedBy).toBe(second.adminId);
+    expect(review?.startedAt).toBe(startedAt);
+  });
+
+  it("ignores review_ended from an admin who is not the current reviewer", async () => {
+    const t = createTest();
+    const reviewer = await signInAs(t, "owner@hackuta.org");
+    const other = await signInAs(t, "other@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken: reviewer.sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+    const before = await getReview(t, applicationId);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken: other.sessionToken,
+      applicationId,
+      action: "review_ended",
+    });
+
+    const after = await getReview(t, applicationId);
+    expect(after?.reviewedBy).toBe(reviewer.adminId);
+    expect(after?.lastActiveAt).toBe(before?.lastActiveAt);
+  });
+
+  it("records reviewer, completion, and activity on a decision", async () => {
+    const t = createTest();
+    const { adminId, sessionToken } = await signInAs(t, "decider@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.setApplicationDecision, {
+      sessionToken,
+      applicationId,
+      decision: "waitlisted",
+    });
+
+    const review = await getReview(t, applicationId);
+    expect(review).toMatchObject({ status: "waitlisted", reviewedBy: adminId });
+    expect(review?.completedAt).toBeGreaterThan(1);
+    expect(review?.lastActiveAt).toBe(review?.completedAt);
+    expect(review?.startedAt).toBe(review?.completedAt);
+  });
+
+  it("sets completedAt and reviewedBy on acceptance", async () => {
+    const t = createTest();
+    const { adminId, sessionToken } = await signInAs(t, "accepter@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.setApplicationDecision, {
+      sessionToken,
+      applicationId,
+      decision: "accepted",
+    });
+
+    const review = await getReview(t, applicationId);
+    expect(review).toMatchObject({ status: "accepted", reviewedBy: adminId });
+    expect(review?.completedAt).toBeGreaterThan(1);
+  });
+
+  it("rejects review mutations without a valid admin session", async () => {
+    const t = createTest();
+    const applicationId = await seedApplication(t);
+
+    await expect(
+      t.mutation(ref.setApplicationDecision, {
+        sessionToken: "deadbeef".repeat(8),
+        applicationId,
+        decision: "accepted",
+      }),
+    ).rejects.toThrow(/not authenticated/i);
+    expect((await getReview(t, applicationId))?.reviewedBy).toBeUndefined();
+  });
+});
+
 describe("organizer session lifetime", () => {
   it("uses a 24-hour session TTL", () => {
     expect(ADMIN_SESSION_TTL_MS).toBe(24 * 60 * 60 * 1000);
@@ -333,7 +487,7 @@ describe("centralized staff authorization", () => {
         });
         expect(await t.run((ctx) => ctx.db.get(logId))).toMatchObject({ adminId, action: decision });
         const review = await t.run((ctx) => ctx.db.query("applicationReviews").unique());
-        expect(review).toMatchObject({ status: decision, reviewedByAdmin: adminId });
+        expect(review).toMatchObject({ status: decision, reviewedBy: adminId });
       }
       const participant = await t.run((ctx) => ctx.db.query("participants").unique());
       expect(participant).toMatchObject({ acceptedBy: adminId });
@@ -370,7 +524,7 @@ describe("centralized staff authorization", () => {
         expect(await t.run((ctx) => ctx.db.query("participants").collect())).toEqual([]);
         const review = await t.run((ctx) => ctx.db.query("applicationReviews").unique());
         expect(review?.status).toBe("under_review");
-        expect(review?.reviewedByAdmin).toBeUndefined();
+        expect(review?.reviewedBy).toBeUndefined();
       },
     );
   });
