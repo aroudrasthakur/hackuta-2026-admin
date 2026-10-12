@@ -1,16 +1,13 @@
-import { convexTest } from "convex-test";
 import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
-import schema from "../../convex/schema";
+import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 import { hashPassword } from "../../convex/admin/passwordHash";
 import {
   ADMIN_SESSION_TTL_MS,
   getCurrentAdmin,
   hashSessionToken,
 } from "../../convex/admin/staffAuth";
-
-const modules = import.meta.glob("../../convex/**/*.ts", { eager: false });
 
 const ref = {
   signIn: makeFunctionReference<
@@ -59,8 +56,8 @@ const ref = {
   >("admin/applicationReviewLogs:listApplicationReviewLogs"),
 };
 
-const createTest = () => convexTest(schema, modules);
-type TestInstance = ReturnType<typeof createTest>;
+const createTest = createConvexTest;
+type TestInstance = ConvexTestInstance;
 
 const TEST_PASSWORD = "SecurePass1";
 

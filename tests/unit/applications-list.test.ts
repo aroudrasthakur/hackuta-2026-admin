@@ -1,14 +1,12 @@
-import { convexTest } from "convex-test";
 import { beforeEach, describe, expect, it } from "vitest";
-import schema from "../../convex/schema";
 import { hashSessionToken } from "../../convex/admin/staffAuth";
 import { listSubmittedApplicationsRef } from "../../src/convex/adminApi";
+import { createConvexTest } from "../helpers/convexTestContext";
 
-const modules = import.meta.glob("../../convex/**/*.ts", { eager: false });
 const sessionToken = "a".repeat(64);
 
 async function createFixture(role: "reviewer" | "admin" = "reviewer") {
-  const t = convexTest(schema, modules);
+  const t = createConvexTest();
   const sessionTokenHash = await hashSessionToken(sessionToken);
   const records = await t.run(async (ctx) => {
     const adminId = await ctx.db.insert("admins", {

@@ -2,20 +2,12 @@ import { usePaginatedQuery } from "convex/react";
 import type { GenericId } from "convex/values";
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../convex/adminApi";
 import { formatApplicationDate } from "../lib/applicationDisplay";
+import { reviewActionLabels } from "../lib/reviewActionLabels";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { EmptyState } from "./states/EmptyState";
 import { LoadingState } from "./states/LoadingState";
 
 const PAGE_SIZE = 50;
-
-const actionLabels: Record<ReviewHistoryEvent["action"], string> = {
-  viewed: "Viewed application",
-  started_review: "Started review",
-  review_ended: "Ended review",
-  accepted: "Accepted applicant",
-  rejected: "Rejected applicant",
-  waitlisted: "Waitlisted applicant",
-};
 
 type ReviewHistoryProps = {
   applicationId: GenericId<"applications">;
@@ -51,7 +43,7 @@ function EventRow({ event }: { event: ReviewHistoryEvent }) {
       <p>
         <span className="font-medium text-night">{event.actorName}</span>{" "}
         <span className={event.action === "accepted" ? "font-medium text-green-700" : "text-ocean"}>
-          {actionLabels[event.action]}
+          {reviewActionLabels[event.action]}
         </span>
       </p>
       <EventTime value={event.createdAt} />
@@ -65,7 +57,7 @@ function ViewsGroup({ events }: { events: EventGroup }) {
       <summary className={`${rowClassName} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>
         <p className="text-ocean">
           <span aria-hidden className="mr-2 inline-block text-[0.625rem] transition-transform group-open:rotate-90">▶</span>
-          {actionLabels.viewed} ×{events.length}
+          {reviewActionLabels.viewed} ×{events.length}
         </p>
         <EventTime value={events[0].createdAt} />
       </summary>

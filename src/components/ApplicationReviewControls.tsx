@@ -2,6 +2,9 @@ import { useMutation } from "convex/react";
 import { useState } from "react";
 import type { GenericId } from "convex/values";
 import { logApplicationReviewActionRef, type ApplicationDetail } from "../convex/adminApi";
+import { formatMutationError } from "../lib/formatMutationError";
+import { reviewPrimaryButtonClass } from "../lib/reviewButtonClasses";
+import { ReviewPanelSection } from "./ReviewPanelSection";
 
 type ApplicationReviewControlsProps = {
   detail: ApplicationDetail;
@@ -43,7 +46,7 @@ export function ApplicationReviewControls({
       await startReview({ sessionToken, applicationId, action: "started_review" });
       setConfirmed(true);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to start review.");
+      setError(formatMutationError(caught, "Unable to start review."));
     } finally {
       setPending(false);
     }
@@ -58,17 +61,11 @@ export function ApplicationReviewControls({
   }
 
   return (
-    <section
+    <ReviewPanelSection
       aria-label="Review claim"
-      className="rounded-lg border border-sand bg-white/60 p-4 space-y-3"
+      title="Active review"
+      description="Opening this page records a view only. Start review when you are ready to claim this application."
     >
-      <div className="space-y-1">
-        <h3 className="font-display text-lg text-night">Active review</h3>
-        <p className="text-sm text-mist">
-          Opening this page records a view only. Start review when you are ready to claim this
-          application.
-        </p>
-      </div>
       {activity.currentReviewerName && !activity.isStale && (
         <p className="text-sm">
           Current reviewer:{" "}
@@ -106,11 +103,11 @@ export function ApplicationReviewControls({
           type="button"
           disabled={pending}
           onClick={() => void handleStartReview()}
-          className="inline-flex items-center justify-center rounded-md border border-ocean bg-ocean px-4 py-2 text-sm font-medium text-light transition hover:bg-ink disabled:opacity-60"
+          className={reviewPrimaryButtonClass}
         >
           {pending ? "Starting…" : ownsActiveReview ? "Refresh review activity" : "Start review"}
         </button>
       )}
-    </section>
+    </ReviewPanelSection>
   );
 }
