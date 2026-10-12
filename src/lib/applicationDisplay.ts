@@ -7,6 +7,22 @@ export function formatApplicationAnswer(value: unknown): string {
   return String(value);
 }
 
+export const dashboardReviewStatusLabels = {
+  unreviewed: "Unreviewed",
+  under_review: "Under Review",
+  accepted: "Accepted",
+  waitlisted: "Waitlisted",
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
+} as const;
+
+export function dashboardReviewStatusLabel(
+  status: keyof typeof dashboardReviewStatusLabels | null | undefined,
+) {
+  if (!status || status === "unreviewed") return dashboardReviewStatusLabels.unreviewed;
+  return dashboardReviewStatusLabels[status];
+}
+
 export function formatApplicationDate(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "Not recorded";
   const date = new Date(value);
