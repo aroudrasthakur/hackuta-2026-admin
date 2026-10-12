@@ -13,6 +13,10 @@ Deploy, configure, and maintain the organizer admin app and shared Convex backen
 
 ## Deploy to shared dev
 
+`.env.example` intentionally targets the shared dev deployment because
+`convex:push-dev` loads that file directly. Keep personal deployment values in
+`.env.local`; do not copy personal deployment identifiers into `.env.example`.
+
 ```bash
 cp .env.example .env.local   # CONVEX_DEPLOYMENT=dev:standing-manatee-425
 npm run verify:register-schema-lock
@@ -20,6 +24,9 @@ npm run convex:push-dev
 ```
 
 `convex:push-dev` runs schema lock verification automatically via `preconvex:push-dev`.
+To use a personal dev deployment for local app development, set its URL and
+`CONVEX_DEPLOYMENT` in `.env.local` and run `npm run convex:dev`. The shared-dev
+push command continues to target `standing-manatee-425`.
 
 ## Production release checklist
 
@@ -35,6 +42,18 @@ npm run convex:push-dev
 | `VITE_CONVEX_URL` | Public — Convex WebSocket URL for the deployment |
 
 Do **not** set `CONVEX_DEPLOYMENT` on Vercel — local CLI only.
+
+## Local development auth bypass
+
+To skip the organizer sign-in form locally, set `VITE_DEV_AUTH_BYPASS=true` in
+`.env.local` and provide `ADMIN_DEV_AUTH_EMAIL` and `ADMIN_DEV_AUTH_PASSWORD` for
+an active admin account on the configured dev Convex deployment. These credentials
+are read only by the local Vite server and are never exposed to the browser. Restart
+Vite after changing these settings.
+
+This option creates a normal, authenticated admin session; it does not disable
+Convex authorization. It is available only in Vite's development server and has no
+effect in production.
 
 ## Register lock refresh
 
