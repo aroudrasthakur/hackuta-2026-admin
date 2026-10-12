@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
-import { routeAdminAuthRequest } from "./adminAuthHandlers";
+import { routeAdminAuthRequest } from "./adminAuthHandlers.ts";
 
 async function readNodeRequestBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];

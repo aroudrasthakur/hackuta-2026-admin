@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { viteAdminAuthApiPlugin } from "./server/viteAdminAuthApiPlugin";
+import { viteAdminAuthApiPlugin } from "./server/viteAdminAuthApiPlugin.ts";
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), viteAdminAuthApiPlugin()],
