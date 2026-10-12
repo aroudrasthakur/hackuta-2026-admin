@@ -7,12 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
 import { AdminProtectedRoute } from "../../src/components/AdminProtectedRoute";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
-import {
-  getApplicationRef,
-  listSubmittedApplicationsRef,
-  logApplicationReviewActionRef,
-  type ApplicationDetail,
-} from "../../src/convex/adminApi";
+import { getApplicationRef, logApplicationReviewActionRef, type ApplicationDetail } from "../../src/convex/adminApi";
 import { ApplicationReviewPage } from "../../src/pages/admin/ApplicationReviewPage";
 import { ApplicationsPage } from "../../src/pages/admin/ApplicationsPage";
 
@@ -58,10 +53,7 @@ describe("read-only application review page", () => {
 
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    mocks.query.mockReset().mockImplementation((ref) => {
-      if (ref === listSubmittedApplicationsRef) return [];
-      return applicationDetail();
-    });
+    mocks.query.mockReset().mockReturnValue(applicationDetail());
     mocks.mutationHook.mockReset().mockReturnValue(mocks.recordView);
     mocks.recordView.mockReset().mockResolvedValue("view-log");
     mocks.actionHook.mockReset();
@@ -102,10 +94,7 @@ describe("read-only application review page", () => {
   }
 
   async function renderDetail(detail: ApplicationDetail | null | undefined) {
-    mocks.query.mockImplementation((ref) => {
-      if (ref === listSubmittedApplicationsRef) return [];
-      return detail;
-    });
+    mocks.query.mockReturnValue(detail);
     await renderPage();
   }
 
@@ -217,8 +206,7 @@ describe("read-only application review page", () => {
 
   it("contains query errors within the page and recovers on another application", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    mocks.query.mockImplementation((ref, args: { applicationId: string }) => {
-      if (ref === listSubmittedApplicationsRef) return [];
+    mocks.query.mockImplementation((_ref, args: { applicationId: string }) => {
       if (args.applicationId === "application-a") throw new Error("Private backend error");
       return applicationDetail();
     });
@@ -249,17 +237,14 @@ describe("read-only application review page", () => {
   it("supports the Back to Applications link without generating another log", async () => {
     await renderPage();
     await act(async () => backLink()!.click());
-    expect(container.textContent).toContain("No submitted applications");
+    expect(container.textContent).toContain("Application queue");
     expect(mocks.recordView).toHaveBeenCalledTimes(1);
   });
 
   it.each(["/admin/applications", "/admin/applications?search=taylor&status=accepted&sort=name"])(
     "keeps dashboard route %s free of view events", async (path) => {
       await renderPage({ path });
-      expect(mocks.query).toHaveBeenCalledWith(listSubmittedApplicationsRef, {
-        sessionToken: "internal-session",
-      });
-      expect(mocks.query).not.toHaveBeenCalledWith(getApplicationRef, expect.anything());
+      expect(mocks.query).not.toHaveBeenCalled();
       expect(mocks.mutationHook).not.toHaveBeenCalled();
       expect(mocks.recordView).not.toHaveBeenCalled();
     },
@@ -268,10 +253,7 @@ describe("read-only application review page", () => {
   it("records once after loading and ignores Strict Mode, rerenders, and query updates", async () => {
     await renderDetail(undefined);
     expect(mocks.recordView).not.toHaveBeenCalled();
-    mocks.query.mockImplementation((ref) => {
-      if (ref === listSubmittedApplicationsRef) return [];
-      return applicationDetail();
-    });
+    mocks.query.mockReturnValue(applicationDetail());
     await renderPage();
     const detail = applicationDetail();
     detail.reviewStatus = "accepted";
@@ -282,8 +264,7 @@ describe("read-only application review page", () => {
   });
 
   it("records new visits to the same application and other applications", async () => {
-    mocks.query.mockImplementation((ref, args: { applicationId: string }) => {
-      if (ref === listSubmittedApplicationsRef) return [];
+    mocks.query.mockImplementation((_ref, args: { applicationId: string }) => {
       const detail = applicationDetail();
       detail.application._id = args.applicationId as GenericId<"applications">;
       return detail;
@@ -319,7 +300,7 @@ describe("read-only application review page", () => {
     await renderPage({ navigation: true });
     await act(async () => backLink()!.click());
     await act(async () => reject(new Error("Late failure")));
-    expect(container.textContent).toContain("No submitted applications");
+    expect(container.textContent).toContain("Application queue");
     expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(mocks.recordView).toHaveBeenCalledTimes(1);
   });

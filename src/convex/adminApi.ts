@@ -4,21 +4,10 @@ import {
   type ApiFromModules,
   type FunctionReturnType,
 } from "convex/server";
-import type { getApplication, listSubmittedApplications } from "../../convex/admin/applications";
+import type { getApplication } from "../../convex/admin/applications";
 import type { logApplicationReviewAction } from "../../convex/admin/applicationReviewLogs";
 
 export const getCurrentStaffRef = makeFunctionReference<"query">("admin/auth:getCurrentStaff");
-
-type SubmittedApplicationsQuery = ApiFromModules<{
-  applications: { listSubmittedApplications: typeof listSubmittedApplications };
-}>["applications"]["listSubmittedApplications"];
-export type SubmittedApplicationSummary = FunctionReturnType<SubmittedApplicationsQuery>[number];
-
-export const listSubmittedApplicationsRef = makeFunctionReference<
-  "query",
-  FunctionArgs<SubmittedApplicationsQuery>,
-  FunctionReturnType<SubmittedApplicationsQuery>
->("admin/applications:listSubmittedApplications");
 
 type ApplicationQuery = ApiFromModules<{
   applications: { getApplication: typeof getApplication };
