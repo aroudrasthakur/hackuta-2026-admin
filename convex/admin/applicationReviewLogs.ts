@@ -100,7 +100,7 @@ export const setApplicationDecision = mutation({
   },
 });
 
-/** Returns one page of history; full history is restricted to `admin` role. */
+/** Returns one page of history, newest first; full history is restricted to `admin` role. */
 export const listApplicationReviewLogs = query({
   args: {
     ...sessionTokenArgs,
@@ -109,10 +109,27 @@ export const listApplicationReviewLogs = query({
   },
   handler: async (ctx, { sessionToken, applicationId, paginationOpts }) => {
     await requireAdminRole(ctx, sessionToken);
-    return await ctx.db
+    if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
+
+    const result = await ctx.db
       .query("applicationReviewLogs")
       .withIndex("by_application_createdAt", (q) => q.eq("applicationId", applicationId))
       .order("desc")
       .paginate(paginationOpts);
+
+    const actorNames = new Map<string, string>();
+    for (const adminId of new Set(result.page.map((log) => log.adminId))) {
+      actorNames.set(adminId, (await ctx.db.get(adminId))?.name ?? "Unknown organizer");
+    }
+
+    return {
+      ...result,
+      page: result.page.map((log) => ({
+        _id: log._id,
+        action: log.action,
+        createdAt: log.createdAt,
+        actorName: actorNames.get(log.adminId) ?? "Unknown organizer",
+      })),
+    };
   },
 });

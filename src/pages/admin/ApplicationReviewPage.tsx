@@ -4,6 +4,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { ApplicationDetail } from "../../components/ApplicationDetail";
 import { ApplicationDecisionControls } from "../../components/ApplicationDecisionControls";
 import { ApplicationReviewControls } from "../../components/ApplicationReviewControls";
+import { ApplicationReviewHistory } from "../../components/ApplicationReviewHistory";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
@@ -11,27 +12,38 @@ import { getApplicationRef, logApplicationReviewActionRef } from "../../convex/a
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { ADMIN_ROUTES } from "../../types/routes";
 
-function ApplicationReviewContent({
+export function ApplicationReviewContent({
   applicationId,
   sessionToken,
   staffAdminId,
+  isAdmin,
 }: {
   applicationId: string;
   sessionToken: string;
   staffAdminId: string;
+  isAdmin: boolean;
 }) {
   const detail = useQuery(getApplicationRef, { sessionToken, applicationId });
   const recordView = useMutation(logApplicationReviewActionRef);
-  const viewRequest = useRef<Promise<unknown> | null>(null);
+  const viewRequest = useRef<{
+    applicationId: string;
+    promise: Promise<unknown>;
+  } | null>(null);
   const [loggingFailed, setLoggingFailed] = useState(false);
   const loadedId = detail?.application._id;
 
   useEffect(() => {
     if (!loadedId) return;
     let active = true;
-    // Share one request across Strict Mode effect replays; a new visit gets a fresh ref.
-    viewRequest.current ??= recordView({ sessionToken, applicationId: loadedId, action: "viewed" });
-    void viewRequest.current.catch(() => {
+    // One in-flight view log per loaded application; reuse only for Strict Mode replays of the same id.
+    if (viewRequest.current?.applicationId !== loadedId) {
+      viewRequest.current = {
+        applicationId: loadedId,
+        promise: recordView({ sessionToken, applicationId: loadedId, action: "viewed" }),
+      };
+      setLoggingFailed(false);
+    }
+    void viewRequest.current.promise.catch(() => {
       if (active) setLoggingFailed(true);
     });
     return () => { active = false; };
@@ -55,6 +67,9 @@ function ApplicationReviewContent({
       />
       <ApplicationDecisionControls detail={detail} sessionToken={sessionToken} />
       <ApplicationDetail detail={detail} />
+      {isAdmin && (
+        <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />
+      )}
     </>
   );
 }
@@ -81,6 +96,7 @@ export function ApplicationReviewPage() {
             applicationId={applicationId}
             sessionToken={sessionToken}
             staffAdminId={staff.adminId}
+            isAdmin={staff.role === "admin"}
           />
         </ErrorBoundary>
       ) : <LoadingState message="Verifying organizer session…" />}
