@@ -1,8 +1,9 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { mutation, query } from "../_generated/server";
+import { applicationFormWasSubmitted } from "../lib/applications";
 import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
-import { requireAdminSession, sessionTokenArgs } from "./staffAuth";
+import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 import {
   applicationReviewLogActivityAction,
   applicationReviewLogDecisionAction,
@@ -21,8 +22,11 @@ export const logApplicationReviewAction = mutation({
     action: applicationReviewLogActivityAction,
   },
   handler: async (ctx, { sessionToken, applicationId, action }) => {
-    const { admin } = await requireAdminSession(ctx, sessionToken);
-    if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
+    const admin = await requireReviewerAccess(ctx, sessionToken);
+    const application = await ctx.db.get(applicationId);
+    if (!application || (action === "viewed" && !applicationFormWasSubmitted(application))) {
+      throw new Error("Application not found");
+    }
 
     const now = Date.now();
     if (action !== "viewed") {
@@ -56,9 +60,10 @@ export const setApplicationDecision = mutation({
     decision: applicationReviewLogDecisionAction,
   },
   handler: async (ctx, { sessionToken, applicationId, decision }) => {
-    const { admin } = await requireAdminSession(ctx, sessionToken);
+    const admin = await requireReviewerAccess(ctx, sessionToken);
     const application = await ctx.db.get(applicationId);
     if (!application) throw new Error("Application not found");
+    if (!applicationFormWasSubmitted(application)) throw new Error("Application has not been submitted.");
 
     const review = await ctx.db
       .query("applicationReviews")
@@ -94,8 +99,7 @@ export const listApplicationReviewLogs = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, { sessionToken, applicationId, paginationOpts }) => {
-    const { admin } = await requireAdminSession(ctx, sessionToken);
-    if (admin.role !== "admin") throw new Error("Not authorized");
+    await requireAdminRole(ctx, sessionToken);
     return await ctx.db
       .query("applicationReviewLogs")
       .withIndex("by_application_createdAt", (q) => q.eq("applicationId", applicationId))
