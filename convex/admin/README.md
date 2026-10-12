@@ -8,7 +8,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | --- | --- |
 | [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
 | [staffAuth.ts](staffAuth.ts) | Session resolution and reusable reviewer/admin authorization helpers |
-| [applications.ts](applications.ts) | Read-only submitted application detail, review status, and resume availability |
+| [applications.ts](applications.ts) | Read-only application queue and submitted application detail (no audit logs on list) |
 | [passwordHash.ts](passwordHash.ts) | Scrypt password hash + verify |
 | [fields.ts](fields.ts) | Shared Convex validators for admin-owned tables |
 | [participantCreation.ts](participantCreation.ts) | Idempotent participant lookup/insert (`applicationId` + `authUserId`) |
@@ -46,7 +46,7 @@ After detail loads, the page calls `logApplicationReviewAction` with `action: "v
 
 | Area | Expected functions |
 | --- | --- |
-| Application queue | List/filter `applications` with `applicationReviews` status |
+| Application queue | `listSubmittedApplications` — submitted rows + current `applicationReviews` state |
 | Single review | Read-only detail is implemented; active review claiming is a follow-up |
 | Organizers | Read/write `admins` table for role checks |
 | Check-in | Participant lookup mutations (TBD) |

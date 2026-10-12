@@ -8,7 +8,7 @@ Organizer route views. Login and read-only application detail are implemented; t
 | --- | --- |
 | [AdminLoginPage.tsx](AdminLoginPage.tsx) | `/admin/login` — organizer email + password sign-in |
 | [AdminDashboardPage.tsx](AdminDashboardPage.tsx) | `/admin` — Convex URL and client status |
-| [ApplicationsPage.tsx](ApplicationsPage.tsx) | `/admin/applications` — application queue placeholder |
+| [ApplicationsPage.tsx](ApplicationsPage.tsx) | `/admin/applications` — submitted application queue (card view) |
 | [ApplicationReviewPage.tsx](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` — protected read-only submitted application |
 | [ParticipantsPage.tsx](ParticipantsPage.tsx) | `/admin/participants` — roster placeholder |
 | [CheckInPage.tsx](CheckInPage.tsx) | `/admin/check-in` — check-in tools placeholder |
@@ -28,7 +28,7 @@ Organizer route views. Login and read-only application detail are implemented; t
 
 | Page | Expected Convex surface |
 | --- | --- |
-| ApplicationsPage | List `applications` + `applicationReviews` via `convex/admin/` |
+| ApplicationsPage | `admin/applications:listSubmittedApplications` — read-only queue, no view logs |
 | ApplicationReviewPage | `admin/applications:getApplication` — applicant answers, review status, resume |
 | ParticipantsPage | Accepted applicants roster |
 | CheckInPage | Event-day check-in |
