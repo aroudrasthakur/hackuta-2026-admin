@@ -100,7 +100,7 @@ Provision a first account on `standing-manatee-425`:
 2. Set credentials via internal mutation:
 
    ```powershell
-   npx.cmd --% convex run --deployment dev:standing-manatee-425 --internal admin/auth:provisionAdminAuthAccount "{\"adminId\":\"YOUR_ADMIN_ID\",\"password\":\"YourSecurePass1\"}"
+   npx.cmd --% convex run --deployment dev:standing-manatee-425 admin/auth:provisionAdminAuthAccount "{\"adminId\":\"YOUR_ADMIN_ID\",\"password\":\"YourSecurePass1\"}"
    ```
 
 3. Sign in at `/admin/login`.
