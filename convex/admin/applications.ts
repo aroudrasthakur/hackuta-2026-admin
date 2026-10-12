@@ -7,6 +7,7 @@ import {
   getApplicationReview,
 } from "../lib/applications";
 import type { ApplicationDoc } from "../lib/dataModel";
+import { ACTIVE_REVIEW_STALE_MS, isFinalReviewStatus, isReviewStale } from "./reviewClaim";
 import { requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 
 function formatApplicantSchool(application: Pick<ApplicationDoc, "school" | "otherSchool">) {
@@ -74,6 +75,8 @@ export const getApplication = query({
     if (!application || !applicationFormWasSubmitted(application)) return null;
 
     const review = await getApplicationReview(ctx, id);
+    const currentReviewer = review?.reviewedBy ? await ctx.db.get(review.reviewedBy) : null;
+    const now = Date.now();
     const resumeUrl = application.resumeStorageId
       ? await ctx.storage.getUrl(application.resumeStorageId)
       : null;
@@ -84,6 +87,25 @@ export const getApplication = query({
     return {
       application,
       reviewStatus: review?.status ?? null,
+      reviewActivity: review
+        ? {
+            reviewedBy: review.reviewedBy ?? null,
+            currentReviewerName: currentReviewer?.name ?? null,
+            startedAt: review.startedAt ?? null,
+            lastActiveAt: review.lastActiveAt ?? null,
+            isFinal: isFinalReviewStatus(review.status),
+            isStale: isReviewStale(review, now),
+            activeReviewStaleMs: ACTIVE_REVIEW_STALE_MS,
+          }
+        : {
+            reviewedBy: null,
+            currentReviewerName: null,
+            startedAt: null,
+            lastActiveAt: null,
+            isFinal: false,
+            isStale: false,
+            activeReviewStaleMs: ACTIVE_REVIEW_STALE_MS,
+          },
       resume: {
         status: resumeStatus,
         url: resumeUrl,

@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ApplicationDetail } from "../../components/ApplicationDetail";
+import { ApplicationReviewControls } from "../../components/ApplicationReviewControls";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
@@ -9,7 +10,15 @@ import { getApplicationRef, logApplicationReviewActionRef } from "../../convex/a
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { ADMIN_ROUTES } from "../../types/routes";
 
-function ApplicationReviewContent({ applicationId, sessionToken }: { applicationId: string; sessionToken: string }) {
+function ApplicationReviewContent({
+  applicationId,
+  sessionToken,
+  staffAdminId,
+}: {
+  applicationId: string;
+  sessionToken: string;
+  staffAdminId: string;
+}) {
   const detail = useQuery(getApplicationRef, { sessionToken, applicationId });
   const recordView = useMutation(logApplicationReviewActionRef);
   const viewRequest = useRef<Promise<unknown> | null>(null);
@@ -38,6 +47,11 @@ function ApplicationReviewContent({ applicationId, sessionToken }: { application
           We couldn’t record this application view. Please reopen the application to try again.
         </p>
       )}
+      <ApplicationReviewControls
+        detail={detail}
+        sessionToken={sessionToken}
+        staffAdminId={staffAdminId}
+      />
       <ApplicationDetail detail={detail} />
     </>
   );
@@ -51,9 +65,9 @@ export function ApplicationReviewPage() {
   return (
     <div className="space-y-5">
       <Link className="inline-block text-sm underline" to={ADMIN_ROUTES.applications}>Back to Applications</Link>
-      {sessionToken && applicationId ? (
+      {sessionToken && applicationId && staff ? (
         <ErrorBoundary
-          key={`${location.key}:${applicationId}:${staff?.adminId}`}
+          key={`${location.key}:${applicationId}:${staff.adminId}`}
           fallback={
             <div role="alert" className="rounded-lg border border-sand bg-clay/30 p-5">
               <h2 className="font-display text-lg text-night">Unable to load application</h2>
@@ -61,7 +75,11 @@ export function ApplicationReviewPage() {
             </div>
           }
         >
-          <ApplicationReviewContent applicationId={applicationId} sessionToken={sessionToken} />
+          <ApplicationReviewContent
+            applicationId={applicationId}
+            sessionToken={sessionToken}
+            staffAdminId={staff.adminId}
+          />
         </ErrorBoundary>
       ) : <LoadingState message="Verifying organizer session…" />}
     </div>

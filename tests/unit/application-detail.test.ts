@@ -116,9 +116,16 @@ describe("read-only submitted application detail", () => {
     const before = await snapshot();
     for (let read = 0; read < 2; read++) {
       const detail = await t.query(getApplicationRef, { sessionToken, applicationId });
-      expect(detail).toEqual({
-        application: before.application, reviewStatus: "accepted",
+      expect(detail).toMatchObject({
+        application: before.application,
+        reviewStatus: "accepted",
         resume: { status: "none", url: null, filename: null },
+        reviewActivity: {
+          reviewedBy: adminId,
+          currentReviewerName: "Staff",
+          isFinal: true,
+          isStale: false,
+        },
       });
     }
     expect(await snapshot()).toEqual(before);

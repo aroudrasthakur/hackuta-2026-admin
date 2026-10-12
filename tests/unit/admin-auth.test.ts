@@ -315,6 +315,36 @@ describe("application review state", () => {
     expect(review?.updatedAt).toBe(1);
   });
 
+  it("creates the review row when claiming an application with no review record", async () => {
+    const t = createTest();
+    const { adminId, sessionToken } = await signInAs(t, "creator@hackuta.org");
+    const userId = await t.run((ctx) =>
+      ctx.db.insert("users", { email: "solo@example.com", name: "Applicant" }),
+    );
+    const applicationId = await t.run((ctx) =>
+      ctx.db.insert("applications", {
+        authUserId: userId,
+        email: "solo@example.com",
+        createdAt: 1,
+        formSubmitted: true,
+        submittedAt: 2,
+      }),
+    );
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+
+    const review = await getReview(t, applicationId);
+    expect(review).toMatchObject({
+      status: "under_review",
+      reviewedBy: adminId,
+    });
+    expect(review?.startedAt).toBeGreaterThan(1);
+  });
+
   it("assigns the session admin and timestamps when a review is started", async () => {
     const t = createTest();
     const { adminId, sessionToken } = await signInAs(t, "starter@hackuta.org");
@@ -334,7 +364,7 @@ describe("application review state", () => {
     expect(review?.status).toBe("under_review");
   });
 
-  it("lets another admin take over without resetting startedAt", async () => {
+  it("rejects a second reviewer while the first review is still active", async () => {
     const t = createTest();
     const first = await signInAs(t, "first@hackuta.org");
     const second = await signInAs(t, "second@hackuta.org");
@@ -345,7 +375,43 @@ describe("application review state", () => {
       applicationId,
       action: "started_review",
     });
-    const startedAt = (await getReview(t, applicationId))?.startedAt;
+
+    await expect(
+      t.mutation(ref.logApplicationReviewAction, {
+        sessionToken: second.sessionToken,
+        applicationId,
+        action: "started_review",
+      }),
+    ).rejects.toThrow(/already being reviewed/i);
+
+    const review = await getReview(t, applicationId);
+    expect(review?.reviewedBy).toBe(first.adminId);
+    expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toHaveLength(1);
+  });
+
+  it("allows reclaiming a stale review and resets startedAt", async () => {
+    const t = createTest();
+    const first = await signInAs(t, "first@hackuta.org");
+    const second = await signInAs(t, "second@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken: first.sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+    const originalStartedAt = (await getReview(t, applicationId))?.startedAt;
+
+    await t.run(async (ctx) => {
+      const review = await ctx.db
+        .query("applicationReviews")
+        .withIndex("by_application", (q) => q.eq("applicationId", applicationId))
+        .unique();
+      if (!review) throw new Error("missing review");
+      await ctx.db.patch(review._id, {
+        lastActiveAt: Date.now() - 31 * 60 * 1000,
+      });
+    });
 
     await t.mutation(ref.logApplicationReviewAction, {
       sessionToken: second.sessionToken,
@@ -355,7 +421,56 @@ describe("application review state", () => {
 
     const review = await getReview(t, applicationId);
     expect(review?.reviewedBy).toBe(second.adminId);
-    expect(review?.startedAt).toBe(startedAt);
+    expect(review?.startedAt).toBeGreaterThan(originalStartedAt!);
+    expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toHaveLength(2);
+  });
+
+  it("refreshes activity without a duplicate started_review log for the same reviewer", async () => {
+    const t = createTest();
+    const { adminId, sessionToken } = await signInAs(t, "owner@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+    const before = await getReview(t, applicationId);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+
+    const after = await getReview(t, applicationId);
+    expect(after?.reviewedBy).toBe(adminId);
+    expect(after?.startedAt).toBe(before?.startedAt);
+    if (before?.lastActiveAt === undefined || after?.lastActiveAt === undefined) {
+      throw new Error("expected review activity timestamps");
+    }
+    expect(after.lastActiveAt).toBeGreaterThanOrEqual(before.lastActiveAt);
+    expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toHaveLength(1);
+  });
+
+  it("rejects starting review after a final decision", async () => {
+    const t = createTest();
+    const { sessionToken } = await signInAs(t, "decider@hackuta.org");
+    const applicationId = await seedApplication(t);
+
+    await t.mutation(ref.setApplicationDecision, {
+      sessionToken,
+      applicationId,
+      decision: "accepted",
+    });
+
+    await expect(
+      t.mutation(ref.logApplicationReviewAction, {
+        sessionToken,
+        applicationId,
+        action: "started_review",
+      }),
+    ).rejects.toThrow(/final decision/i);
   });
 
   it("ignores review_ended from an admin who is not the current reviewer", async () => {

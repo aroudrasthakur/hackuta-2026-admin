@@ -40,6 +40,15 @@ function applicationDetail(): ApplicationDetail {
       mlhCommunicationsConsent: false, github: "https://github.com/example",
     },
     reviewStatus: "under_review",
+    reviewActivity: {
+      reviewedBy: null,
+      currentReviewerName: null,
+      startedAt: null,
+      lastActiveAt: null,
+      isFinal: false,
+      isStale: false,
+      activeReviewStaleMs: 30 * 60 * 1000,
+    },
     resume: { status: "available", url: "https://files.example.com/resume.pdf", filename: "Taylor.pdf" },
   };
 }
@@ -148,7 +157,8 @@ describe("read-only application review page", () => {
     expect(answer("Accessibility needs")).toBe("Step-free access");
     expect(answer("Contact name")).toBe("Jordan Student");
     expect(container.textContent).toContain("Review status: Under Review");
-    expect(container.querySelectorAll("input, textarea, select, button")).toHaveLength(0);
+    expect(container.querySelectorAll("input, textarea, select")).toHaveLength(0);
+    expect(container.textContent).toContain("Start review");
   });
 
   it("handles sparse and older applications without raw missing values", async () => {
