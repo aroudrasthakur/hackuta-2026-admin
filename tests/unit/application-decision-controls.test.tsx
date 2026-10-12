@@ -97,6 +97,35 @@ describe("ApplicationDecisionControls", () => {
     });
   });
 
+  it("cancels acceptance without calling the backend", async () => {
+    await renderControls();
+    await act(async () => button("Accept")!.click());
+    await act(async () => button("Cancel")!.click());
+    expect(button("Accept")).toBeDefined();
+    expect(button("Confirm acceptance")).toBeUndefined();
+    expect(mocks.finalize).not.toHaveBeenCalled();
+  });
+
+  it("confirms acceptance once and blocks repeated clicks while pending", async () => {
+    let resolveDecision!: (result: { logId: string; duplicate: boolean }) => void;
+    mocks.finalize.mockReturnValue(new Promise((resolve) => { resolveDecision = resolve; }));
+    await renderControls();
+    await act(async () => button("Accept")!.click());
+    expect(mocks.finalize).not.toHaveBeenCalled();
+
+    await act(async () => button("Confirm acceptance")!.click());
+    expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith({
+      sessionToken: "session-token", applicationId: "application-a", decision: "accepted",
+    });
+    expect(button("Finalizing…")!.disabled).toBe(true);
+    expect(button("Cancel")!.disabled).toBe(true);
+    await act(async () => button("Finalizing…")!.click());
+    expect(mocks.finalize).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolveDecision({ logId: "accepted-log", duplicate: false }));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Application accepted");
+  });
+
   it("hides controls after a final decision", async () => {
     await renderControls({
       detail: detail({
