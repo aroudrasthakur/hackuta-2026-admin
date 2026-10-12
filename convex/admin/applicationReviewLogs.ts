@@ -2,14 +2,13 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { mutation, query } from "../_generated/server";
 import { applicationFormWasSubmitted } from "../lib/applications";
-import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
+import { finalizeApplicationDecision } from "./decisionFinalize";
 import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 import {
   applicationReviewLogActivityAction,
   applicationReviewLogDecisionAction,
 } from "./fields";
 import { startReviewClaim } from "./reviewClaim";
-import { decisionPatch } from "./reviewState";
 
 /**
  * Appends a non-decision event; decisions are recorded with their state update below.
@@ -69,13 +68,17 @@ export const logApplicationReviewAction = mutation({
   },
 });
 
-/** Changes the current decision and appends its event atomically. */
+/** Confirmed final decision — updates review state, audit log, and schedules decision email. */
 export const setApplicationDecision = mutation({
   args: {
     ...sessionTokenArgs,
     applicationId: v.id("applications"),
     decision: applicationReviewLogDecisionAction,
   },
+  returns: v.object({
+    logId: v.id("applicationReviewLogs"),
+    duplicate: v.boolean(),
+  }),
   handler: async (ctx, { sessionToken, applicationId, decision }) => {
     const admin = await requireReviewerAccess(ctx, sessionToken);
     const application = await ctx.db.get(applicationId);
@@ -88,22 +91,11 @@ export const setApplicationDecision = mutation({
       .unique();
     if (!review) throw new Error("Application review not found");
 
-    if (decision === "accepted") {
-      const result = await applyAcceptedApplicationDecision(ctx, {
-        application,
-        review,
-        admin,
-      });
-      return result.logId;
-    }
-
-    const now = Date.now();
-    await ctx.db.patch(review._id, decisionPatch(review, admin._id, decision, now));
-    return await ctx.db.insert("applicationReviewLogs", {
-      applicationId,
-      adminId: admin._id,
-      action: decision,
-      createdAt: now,
+    return await finalizeApplicationDecision(ctx, {
+      application,
+      review,
+      admin,
+      decision,
     });
   },
 });

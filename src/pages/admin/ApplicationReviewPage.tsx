@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ApplicationDetail } from "../../components/ApplicationDetail";
+import { ApplicationDecisionControls } from "../../components/ApplicationDecisionControls";
 import { ApplicationReviewControls } from "../../components/ApplicationReviewControls";
 import { ApplicationReviewHistory } from "../../components/ApplicationReviewHistory";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
@@ -64,6 +65,7 @@ export function ApplicationReviewContent({
         sessionToken={sessionToken}
         staffAdminId={staffAdminId}
       />
+      <ApplicationDecisionControls detail={detail} sessionToken={sessionToken} />
       <ApplicationDetail detail={detail} />
       {isAdmin && (
         <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />

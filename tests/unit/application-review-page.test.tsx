@@ -12,6 +12,7 @@ import {
   listApplicationReviewLogsRef,
   listSubmittedApplicationsRef,
   logApplicationReviewActionRef,
+  setApplicationDecisionRef,
   type ApplicationDetail,
 } from "../../src/convex/adminApi";
 import {
@@ -21,7 +22,12 @@ import {
 import { ApplicationsPage } from "../../src/pages/admin/ApplicationsPage";
 
 const mocks = vi.hoisted(() => ({
-  query: vi.fn(), paginatedQuery: vi.fn(), mutationHook: vi.fn(), recordView: vi.fn(), actionHook: vi.fn(),
+  query: vi.fn(),
+  paginatedQuery: vi.fn(),
+  mutationHook: vi.fn(),
+  recordView: vi.fn(),
+  finalizeDecision: vi.fn(),
+  actionHook: vi.fn(),
 }));
 vi.mock("convex/react", () => ({
   useQuery: mocks.query, usePaginatedQuery: mocks.paginatedQuery,
@@ -79,7 +85,10 @@ describe("read-only application review page", () => {
       return applicationDetail();
     });
     mocks.paginatedQuery.mockReset().mockReturnValue({ results: [], status: "Exhausted", loadMore: vi.fn() });
-    mocks.mutationHook.mockReset().mockReturnValue(mocks.recordView);
+    mocks.mutationHook.mockReset().mockImplementation((ref) =>
+      ref === setApplicationDecisionRef ? mocks.finalizeDecision : mocks.recordView,
+    );
+    mocks.finalizeDecision.mockReset().mockResolvedValue({ logId: "decision-log", duplicate: false });
     mocks.recordView.mockReset().mockResolvedValue("view-log");
     mocks.actionHook.mockReset();
     container = document.createElement("div");
@@ -136,7 +145,7 @@ describe("read-only application review page", () => {
       .find((element) => element.textContent === "Back to Applications");
   }
 
-  it.each(["reviewer", "admin"] as const)("shows the full application for %s accounts without mutation controls", async (role) => {
+  it.each(["reviewer", "admin"] as const)("shows decision controls without finalizing until confirmation", async (role) => {
     const context = staffContext();
     context.staff = { ...context.staff!, role };
     await renderPage({ context });
@@ -167,6 +176,20 @@ describe("read-only application review page", () => {
     expect(container.textContent).toContain("Review status: Under Review");
     expect(container.querySelectorAll("input, textarea, select")).toHaveLength(0);
     expect(container.textContent).toContain("Start review");
+    expect(container.textContent).toContain("Accept");
+    expect(mocks.finalizeDecision).not.toHaveBeenCalled();
+    await act(async () =>
+      Array.from(container.querySelectorAll("button")).find((el) => el.textContent === "Accept")!.click(),
+    );
+    expect(mocks.finalizeDecision).not.toHaveBeenCalled();
+    await act(async () =>
+      Array.from(container.querySelectorAll("button")).find((el) => el.textContent === "Confirm acceptance")!.click(),
+    );
+    expect(mocks.finalizeDecision).toHaveBeenCalledExactlyOnceWith({
+      sessionToken: "internal-session",
+      applicationId: "application-a",
+      decision: "accepted",
+    });
   });
 
   it.each(["reviewer", "admin"] as const)("shows review history only to admin accounts (%s)", async (role) => {
