@@ -12,10 +12,14 @@ function isE2eMockAuthEnabled() {
   return process.env.VITE_E2E_MOCK === "true";
 }
 
+type AdminSignInResult =
+  | { ok: true; sessionToken: string; expiresAt: number }
+  | { ok: false; error: string };
+
 const adminSignInRef = makeFunctionReference<
   "mutation",
   { email: string; password: string },
-  { sessionToken: string; expiresAt: number }
+  AdminSignInResult
 >("admin/auth:signIn");
 
 const adminSignOutRef = makeFunctionReference<
@@ -78,6 +82,10 @@ export async function handleAdminSignIn(request: Request) {
 
     const client = createConvexClient();
     const result = await client.mutation(adminSignInRef, { email, password });
+    if (!result.ok) {
+      const status = result.error.includes("inactive") ? 403 : 401;
+      return jsonResponse({ error: result.error }, { status });
+    }
     const headers = new Headers();
     headers.append(
       "Set-Cookie",
@@ -86,8 +94,7 @@ export async function handleAdminSignIn(request: Request) {
     return jsonResponse({ ok: true, expiresAt: result.expiresAt }, { headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Sign-in failed.";
-    const status = message.includes("inactive") ? 403 : 401;
-    return jsonResponse({ error: message }, { status });
+    return jsonResponse({ error: message }, { status: 401 });
   }
 }
 

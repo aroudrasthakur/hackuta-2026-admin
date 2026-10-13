@@ -136,6 +136,20 @@ describe("starting a review", () => {
     expect((await getReview(t, applicant.applicationId))?.reviewedBy).toBe(first.adminId);
   });
 
+  it("does not let a second reviewer finalize while the first claim is active", async () => {
+    const { t, first, second, applicant, act } = await setup();
+    await act(first, "started_review");
+    vi.advanceTimersByTime(ACTIVE_REVIEW_STALE_MS - 1_000);
+
+    await expect(
+      t.mutation(setApplicationDecisionRef, {
+        sessionToken: second.sessionToken,
+        applicationId: applicant.applicationId,
+        decision: "waitlisted",
+      }),
+    ).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+  });
+
   it("keeps ownership and start time when the same reviewer reopens", async () => {
     const { t, first, applicant, act } = await setup();
     await act(first, "started_review");

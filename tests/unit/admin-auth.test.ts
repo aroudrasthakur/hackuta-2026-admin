@@ -2,12 +2,17 @@ import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE } from "../../convex/admin/adminSignInRateLimit";
 import {
   createStaffAuthorizationFixture,
+  mutateOrganizerSignIn,
   ORGANIZER_TEST_PASSWORD,
   seedAdminAccount,
+  seedAdminSignInFailures,
   seedSubmittedApplication,
+  signInOrganizer,
 } from "../helpers/staffTestFixtures";
+import { REVIEW_ALREADY_CLAIMED } from "../../convex/admin/reviewClaim";
 import {
   ADMIN_SESSION_TTL_MS,
   getCurrentAdmin,
@@ -15,11 +20,6 @@ import {
 } from "../../convex/admin/staffAuth";
 
 const ref = {
-  signIn: makeFunctionReference<
-    "mutation",
-    { email: string; password: string },
-    { sessionToken: string; expiresAt: number }
-  >("admin/auth:signIn"),
   signOut: makeFunctionReference<"mutation", { sessionToken: string }>("admin/auth:signOut"),
   getCurrentStaff: makeFunctionReference<
     "query",
@@ -71,14 +71,23 @@ async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer
 }
 
 describe("organizer auth boundary", () => {
+  it("blocks sign-in after too many failed attempts for the same email", async () => {
+    const t = createTest();
+    await seedAdminAccount(t, { email: "limited@hackuta.org", role: "admin", active: true });
+    await seedAdminSignInFailures(t, "limited@hackuta.org", 5);
+
+    const blocked = await mutateOrganizerSignIn(t, {
+      email: "limited@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+    });
+    expect(blocked).toEqual({ ok: false, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE });
+  });
+
   it("signs in with valid credentials and resolves staff from session token", async () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
 
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "reviewer@hackuta.org",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
+    const { sessionToken } = await signInOrganizer(t, "reviewer@hackuta.org");
 
     const staff = await t.query(ref.getCurrentStaff, { sessionToken });
     expect(staff).toMatchObject({
@@ -92,18 +101,22 @@ describe("organizer auth boundary", () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "admin@hackuta.org", role: "admin", active: true });
 
-    await expect(
-      t.mutation(ref.signIn, { email: "admin@hackuta.org", password: "WrongPass1" }),
-    ).rejects.toThrow(/invalid email or password/i);
+    const wrongPassword = await mutateOrganizerSignIn(t, {
+      email: "admin@hackuta.org",
+      password: "WrongPass1",
+    });
+    expect(wrongPassword).toEqual({ ok: false, error: "Invalid email or password." });
   });
 
   it("rejects inactive accounts at sign-in", async () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "inactive@hackuta.org", role: "admin", active: false });
 
-    await expect(
-      t.mutation(ref.signIn, { email: "inactive@hackuta.org", password: ORGANIZER_TEST_PASSWORD }),
-    ).rejects.toThrow(/inactive/i);
+    const inactive = await mutateOrganizerSignIn(t, {
+      email: "inactive@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+    });
+    expect(inactive).toEqual({ ok: false, error: "This account is inactive." });
   });
 
   it("returns null for invalid session tokens", async () => {
@@ -138,14 +151,8 @@ describe("organizer auth boundary", () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "rotate@hackuta.org", role: "admin", active: true });
 
-    const first = await t.mutation(ref.signIn, {
-      email: "rotate@hackuta.org",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
-    const second = await t.mutation(ref.signIn, {
-      email: "rotate@hackuta.org",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
+    const first = await signInOrganizer(t, "rotate@hackuta.org");
+    const second = await signInOrganizer(t, "rotate@hackuta.org");
 
     expect(first.sessionToken).not.toEqual(second.sessionToken);
     expect(await t.query(ref.getCurrentStaff, { sessionToken: first.sessionToken })).toBeNull();
@@ -158,10 +165,7 @@ describe("organizer auth boundary", () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
     const applicationId = await seedSubmittedApplication(t);
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "reviewer@hackuta.org",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
+    const { sessionToken } = await signInOrganizer(t, "reviewer@hackuta.org");
 
     await expect(
       t.query(ref.listApplicationReviewLogs, {
@@ -176,10 +180,7 @@ describe("organizer auth boundary", () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "admin@hackuta.org", role: "admin", active: true });
     const applicationId = await seedSubmittedApplication(t);
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "admin@hackuta.org",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
+    const { sessionToken } = await signInOrganizer(t, "admin@hackuta.org");
 
     const page = await t.query(ref.listApplicationReviewLogs, {
       sessionToken,
@@ -205,10 +206,7 @@ describe("organizer auth boundary", () => {
   it("sign-out removes the active session token", async () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "logout@hackuta.org", role: "admin", active: true });
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "logout@hackuta.org",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
+    const { sessionToken } = await signInOrganizer(t, "logout@hackuta.org");
 
     await t.mutation(ref.signOut, { sessionToken });
     expect(await t.query(ref.getCurrentStaff, { sessionToken })).toBeNull();
@@ -217,7 +215,7 @@ describe("organizer auth boundary", () => {
 
 async function signInAs(t: TestInstance, email: string, role: "reviewer" | "admin" = "reviewer") {
   const adminId = await seedAdminAccount(t, { email, role, active: true });
-  const { sessionToken } = await t.mutation(ref.signIn, { email, password: ORGANIZER_TEST_PASSWORD });
+  const { sessionToken } = await signInOrganizer(t, email);
   return { adminId, sessionToken };
 }
 
@@ -321,6 +319,27 @@ describe("application review state", () => {
     const review = await getReview(t, applicationId);
     expect(review?.reviewedBy).toBe(first.adminId);
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toHaveLength(1);
+  });
+
+  it("blocks a decision while another organizer holds an active review claim", async () => {
+    const t = createTest();
+    const first = await signInAs(t, "first@hackuta.org");
+    const second = await signInAs(t, "second@hackuta.org");
+    const applicationId = await seedSubmittedApplication(t);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken: first.sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+
+    await expect(
+      t.mutation(ref.setApplicationDecision, {
+        sessionToken: second.sessionToken,
+        applicationId,
+        decision: "waitlisted",
+      }),
+    ).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
   });
 
   it("allows reclaiming a stale review and resets startedAt", async () => {

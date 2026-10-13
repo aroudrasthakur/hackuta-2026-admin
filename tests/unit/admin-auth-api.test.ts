@@ -40,7 +40,7 @@ function post(path: string, body?: unknown, headers: Record<string, string> = {}
 
 describe("sign-in API", () => {
   it("sets the HttpOnly session cookie and never returns the token in the body", async () => {
-    convex.mutation.mockResolvedValue({ sessionToken: token, expiresAt: 123 });
+    convex.mutation.mockResolvedValue({ ok: true, sessionToken: token, expiresAt: 123 });
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a@hackuta.org", password: "pw" }));
 
     expect(response.status).toBe(200);
@@ -54,7 +54,7 @@ describe("sign-in API", () => {
   });
 
   it("marks the cookie Secure behind an HTTPS proxy", async () => {
-    convex.mutation.mockResolvedValue({ sessionToken: token, expiresAt: 1 });
+    convex.mutation.mockResolvedValue({ ok: true, sessionToken: token, expiresAt: 1 });
     const response = await signInRoute(post("/api/admin/sign-in", {}, { "x-forwarded-proto": "https" }));
     expect(response.headers.get("set-cookie")).toContain("Secure");
     expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), { email: "", password: "" });
@@ -64,7 +64,7 @@ describe("sign-in API", () => {
     ["Invalid email or password.", 401],
     ["This account is inactive.", 403],
   ])("returns %s with status %i", async (message, status) => {
-    convex.mutation.mockRejectedValue(new Error(message));
+    convex.mutation.mockResolvedValue({ ok: false, error: message });
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual({ error: message });
@@ -94,7 +94,7 @@ describe("sign-in API", () => {
   it("falls back to CONVEX_URL", async () => {
     vi.stubEnv("VITE_CONVEX_URL", "");
     vi.stubEnv("CONVEX_URL", "https://fallback.convex.cloud");
-    convex.mutation.mockResolvedValue({ sessionToken: token, expiresAt: 1 });
+    convex.mutation.mockResolvedValue({ ok: true, sessionToken: token, expiresAt: 1 });
     await signInRoute(post("/api/admin/sign-in", {}));
     expect(convex.urls).toEqual(["https://fallback.convex.cloud"]);
   });
@@ -150,7 +150,7 @@ describe("API routing", () => {
   });
 
   it("routes every known path", async () => {
-    convex.mutation.mockResolvedValue({ sessionToken: token, expiresAt: 1 });
+    convex.mutation.mockResolvedValue({ ok: true, sessionToken: token, expiresAt: 1 });
     expect((await routeAdminAuthRequest(post("/api/admin/sign-in", {}))).status).toBe(200);
     expect((await routeAdminAuthRequest(post("/api/admin/sign-out"))).status).toBe(200);
     expect((await routeAdminAuthRequest(new Request(`${base}/api/admin/session-token`))).status).toBe(401);
@@ -219,7 +219,7 @@ describe("Vite dev auth plugin", () => {
   });
 
   it("serves sign-in with the request body and cookie header", async () => {
-    convex.mutation.mockResolvedValue({ sessionToken: token, expiresAt: 9 });
+    convex.mutation.mockResolvedValue({ ok: true, sessionToken: token, expiresAt: 9 });
     const res = nodeResponse();
     mountPlugin()(
       nodeRequest("/api/admin/sign-in", "POST", JSON.stringify({ email: "a@hackuta.org", password: "pw" }), {
