@@ -41,6 +41,19 @@ function isActiveReviewClaim(review: ApplicationReviewDoc, now: number) {
   );
 }
 
+/** True when another organizer holds a non-stale in-progress claim. */
+export function isActiveReviewClaimHeldByOther(
+  review: ApplicationReviewDoc,
+  adminId: GenericId<"admins">,
+  now: number,
+) {
+  return (
+    isActiveReviewClaim(review, now) &&
+    review.reviewedBy !== undefined &&
+    review.reviewedBy !== adminId
+  );
+}
+
 export type StartReviewClaimResult =
   | { outcome: "logged" }
   | { outcome: "refreshed" };

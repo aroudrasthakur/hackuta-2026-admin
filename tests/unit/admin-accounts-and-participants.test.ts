@@ -4,13 +4,15 @@ import { describe, expect, it } from "vitest";
 import { buildDecisionEmailContent } from "../../convex/admin/decisionEmailTemplates";
 import { createQrCodeToken } from "../../convex/admin/participantCreation";
 import { createConvexTest } from "../helpers/convexTestContext";
-import { ORGANIZER_TEST_PASSWORD, seedAdminAccount } from "../helpers/staffTestFixtures";
+import {
+  mutateOrganizerSignIn,
+  ORGANIZER_TEST_PASSWORD,
+  seedAdminAccount,
+  signInOrganizer,
+} from "../helpers/staffTestFixtures";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 
 const ref = {
-  signIn: makeFunctionReference<"mutation", { email: string; password: string }, { sessionToken: string }>(
-    "admin/auth:signIn",
-  ),
   signOut: makeFunctionReference<"mutation", { sessionToken: string }>("admin/auth:signOut"),
   getCurrentStaff: makeFunctionReference<"query", { sessionToken: string }, unknown>(
     "admin/auth:getCurrentStaff",
@@ -31,10 +33,7 @@ describe("organizer sign-in edge cases", () => {
   it("normalizes the email before looking up the account", async () => {
     const t = createConvexTest();
     await seedAdminAccount(t, { email: "case@hackuta.org", role: "reviewer", active: true });
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "  CASE@HackUTA.org ",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
+    const { sessionToken } = await signInOrganizer(t, "  CASE@HackUTA.org ");
     expect(await t.query(ref.getCurrentStaff, { sessionToken })).toMatchObject({ email: "case@hackuta.org" });
   });
 
@@ -45,7 +44,8 @@ describe("organizer sign-in edge cases", () => {
   ])("rejects %s with the generic message", async (_label, email, password) => {
     const t = createConvexTest();
     await seedAdminAccount(t, { email: "admin@hackuta.org", role: "admin", active: true });
-    await expect(t.mutation(ref.signIn, { email, password })).rejects.toThrow("Invalid email or password.");
+    const result = await mutateOrganizerSignIn(t, { email, password });
+    expect(result).toEqual({ ok: false, error: "Invalid email or password." });
   });
 
   it("rejects an account that has no password set", async () => {
@@ -60,9 +60,11 @@ describe("organizer sign-in edge cases", () => {
         updatedAt: 1,
       }),
     );
-    await expect(
-      t.mutation(ref.signIn, { email: "nopass@hackuta.org", password: ORGANIZER_TEST_PASSWORD }),
-    ).rejects.toThrow("Invalid email or password.");
+    const noPassword = await mutateOrganizerSignIn(t, {
+      email: "nopass@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+    });
+    expect(noPassword).toEqual({ ok: false, error: "Invalid email or password." });
   });
 
   it("signing out an unknown session still succeeds", async () => {
@@ -79,25 +81,23 @@ describe("organizer password provisioning", () => {
 
     await t.mutation(ref.provision, { adminId, password: "NewPass123" });
 
-    await expect(t.mutation(ref.signIn, { email, password: "NewPass123" })).resolves.toHaveProperty(
-      "sessionToken",
-    );
+    const signedIn = await signInOrganizer(t, email, "NewPass123");
+    expect(signedIn.sessionToken).toHaveLength(64);
   });
 
   it("replaces an existing password and signs out every session", async () => {
     const t = createConvexTest();
     const adminId = await seedAdminAccount(t, { email: "reset@hackuta.org", role: "admin", active: true });
-    const { sessionToken } = await t.mutation(ref.signIn, {
-      email: "reset@hackuta.org",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
+    const { sessionToken } = await signInOrganizer(t, "reset@hackuta.org");
 
     await t.mutation(ref.provision, { adminId, password: "Changed123" });
 
     expect(await t.query(ref.getCurrentStaff, { sessionToken })).toBeNull();
-    await expect(
-      t.mutation(ref.signIn, { email: "reset@hackuta.org", password: ORGANIZER_TEST_PASSWORD }),
-    ).rejects.toThrow(/invalid/i);
+    const oldPassword = await mutateOrganizerSignIn(t, {
+      email: "reset@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+    });
+    expect(oldPassword.ok).toBe(false);
     expect(await t.run((ctx) => ctx.db.query("adminAuthAccounts").collect())).toHaveLength(1);
   });
 

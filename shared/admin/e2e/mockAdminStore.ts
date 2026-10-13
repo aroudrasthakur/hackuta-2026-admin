@@ -434,21 +434,19 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       const applicationId = String(args.applicationId ?? "");
       const decision = String(args.decision ?? "") as "accepted" | "rejected" | "waitlisted";
       if (!applications.has(applicationId)) throw new Error("Application not found");
-      let review = reviews.get(applicationId);
-      if (!review) {
-        review = {
-          applicationId,
-          status: "under_review",
-          reviewedBy: admin.adminId,
-          startedAt: now,
-          lastActiveAt: now,
-          createdAt: now,
-          updatedAt: now,
-        };
-        reviews.set(applicationId, review);
-      }
+      const review = reviews.get(applicationId);
+      if (!review) throw new Error("Application review not found");
       if (isFinalStatus(review.status)) {
         throw new Error("This application already has a final decision.");
+      }
+      if (
+        review.status === "under_review" &&
+        review.reviewedBy &&
+        review.reviewedBy !== admin.adminId &&
+        review.lastActiveAt !== undefined &&
+        now - review.lastActiveAt <= ACTIVE_REVIEW_STALE_MS
+      ) {
+        throw new Error("Application is already being reviewed by another organizer.");
       }
       review.status = decision;
       review.reviewedBy = admin.adminId;

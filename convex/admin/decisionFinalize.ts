@@ -5,7 +5,7 @@ import { formatApplicantFullName } from "../lib/applications";
 import type { ApplicationDoc, DataModel, MutationCtx } from "../lib/dataModel";
 import { getHackathonName } from "../lib/eventConfig";
 import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
-import { isFinalReviewStatus } from "./reviewClaim";
+import { isActiveReviewClaimHeldByOther, isFinalReviewStatus, REVIEW_ALREADY_CLAIMED } from "./reviewClaim";
 import { decisionPatch } from "./reviewState";
 
 type ApplicationReviewDoc = DocumentByName<DataModel, "applicationReviews">;
@@ -78,6 +78,11 @@ export async function finalizeApplicationDecision(
       return { logId: existingLog._id, duplicate: true as const };
     }
     throw new Error("Application already has a final decision.");
+  }
+
+  const now = Date.now();
+  if (isActiveReviewClaimHeldByOther(args.review, args.admin._id, now)) {
+    throw new Error(REVIEW_ALREADY_CLAIMED);
   }
 
   let logId: GenericId<"applicationReviewLogs">;

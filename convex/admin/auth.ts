@@ -1,5 +1,10 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "../_generated/server";
+import {
+  ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE,
+  isAdminSignInRateLimited,
+  recordAdminSignInFailure,
+} from "./adminSignInRateLimit";
 import { normalizeEmail } from "../lib/normalizeEmail";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { hashPassword, verifyPassword } from "./passwordHash";
@@ -9,16 +14,33 @@ import { hashSessionToken, resolveAdminSession, sessionTokenArgs } from "./staff
 const INVALID_CREDENTIALS = "Invalid email or password.";
 const INACTIVE_ACCOUNT = "This account is inactive.";
 
+const signInResult = v.union(
+  v.object({
+    ok: v.literal(true),
+    sessionToken: v.string(),
+    expiresAt: v.number(),
+  }),
+  v.object({
+    ok: v.literal(false),
+    error: v.string(),
+  }),
+);
+
 /** Email + password sign-in for provisioned organizer accounts only. */
 export const signIn = mutation({
   args: {
     email: v.string(),
     password: v.string(),
   },
+  returns: signInResult,
   handler: async (ctx, { email, password }) => {
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail || !password) {
-      throw new Error(INVALID_CREDENTIALS);
+      return { ok: false as const, error: INVALID_CREDENTIALS };
+    }
+
+    if (await isAdminSignInRateLimited(ctx, normalizedEmail)) {
+      return { ok: false as const, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE };
     }
 
     const admin = await ctx.db
@@ -26,10 +48,11 @@ export const signIn = mutation({
       .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
       .unique();
     if (!admin) {
-      throw new Error(INVALID_CREDENTIALS);
+      await recordAdminSignInFailure(ctx, normalizedEmail);
+      return { ok: false as const, error: INVALID_CREDENTIALS };
     }
     if (!admin.active) {
-      throw new Error(INACTIVE_ACCOUNT);
+      return { ok: false as const, error: INACTIVE_ACCOUNT };
     }
 
     const authAccount = await ctx.db
@@ -37,15 +60,22 @@ export const signIn = mutation({
       .withIndex("by_admin", (q) => q.eq("adminId", admin._id))
       .unique();
     if (!authAccount) {
-      throw new Error(INVALID_CREDENTIALS);
+      await recordAdminSignInFailure(ctx, normalizedEmail);
+      return { ok: false as const, error: INVALID_CREDENTIALS };
     }
 
     const valid = await verifyPassword(authAccount.passwordHash, password);
     if (!valid) {
-      throw new Error(INVALID_CREDENTIALS);
+      await recordAdminSignInFailure(ctx, normalizedEmail);
+      return { ok: false as const, error: INVALID_CREDENTIALS };
     }
 
-    return await createAdminSession(ctx, admin._id);
+    const session = await createAdminSession(ctx, admin._id);
+    return {
+      ok: true as const,
+      sessionToken: session.sessionToken,
+      expiresAt: session.expiresAt,
+    };
   },
 });
 

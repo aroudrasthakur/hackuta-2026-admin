@@ -55,6 +55,15 @@ export function ApplicationReviewContent({
   if (detail === null) {
     return <EmptyState title="Application not found" description="This link does not identify a submitted application." />;
   }
+
+  const activity = detail.reviewActivity;
+  const blockedByOther =
+    activity.reviewedBy !== null &&
+    activity.reviewedBy !== staffAdminId &&
+    !activity.isStale &&
+    !activity.isFinal &&
+    detail.reviewStatus === "under_review";
+
   return (
     <>
       {loggingFailed && (
@@ -67,7 +76,11 @@ export function ApplicationReviewContent({
         sessionToken={sessionToken}
         staffAdminId={staffAdminId}
       />
-      <ApplicationDecisionControls detail={detail} sessionToken={sessionToken} />
+      <ApplicationDecisionControls
+        detail={detail}
+        sessionToken={sessionToken}
+        blockedByOther={blockedByOther}
+      />
       <ApplicationDetail detail={detail} />
       {isAdmin && (
         <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />

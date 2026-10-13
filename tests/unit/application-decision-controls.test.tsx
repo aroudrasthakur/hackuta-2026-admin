@@ -165,6 +165,12 @@ describe("ApplicationDecisionControls", () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toBe("Unable to finalize decision.");
   });
 
+  it("hides decision actions when another organizer holds the active claim", async () => {
+    await renderControls({ blockedByOther: true });
+    expect(button("Accept")).toBeUndefined();
+    expect(container.textContent).toContain("another organizer holds the active review claim");
+  });
+
   it("hides controls after a final decision", async () => {
     await renderControls({
       detail: detail({

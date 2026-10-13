@@ -1,9 +1,58 @@
+import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { hashPassword } from "../../convex/admin/passwordHash";
 import { hashSessionToken } from "../../convex/admin/staffAuth";
+import { ADMIN_SIGN_IN_FAILURE_BUCKET } from "../../convex/admin/adminSignInRateLimit";
 import type { ConvexTestInstance } from "./convexTestContext";
 
 export const ORGANIZER_TEST_PASSWORD = "SecurePass1";
+
+export type OrganizerSignInResult =
+  | { ok: true; sessionToken: string; expiresAt: number }
+  | { ok: false; error: string };
+
+const organizerSignInRef = makeFunctionReference<
+  "mutation",
+  { email: string; password: string },
+  OrganizerSignInResult
+>("admin/auth:signIn");
+
+export async function mutateOrganizerSignIn(
+  t: ConvexTestInstance,
+  args: { email: string; password: string },
+) {
+  return t.mutation(organizerSignInRef, args);
+}
+
+/** Calls sign-in and throws with the server error when credentials are rejected. */
+export async function signInOrganizer(
+  t: ConvexTestInstance,
+  email: string,
+  password: string = ORGANIZER_TEST_PASSWORD,
+) {
+  const result = await mutateOrganizerSignIn(t, { email, password });
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result;
+}
+
+export async function seedAdminSignInFailures(
+  t: ConvexTestInstance,
+  email: string,
+  count: number,
+  now = Date.now(),
+) {
+  await t.run(async (ctx) => {
+    for (let i = 0; i < count; i += 1) {
+      await ctx.db.insert("rateLimits", {
+        bucket: ADMIN_SIGN_IN_FAILURE_BUCKET,
+        key: email.toLowerCase(),
+        createdAt: now - i * 1000,
+      });
+    }
+  });
+}
 
 export async function seedAdminAccount(
   t: ConvexTestInstance,
