@@ -83,10 +83,13 @@ describe("ApplicationDecisionControls", () => {
 
   it("finalizes only after confirmation and supports cancel", async () => {
     await renderControls();
-    await act(async () => button("Reject")!.click());
-    await act(async () => button("Cancel")!.click());
-    expect(container.textContent).toContain("Accept");
-    expect(mocks.finalize).not.toHaveBeenCalled();
+    for (const decision of ["Accept", "Reject"]) {
+      await act(async () => button(decision)!.click());
+      await act(async () => button("Cancel")!.click());
+      expect(button(decision)).toBeDefined();
+      expect(button("Cancel")).toBeUndefined();
+      expect(mocks.finalize).not.toHaveBeenCalled();
+    }
 
     await act(async () => button("Waitlist")!.click());
     await act(async () => button("Confirm waitlist")!.click());
@@ -112,21 +115,31 @@ describe("ApplicationDecisionControls", () => {
     expect(container.textContent).toContain("will receive an email shortly");
   });
 
-  it("sends only one request when confirm is clicked twice", async () => {
-    let resolve!: (value: unknown) => void;
-    mocks.finalize.mockReturnValue(new Promise((done) => (resolve = done)));
+  it("sends only one request while finalization is pending", async () => {
+    let resolveDecision!: (result: { logId: string; duplicate: boolean }) => void;
+    mocks.finalize.mockReturnValue(
+      new Promise((resolve) => {
+        resolveDecision = resolve;
+      }),
+    );
     await renderControls();
     await act(async () => button("Accept")!.click());
 
     const confirm = button("Confirm acceptance")!;
     await act(async () => confirm.click());
     await act(async () => confirm.click());
-    expect(button("Finalizing…")?.disabled).toBe(true);
-    expect(button("Cancel")?.disabled).toBe(true);
-    await act(async () => button("Cancel")!.click());
-
-    await act(async () => resolve({ logId: "log", duplicate: false }));
+    expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith({
+      sessionToken: "session-token",
+      applicationId: "application-a",
+      decision: "accepted",
+    });
+    expect(button("Finalizing…")!.disabled).toBe(true);
+    expect(button("Cancel")!.disabled).toBe(true);
+    await act(async () => button("Finalizing…")!.click());
     expect(mocks.finalize).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolveDecision({ logId: "accepted-log", duplicate: false }));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Application accepted");
   });
 
   it("shows the server error and keeps the confirmation open", async () => {
