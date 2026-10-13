@@ -16,6 +16,8 @@
 | [shared/README.md](../shared/README.md) | Isomorphic registration code (register-locked) |
 | [scripts/README.md](../scripts/README.md) | Build, codegen stub, schema lock scripts |
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | CI — whitespace, schema lock, lint, typecheck, build |
+| [.github/workflows/secrets.yml](../.github/workflows/secrets.yml) | Gitleaks secret scan (full history) |
+| [.github/workflows/codeql.yml](../.github/workflows/codeql.yml) | CodeQL JavaScript/TypeScript analysis |
 
 Related repos: [hackuta-2026-register](../hackuta-2026-register) (registration UI), [hackuta-2026-repository](../hackuta-2026-repository) (marketing site).
 
