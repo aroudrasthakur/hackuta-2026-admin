@@ -12,17 +12,8 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 export function AdminNav() {
   return (
     <nav className="flex flex-wrap gap-1" aria-label="Admin">
-      <NavLink to={ADMIN_ROUTES.dashboard} end className={linkClass}>
-        Dashboard
-      </NavLink>
       <NavLink to={ADMIN_ROUTES.applications} className={linkClass}>
         Applications
-      </NavLink>
-      <NavLink to={ADMIN_ROUTES.participants} className={linkClass}>
-        Participants
-      </NavLink>
-      <NavLink to={ADMIN_ROUTES.checkIn} className={linkClass}>
-        Check-in
       </NavLink>
     </nav>
   );

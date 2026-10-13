@@ -3,7 +3,7 @@ import type { Plugin } from "vite";
 import {
   routeAdminAuthRequest,
   type AdminAuthApiConfig,
-} from "./adminAuthHandlers";
+} from "./adminAuthHandlers.ts";
 
 async function readNodeRequestBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];

@@ -1,43 +1,89 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { mutation, query } from "../_generated/server";
-import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
-import { requireAdminSession, sessionTokenArgs } from "./staffAuth";
+import { applicationFormWasSubmitted } from "../lib/applications";
+import { finalizeApplicationDecision } from "./decisionFinalize";
+import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 import {
   applicationReviewLogActivityAction,
   applicationReviewLogDecisionAction,
 } from "./fields";
+import { startReviewClaim } from "./reviewClaim";
 
-/** Appends a non-decision event; decisions are recorded with their state update below. */
+/**
+ * Appends a non-decision event; decisions are recorded with their state update below.
+ * `viewed` is log-only. `started_review` claims the review with conflict + stale rules;
+ * `review_ended` counts as activity only for the admin currently reviewing.
+ */
 export const logApplicationReviewAction = mutation({
   args: {
     ...sessionTokenArgs,
     applicationId: v.id("applications"),
     action: applicationReviewLogActivityAction,
   },
+  returns: v.union(v.id("applicationReviewLogs"), v.null()),
   handler: async (ctx, { sessionToken, applicationId, action }) => {
-    const { admin } = await requireAdminSession(ctx, sessionToken);
-    if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
+    const admin = await requireReviewerAccess(ctx, sessionToken);
+    const application = await ctx.db.get(applicationId);
+    if (
+      !application ||
+      ((action === "viewed" || action === "started_review") &&
+        !applicationFormWasSubmitted(application))
+    ) {
+      throw new Error("Application not found");
+    }
+
+    const now = Date.now();
+    if (action === "started_review") {
+      const claim = await startReviewClaim(ctx, { applicationId, admin, now });
+      if (claim.outcome === "refreshed") {
+        return null;
+      }
+      return await ctx.db.insert("applicationReviewLogs", {
+        applicationId,
+        adminId: admin._id,
+        action,
+        createdAt: now,
+      });
+    }
+
+    if (action !== "viewed") {
+      const review = await ctx.db
+        .query("applicationReviews")
+        .withIndex("by_application", (q) => q.eq("applicationId", applicationId))
+        .unique();
+      if (!review) throw new Error("Application review not found");
+
+      if (review.reviewedBy === admin._id) {
+        await ctx.db.patch(review._id, { lastActiveAt: now, updatedAt: now });
+      }
+    }
+
     return await ctx.db.insert("applicationReviewLogs", {
       applicationId,
       adminId: admin._id,
       action,
-      createdAt: Date.now(),
+      createdAt: now,
     });
   },
 });
 
-/** Changes the current decision and appends its event atomically. */
+/** Confirmed final decision — updates review state, audit log, and schedules decision email. */
 export const setApplicationDecision = mutation({
   args: {
     ...sessionTokenArgs,
     applicationId: v.id("applications"),
     decision: applicationReviewLogDecisionAction,
   },
+  returns: v.object({
+    logId: v.id("applicationReviewLogs"),
+    duplicate: v.boolean(),
+  }),
   handler: async (ctx, { sessionToken, applicationId, decision }) => {
-    const { admin } = await requireAdminSession(ctx, sessionToken);
+    const admin = await requireReviewerAccess(ctx, sessionToken);
     const application = await ctx.db.get(applicationId);
     if (!application) throw new Error("Application not found");
+    if (!applicationFormWasSubmitted(application)) throw new Error("Application has not been submitted.");
 
     const review = await ctx.db
       .query("applicationReviews")
@@ -45,32 +91,16 @@ export const setApplicationDecision = mutation({
       .unique();
     if (!review) throw new Error("Application review not found");
 
-    if (decision === "accepted") {
-      const result = await applyAcceptedApplicationDecision(ctx, {
-        application,
-        review,
-        admin,
-      });
-      return result.logId;
-    }
-
-    const now = Date.now();
-    await ctx.db.patch(review._id, {
-      status: decision,
-      reviewedAt: now,
-      reviewedByAdmin: admin._id,
-      updatedAt: now,
-    });
-    return await ctx.db.insert("applicationReviewLogs", {
-      applicationId,
-      adminId: admin._id,
-      action: decision,
-      createdAt: now,
+    return await finalizeApplicationDecision(ctx, {
+      application,
+      review,
+      admin,
+      decision,
     });
   },
 });
 
-/** Returns one page of history; full history is restricted to `admin` role. */
+/** Returns one page of history, newest first; full history is restricted to `admin` role. */
 export const listApplicationReviewLogs = query({
   args: {
     ...sessionTokenArgs,
@@ -78,12 +108,28 @@ export const listApplicationReviewLogs = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, { sessionToken, applicationId, paginationOpts }) => {
-    const { admin } = await requireAdminSession(ctx, sessionToken);
-    if (admin.role !== "admin") throw new Error("Not authorized");
-    return await ctx.db
+    await requireAdminRole(ctx, sessionToken);
+    if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
+
+    const result = await ctx.db
       .query("applicationReviewLogs")
       .withIndex("by_application_createdAt", (q) => q.eq("applicationId", applicationId))
       .order("desc")
       .paginate(paginationOpts);
+
+    const actorNames = new Map<string, string>();
+    for (const adminId of new Set(result.page.map((log) => log.adminId))) {
+      actorNames.set(adminId, (await ctx.db.get(adminId))?.name ?? "Unknown organizer");
+    }
+
+    return {
+      ...result,
+      page: result.page.map((log) => ({
+        _id: log._id,
+        action: log.action,
+        createdAt: log.createdAt,
+        actorName: actorNames.get(log.adminId) ?? "Unknown organizer",
+      })),
+    };
   },
 });

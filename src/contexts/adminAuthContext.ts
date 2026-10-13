@@ -9,8 +9,8 @@ export type StaffProfile = {
 };
 
 export type AdminAuthContextValue = {
-  staff: StaffProfile | null | undefined;
   sessionToken: string | null;
+  staff: StaffProfile | null | undefined;
   authError: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;

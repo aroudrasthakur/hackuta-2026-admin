@@ -5,7 +5,7 @@ import {
   isSecureRequest,
   readAdminSessionCookie,
   serializeAdminSessionCookie,
-} from "./adminAuthCookie";
+} from "./adminAuthCookie.ts";
 
 const adminSignInRef = makeFunctionReference<
   "mutation",

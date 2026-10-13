@@ -1,45 +1,9 @@
-# Admin pages (`src/pages/admin`)
+# Admin pages
 
-Organizer route views.
-
-## Overview
-
-| File | Summary |
+| File | Route |
 | --- | --- |
-| [AdminLoginPage.tsx](AdminLoginPage.tsx) | `/admin/login` — organizer email + password sign-in |
-| [AdminDashboardPage.tsx](AdminDashboardPage.tsx) | `/admin` — Convex URL and client status |
-| [ApplicationsPage.tsx](ApplicationsPage.tsx) | `/admin/applications` — reactive submitted application review queue |
-| [ApplicationReviewPage.tsx](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` — single review placeholder |
-| [ParticipantsPage.tsx](ParticipantsPage.tsx) | `/admin/participants` — roster placeholder |
-| [CheckInPage.tsx](CheckInPage.tsx) | `/admin/check-in` — check-in tools placeholder |
+| [`AdminLoginPage.tsx`](AdminLoginPage.tsx) | `/admin/login` |
+| [`ApplicationsPage.tsx`](ApplicationsPage.tsx) | `/admin/applications` |
+| [`ApplicationReviewPage.tsx`](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` |
 
-## Route map
-
-| Path | Component |
-| --- | --- |
-| /admin/login | AdminLoginPage |
-| /admin | AdminDashboardPage |
-| /admin/applications | ApplicationsPage |
-| /admin/applications/:applicationId | ApplicationReviewPage |
-| /admin/participants | ParticipantsPage |
-| /admin/check-in | CheckInPage |
-
-## Future backend wiring
-
-| Page | Expected Convex surface |
-| --- | --- |
-| ApplicationsPage | Read submitted `applications` + `applicationReviews` via `convex/admin/applications.ts` |
-| ApplicationReviewPage | Read application row; mutate `applicationReviews` |
-| ParticipantsPage | Accepted applicants roster |
-| CheckInPage | Event-day check-in |
-
-Schema note: `applicationReviews` is the only register-origin table editable in [convex/schema.ts](../../../convex/schema.ts). `admins`, `applicationReviewLogs`, and `participants` are admin-owned tables in the same file.
-
-## Related
-
-| Location | Role |
-| --- | --- |
-| [pages/README.md](../README.md) | Full route table |
-| [convex/admin/README.md](../../../convex/admin/README.md) | Organizer functions |
-
-Parent index: [../../README.md](../../README.md).
+Review page: view logging, claim review, two-step decisions, admin-only review history.

@@ -33,7 +33,7 @@ push command continues to target `standing-manatee-425`.
 1. **Quality gate:** `npm run check:whitespace && npm run verify:register-schema-lock && npm run lint && npm run typecheck && npm run build`
 2. **Convex prod:** `npm run convex:deploy`
 3. **Vercel:** push to `main` or promote deployment; set `VITE_CONVEX_URL`
-4. **Smoke test:** load `/admin`, confirm Convex URL on dashboard, exercise placeholder routes
+4. **Smoke test:** sign in, open `/admin/applications`, open one application review
 
 ## Vercel environment variables
 
