@@ -97,6 +97,58 @@ describe("ApplicationDecisionControls", () => {
     });
   });
 
+  it.each([
+    ["Accept", "Confirm acceptance", "accepted", "Application accepted."],
+    ["Reject", "Confirm rejection", "rejected", "Application rejected."],
+    ["Waitlist", "Confirm waitlist", "waitlisted", "Application waitlisted."],
+  ] as const)("%s sends one decision and shows the email notice", async (choice, confirm, decision, message) => {
+    await renderControls();
+    await act(async () => button(choice)!.click());
+    expect(mocks.finalize).not.toHaveBeenCalled();
+
+    await act(async () => button(confirm)!.click());
+    expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ decision }));
+    expect(container.textContent).toContain(message);
+    expect(container.textContent).toContain("will receive an email shortly");
+  });
+
+  it("sends only one request when confirm is clicked twice", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.finalize.mockReturnValue(new Promise((done) => (resolve = done)));
+    await renderControls();
+    await act(async () => button("Accept")!.click());
+
+    const confirm = button("Confirm acceptance")!;
+    await act(async () => confirm.click());
+    await act(async () => confirm.click());
+    expect(button("Finalizing…")?.disabled).toBe(true);
+    expect(button("Cancel")?.disabled).toBe(true);
+    await act(async () => button("Cancel")!.click());
+
+    await act(async () => resolve({ logId: "log", duplicate: false }));
+    expect(mocks.finalize).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the server error and keeps the confirmation open", async () => {
+    mocks.finalize.mockRejectedValue(new Error("This application already has a final decision."));
+    await renderControls();
+    await act(async () => button("Reject")!.click());
+    await act(async () => button("Confirm rejection")!.click());
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      "This application already has a final decision.",
+    );
+    expect(button("Confirm rejection")).toBeDefined();
+  });
+
+  it("shows a fallback message for a non-Error failure", async () => {
+    mocks.finalize.mockRejectedValue("boom");
+    await renderControls();
+    await act(async () => button("Accept")!.click());
+    await act(async () => button("Confirm acceptance")!.click());
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Unable to finalize decision.");
+  });
+
   it("hides controls after a final decision", async () => {
     await renderControls({
       detail: detail({
