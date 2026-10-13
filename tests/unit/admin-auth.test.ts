@@ -51,6 +51,18 @@ const ref = {
     },
     { adminId: string; email: string; ok: true }
   >("admin/auth:createAndProvisionAdmin"),
+  createSampleApplication: makeFunctionReference<
+    "mutation",
+    {
+      sessionToken: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      school: string;
+      status?: "unreviewed" | "under_review" | "accepted" | "waitlisted" | "rejected";
+    },
+    { applicationId: string; ok: true }
+  >("admin/applications:createSampleApplication"),
 };
 
 const createTest = () => convexTest(schema, modules);
@@ -300,6 +312,60 @@ describe("organizer auth boundary", () => {
     });
     expect(result.ok).toBe(true);
     expect(result.email).toBe("newadmin@hackuta.org");
+  });
+
+  it("requires an active admin session to call createSampleApplication", async () => {
+    const t = createTest();
+
+    // 1. Unauthenticated call must fail
+    await expect(
+      t.mutation(ref.createSampleApplication, {
+        sessionToken: "invalid_session_token_that_does_not_exist_32",
+        firstName: "Test",
+        lastName: "Applicant",
+        email: "applicant@test.edu",
+        school: "Test University",
+      }),
+    ).rejects.toThrow(/not authenticated/i);
+
+    // 2. Reviewer role must be rejected
+    await seedAdmin(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
+    const { sessionToken: reviewerToken } = await t.mutation(ref.signIn, {
+      email: "reviewer1@hackuta.org",
+      password: TEST_PASSWORD,
+    });
+    await expect(
+      t.mutation(ref.createSampleApplication, {
+        sessionToken: reviewerToken,
+        firstName: "Test",
+        lastName: "Applicant",
+        email: "applicant@test.edu",
+        school: "Test University",
+      }),
+    ).rejects.toThrow(/not authorized/i);
+
+    // 3. Admin role succeeds
+    await seedAdmin(t, { email: "admin1@hackuta.org", role: "admin", active: true });
+    const { sessionToken: adminToken } = await t.mutation(ref.signIn, {
+      email: "admin1@hackuta.org",
+      password: TEST_PASSWORD,
+    });
+    const result = await t.mutation(ref.createSampleApplication, {
+      sessionToken: adminToken,
+      firstName: "Test",
+      lastName: "Applicant",
+      email: "applicant@test.edu",
+      school: "Test University",
+    });
+    expect(result.ok).toBe(true);
+    expect(result.applicationId).toBeTruthy();
+  });
+
+  it("rejects non-existent emails with standard invalid credentials error", async () => {
+    const t = createTest();
+    await expect(
+      t.mutation(ref.signIn, { email: "nonexistent@hackuta.org", password: "SomePassword1!" }),
+    ).rejects.toThrow(/invalid email or password/i);
   });
 });
 

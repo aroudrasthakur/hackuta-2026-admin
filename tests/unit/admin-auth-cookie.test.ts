@@ -5,6 +5,11 @@ import {
   readAdminSessionCookie,
   serializeAdminSessionCookie,
 } from "../../server/adminAuthCookie";
+import {
+  clearFailedSignInAttempts,
+  isSignInRateLimited,
+  recordFailedSignInAttempt,
+} from "../../server/adminAuthHandlers";
 
 describe("organizer session cookie helpers", () => {
   it("serializes an HttpOnly SameSite=Strict cookie", () => {
@@ -28,5 +33,28 @@ describe("organizer session cookie helpers", () => {
     expect(cookie).toContain(`${ADMIN_SESSION_COOKIE}=`);
     expect(cookie).toContain("Max-Age=0");
     expect(cookie).toContain("HttpOnly");
+  });
+});
+
+describe("organizer API sign-in rate limiter", () => {
+  const req = new Request("http://127.0.0.1/api/admin/sign-in", {
+    headers: { "x-forwarded-for": "192.168.1.100" },
+  });
+  const email = "ratelimit-test@hackuta.org";
+
+  it("permits initial attempts and blocks after 5 failures", () => {
+    clearFailedSignInAttempts(req, email);
+    expect(isSignInRateLimited(req, email)).toBe(false);
+
+    for (let i = 0; i < 4; i++) {
+      recordFailedSignInAttempt(req, email);
+      expect(isSignInRateLimited(req, email)).toBe(false);
+    }
+
+    recordFailedSignInAttempt(req, email);
+    expect(isSignInRateLimited(req, email)).toBe(true);
+
+    clearFailedSignInAttempts(req, email);
+    expect(isSignInRateLimited(req, email)).toBe(false);
   });
 });

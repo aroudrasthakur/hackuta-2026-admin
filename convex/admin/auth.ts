@@ -9,6 +9,10 @@ import { hashSessionToken, requireAdminSession, resolveAdminSession, sessionToke
 const INVALID_CREDENTIALS = "Invalid email or password.";
 const INACTIVE_ACCOUNT = "This account is inactive.";
 
+// Pre-computed Scrypt hash to ensure constant-time password verification on invalid email
+const DUMMY_PASSWORD_HASH =
+  "bb6f7d995cfc347c9a863503584ff172:88566a22c94ca8c063511cad240defeb8ace7c299640b4df747b4ff19384a7805bd18f49bf3f8771ba28d81c02ee21bd17740193d9b98bc918523c14ce1da0f4";
+
 /** Email + password sign-in for provisioned organizer accounts only. */
 export const signIn = mutation({
   args: {
@@ -25,24 +29,23 @@ export const signIn = mutation({
       .query("admins")
       .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
       .unique();
-    if (!admin) {
+
+    const authAccount = admin
+      ? await ctx.db
+          .query("adminAuthAccounts")
+          .withIndex("by_admin", (q) => q.eq("adminId", admin._id))
+          .unique()
+      : null;
+
+    const hashToVerify = authAccount?.passwordHash ?? DUMMY_PASSWORD_HASH;
+    const valid = await verifyPassword(hashToVerify, password);
+
+    if (!admin || !authAccount || !valid) {
       throw new Error(INVALID_CREDENTIALS);
     }
+
     if (!admin.active) {
       throw new Error(INACTIVE_ACCOUNT);
-    }
-
-    const authAccount = await ctx.db
-      .query("adminAuthAccounts")
-      .withIndex("by_admin", (q) => q.eq("adminId", admin._id))
-      .unique();
-    if (!authAccount) {
-      throw new Error(INVALID_CREDENTIALS);
-    }
-
-    const valid = await verifyPassword(authAccount.passwordHash, password);
-    if (!valid) {
-      throw new Error(INVALID_CREDENTIALS);
     }
 
     return await createAdminSession(ctx, admin._id);

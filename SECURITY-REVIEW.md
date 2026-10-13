@@ -35,10 +35,54 @@ The mutation now requires a valid caller session (`requireAdminSession`), valida
 that the caller has `role: "admin"`, and rejects unauthenticated or reviewer callers.
 Unit tests verify both unauthorized rejection and authorized execution.
 
+## Finding 3: Unauthenticated Sample Application Injection via Public Mutation
+
+- **Severity:** Medium
+- **Confidence:** 10/10
+- **Affected file:** `convex/admin/applications.ts` (`createSampleApplication`)
+- **Status:** Fixed
+
+`createSampleApplication` was exported as a public Convex mutation without caller
+authentication or session checks. Any unauthenticated caller could invoke it to inject
+arbitrary user records, applications with submitted status, and arbitrary review decisions.
+
+The mutation now requires a valid caller session (`requireAdminSession`) with `admin`
+role, rejecting unauthenticated callers and reviewers. Unit tests verify unauthorized
+rejection and authorized execution.
+
+## Finding 4: Account Enumeration via Timing Side-Channel in Organizer Sign-In
+
+- **Severity:** Low
+- **Confidence:** 9/10
+- **Affected file:** `convex/admin/auth.ts` (`signIn`)
+- **Status:** Fixed
+
+When `signIn` received a non-existent email address, it previously exited immediately
+without performing password verification, whereas valid accounts triggered CPU-intensive
+Scrypt verification (~100ms). This timing disparity allowed unauthenticated callers to
+enumerate valid organizer email addresses.
+
+`signIn` now performs a constant-time dummy Scrypt verification when an account is not
+found or inactive before raising the invalid credentials error, eliminating the timing
+disparity.
+
+## Finding 5: Brute-Force Password Guessing & Sensitive Token Caching
+
+- **Severity:** Medium
+- **Confidence:** 9/10
+- **Affected file:** `server/adminAuthHandlers.ts`
+- **Status:** Fixed
+
+Organizer sign-in requests lacked endpoint-level rate limiting, allowing brute-force
+password guessing. Additionally, `/api/admin/session-token` and auth API responses lacked
+strict `Cache-Control` headers, risking caching of bearer tokens by proxies.
+
+The auth API handler now enforces IP + email rate limiting (locking out after 5 consecutive
+failed attempts within 15 minutes with HTTP 429) and adds `Cache-Control: no-store, no-cache, must-revalidate, private`
+to all auth API responses.
+
 ## Review summary
 
-No exploitable authentication or data-access issue was found in the reviewed
-changes. The local development sign-in helper is limited to Vite development
-mode and creates a normal authenticated Convex session. The dashboard query
-requires an active staff session, is read-only, and does not expose historical
-review logs. Production deployment configuration was not remotely exercised.
+All identified public mutations and helper endpoints are now strictly authenticated and
+role-gated. Side-channel timing discrepancies and brute-force vulnerabilities have been
+mitigated, and sensitive organizer session tokens are protected against caching.

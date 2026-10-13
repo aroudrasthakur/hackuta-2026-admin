@@ -58,9 +58,10 @@ export const listSubmittedApplications = query({
   },
 });
 
-/** Helper mutation to create sample submitted applications for testing the review dashboard. */
+/** Helper mutation to create sample submitted applications for testing the review dashboard. Restricted to admins. */
 export const createSampleApplication = mutation({
   args: {
+    ...sessionTokenArgs,
     firstName: v.string(),
     lastName: v.string(),
     email: v.string(),
@@ -77,6 +78,11 @@ export const createSampleApplication = mutation({
     reviewerAdminId: v.optional(v.id("admins")),
   },
   handler: async (ctx, args) => {
+    const { admin: caller } = await requireAdminSession(ctx, args.sessionToken);
+    if (caller.role !== "admin") {
+      throw new Error("Not authorized: admin role required.");
+    }
+
     const now = Date.now();
     const user = await ctx.db
       .query("users")

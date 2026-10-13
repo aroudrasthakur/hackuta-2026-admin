@@ -47,11 +47,52 @@ function createConvexClient(configuredUrl?: string) {
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
+  headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
   return new Response(JSON.stringify(body), { ...init, headers });
 }
 
 async function readJsonBody<T>(request: Request): Promise<T> {
   return (await request.json()) as T;
+}
+
+const MAX_FAILED_SIGN_IN_ATTEMPTS = 5;
+const SIGN_IN_LOCKOUT_MS = 15 * 60 * 1000;
+
+type FailedAttemptRecord = { count: number; firstAttempt: number };
+const failedSignInAttempts = new Map<string, FailedAttemptRecord>();
+
+function getClientIdentifier(request: Request, email: string): string {
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const ip = forwardedFor || "direct";
+  return `${ip}:${email.trim().toLowerCase()}`;
+}
+
+export function isSignInRateLimited(request: Request, email: string): boolean {
+  const key = getClientIdentifier(request, email);
+  const record = failedSignInAttempts.get(key);
+  if (!record) return false;
+  const now = Date.now();
+  if (now - record.firstAttempt > SIGN_IN_LOCKOUT_MS) {
+    failedSignInAttempts.delete(key);
+    return false;
+  }
+  return record.count >= MAX_FAILED_SIGN_IN_ATTEMPTS;
+}
+
+export function recordFailedSignInAttempt(request: Request, email: string) {
+  const key = getClientIdentifier(request, email);
+  const now = Date.now();
+  const record = failedSignInAttempts.get(key);
+  if (!record || now - record.firstAttempt > SIGN_IN_LOCKOUT_MS) {
+    failedSignInAttempts.set(key, { count: 1, firstAttempt: now });
+  } else {
+    record.count += 1;
+  }
+}
+
+export function clearFailedSignInAttempts(request: Request, email: string) {
+  const key = getClientIdentifier(request, email);
+  failedSignInAttempts.delete(key);
 }
 
 export async function handleAdminSignIn(request: Request, configuredUrl?: string) {
@@ -70,9 +111,17 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
     return jsonResponse({ error: "Invalid request body." }, { status: 400 });
   }
 
+  if (isSignInRateLimited(request, email)) {
+    return jsonResponse(
+      { error: "Too many failed sign-in attempts. Please try again later." },
+      { status: 429 },
+    );
+  }
+
   try {
     const client = createConvexClient(configuredUrl);
     const result = await client.mutation(adminSignInRef, { email, password });
+    clearFailedSignInAttempts(request, email);
     const headers = new Headers();
     headers.append(
       "Set-Cookie",
@@ -80,8 +129,13 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
     );
     return jsonResponse({ ok: true, expiresAt: result.expiresAt }, { headers });
   } catch (error) {
+    recordFailedSignInAttempt(request, email);
     const message = error instanceof Error ? error.message : "Sign-in failed.";
-    const status = message.includes("inactive") ? 403 : 401;
+    const status = message.includes("inactive")
+      ? 403
+      : message.includes("Too many")
+        ? 429
+        : 401;
     return jsonResponse({ error: message }, { status });
   }
 }
@@ -147,7 +201,10 @@ export async function handleAdminSessionToken(request: Request) {
 
   return new Response(sessionToken, {
     status: 200,
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate, private",
+    },
   });
 }
 
