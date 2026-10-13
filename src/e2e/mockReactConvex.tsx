@@ -12,7 +12,7 @@ import {
   e2eMockRunQuery,
   getE2eMockRevision,
   subscribeE2eMockStore,
-} from "../../shared/admin/e2e/mockAdminStore";
+} from "../../shared/admin/e2e/mockAdminStore.ts";
 import { convexRefPath } from "./convexRefPath";
 
 const MockRevisionContext = createContext(0);

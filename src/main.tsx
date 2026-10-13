@@ -6,7 +6,7 @@ import { AdminAuthProvider } from "./contexts/AdminAuthProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ErrorState } from "./components/states/ErrorState";
 import { isE2eMockEnabled } from "./constants/e2eMock";
-import { resetE2eMockStore } from "../shared/admin/e2e/mockAdminStore";
+import { resetE2eMockStore } from "../shared/admin/e2e/mockAdminStore.ts";
 import { ConvexProvider } from "./convex/reactBindings";
 import { convexClient } from "./lib/convexClient";
 import "./styles/index.css";
