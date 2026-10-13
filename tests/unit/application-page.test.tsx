@@ -16,10 +16,11 @@ const mocks = vi.hoisted(() => ({
   action: vi.fn(),
 }));
 
-vi.mock("convex/react", () => ({
+vi.mock("../../src/convex/reactBindings", () => ({
+  ConvexProvider: ({ children }: { children: unknown }) => children,
   useQuery: mocks.query,
   useMutation: mocks.mutation,
-  useAction: mocks.action,
+  usePaginatedQuery: vi.fn(),
 }));
 
 function fixtures(): SubmittedApplicationSummary[] {

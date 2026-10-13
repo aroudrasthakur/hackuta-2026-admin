@@ -1,4 +1,4 @@
-import { usePaginatedQuery } from "convex/react";
+import { usePaginatedQuery } from "../convex/reactBindings";
 import type { GenericId } from "convex/values";
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../convex/adminApi";
 import { formatApplicationDate } from "../lib/applicationDisplay";

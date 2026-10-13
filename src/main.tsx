@@ -1,11 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { ConvexProvider } from "convex/react";
 import App from "./App";
 import { AdminAuthProvider } from "./contexts/AdminAuthProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ErrorState } from "./components/states/ErrorState";
+import { isE2eMockEnabled } from "./constants/e2eMock";
+import { resetE2eMockStore } from "../shared/admin/e2e/mockAdminStore";
+import { ConvexProvider } from "./convex/reactBindings";
 import { convexClient } from "./lib/convexClient";
 import "./styles/index.css";
 
@@ -24,9 +26,15 @@ const app = (
   </React.StrictMode>
 );
 
+if (isE2eMockEnabled() && typeof window !== "undefined") {
+  (window as Window & { __resetE2eMock?: () => void }).__resetE2eMock = resetE2eMockStore;
+}
+
+const convexReady = convexClient !== null || isE2eMockEnabled();
+
 ReactDOM.createRoot(root).render(
-  convexClient ? (
-    <ConvexProvider client={convexClient}>
+  convexReady ? (
+    <ConvexProvider client={convexClient!}>
       <AdminAuthProvider>{app}</AdminAuthProvider>
     </ConvexProvider>
   ) : (

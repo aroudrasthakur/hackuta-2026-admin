@@ -25,6 +25,7 @@ Vite, React 19, TypeScript, React Router, Convex, Tailwind CSS v4.
 | `npm run dev` | Vite + local API |
 | `npm run convex:push-dev` | Push to standing-manatee-425 (runs schema lock verify) |
 | `npm run test:unit` | Vitest |
+| `npm run test:coverage` | Vitest + 90% coverage check (CI). See [tests/README.md](tests/README.md) |
 | `npm run verify:register-schema-lock` | Fail if register-locked files drift |
 
 Copy `.env.example` → `.env.local` with `CONVEX_DEPLOYMENT=dev:standing-manatee-425`.

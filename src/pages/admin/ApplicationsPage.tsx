@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useQuery } from "../../convex/reactBindings";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ErrorBoundary } from "../../components/ErrorBoundary";

@@ -1,4 +1,4 @@
-import { useMutation } from "convex/react";
+import { useMutation } from "../convex/reactBindings";
 import { useState } from "react";
 import type { GenericId } from "convex/values";
 import { logApplicationReviewActionRef, type ApplicationDetail } from "../convex/adminApi";

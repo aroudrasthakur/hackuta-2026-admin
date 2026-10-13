@@ -28,6 +28,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ["src/e2e/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
+  {
     files: ["convex/**/*.ts"],
     languageOptions: { globals: globals.node },
   },

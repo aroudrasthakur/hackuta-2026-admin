@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   process.env.VITE_CONVEX_URL ??= env.VITE_CONVEX_URL;
   process.env.CONVEX_URL ??= env.CONVEX_URL ?? env.VITE_CONVEX_URL;
+  process.env.VITE_E2E_MOCK ??= env.VITE_E2E_MOCK;
 
   return {
     plugins: [react(), tailwindcss(), viteAdminAuthApiPlugin()],
