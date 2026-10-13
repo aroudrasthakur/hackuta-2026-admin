@@ -83,10 +83,13 @@ describe("ApplicationDecisionControls", () => {
 
   it("finalizes only after confirmation and supports cancel", async () => {
     await renderControls();
-    await act(async () => button("Reject")!.click());
-    await act(async () => button("Cancel")!.click());
-    expect(container.textContent).toContain("Accept");
-    expect(mocks.finalize).not.toHaveBeenCalled();
+    for (const decision of ["Accept", "Reject"]) {
+      await act(async () => button(decision)!.click());
+      await act(async () => button("Cancel")!.click());
+      expect(button(decision)).toBeDefined();
+      expect(button("Cancel")).toBeUndefined();
+      expect(mocks.finalize).not.toHaveBeenCalled();
+    }
 
     await act(async () => button("Waitlist")!.click());
     await act(async () => button("Confirm waitlist")!.click());
@@ -95,6 +98,26 @@ describe("ApplicationDecisionControls", () => {
       applicationId: "application-a",
       decision: "waitlisted",
     });
+  });
+
+  it("confirms acceptance once and blocks repeated clicks while pending", async () => {
+    let resolveDecision!: (result: { logId: string; duplicate: boolean }) => void;
+    mocks.finalize.mockReturnValue(new Promise((resolve) => { resolveDecision = resolve; }));
+    await renderControls();
+    await act(async () => button("Accept")!.click());
+    expect(mocks.finalize).not.toHaveBeenCalled();
+
+    await act(async () => button("Confirm acceptance")!.click());
+    expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith({
+      sessionToken: "session-token", applicationId: "application-a", decision: "accepted",
+    });
+    expect(button("Finalizing…")!.disabled).toBe(true);
+    expect(button("Cancel")!.disabled).toBe(true);
+    await act(async () => button("Finalizing…")!.click());
+    expect(mocks.finalize).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolveDecision({ logId: "accepted-log", duplicate: false }));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Application accepted");
   });
 
   it("hides controls after a final decision", async () => {
