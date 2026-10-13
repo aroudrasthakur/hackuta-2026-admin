@@ -4,6 +4,7 @@ import { SCHOOL_OTHER_OPTION } from "../../shared/registration/constants";
 import {
   applicationFormWasSubmitted,
   formatApplicantFullName,
+  getApplicationByUser,
   getApplicationReview,
 } from "../lib/applications";
 import type { ApplicationDoc } from "../lib/dataModel";
@@ -132,10 +133,9 @@ export const createSampleApplication = mutation({
         v.literal("rejected"),
       ),
     ),
-    reviewerAdminId: v.optional(v.id("admins")),
   },
   handler: async (ctx, args) => {
-    await requireAdminRole(ctx, args.sessionToken);
+    const admin = await requireAdminRole(ctx, args.sessionToken);
 
     const now = Date.now();
     const user = await ctx.db
@@ -150,6 +150,11 @@ export const createSampleApplication = mutation({
         email: args.email,
         emailVerificationTime: now,
       }));
+
+    const existingApplication = await getApplicationByUser(ctx, authUserId);
+    if (existingApplication && applicationFormWasSubmitted(existingApplication)) {
+      throw new Error("Applicant already has a submitted application.");
+    }
 
     const applicationId = await ctx.db.insert("applications", {
       authUserId,
@@ -167,7 +172,7 @@ export const createSampleApplication = mutation({
       await ctx.db.insert("applicationReviews", {
         applicationId,
         status: args.status,
-        ...(args.reviewerAdminId ? { reviewedBy: args.reviewerAdminId } : {}),
+        reviewedBy: admin._id,
         createdAt: now,
         updatedAt: now,
       });

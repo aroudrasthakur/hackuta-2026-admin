@@ -4,6 +4,12 @@ import { normalizeEmail } from "../lib/normalizeEmail";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { hashPassword, verifyPassword } from "./passwordHash";
 import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
+import {
+  ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE,
+  clearAdminSignInFailures,
+  isAdminSignInRateLimited,
+  recordFailedAdminSignIn,
+} from "./adminSignInRateLimit";
 import { hashSessionToken, requireAdminRole, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
 
 const INVALID_CREDENTIALS = "Invalid email or password.";
@@ -22,7 +28,11 @@ export const signIn = mutation({
   handler: async (ctx, { email, password }) => {
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail || !password) {
-      throw new Error(INVALID_CREDENTIALS);
+      return { ok: false as const, error: INVALID_CREDENTIALS };
+    }
+
+    if (await isAdminSignInRateLimited(ctx, normalizedEmail)) {
+      return { ok: false as const, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE };
     }
 
     const admin = await ctx.db
@@ -43,14 +53,18 @@ export const signIn = mutation({
     );
 
     if (!admin || !authAccount || !valid) {
-      throw new Error(INVALID_CREDENTIALS);
+      await recordFailedAdminSignIn(ctx, normalizedEmail);
+      return { ok: false as const, error: INVALID_CREDENTIALS };
     }
 
     if (!admin.active) {
-      throw new Error(INACTIVE_ACCOUNT);
+      await recordFailedAdminSignIn(ctx, normalizedEmail);
+      return { ok: false as const, error: INACTIVE_ACCOUNT };
     }
 
-    return await createAdminSession(ctx, admin._id);
+    await clearAdminSignInFailures(ctx, normalizedEmail);
+    const session = await createAdminSession(ctx, admin._id);
+    return { ok: true as const, ...session };
   },
 });
 
