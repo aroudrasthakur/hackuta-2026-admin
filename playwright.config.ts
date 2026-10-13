@@ -24,9 +24,11 @@ export default defineConfig({
     env: {
       VITE_E2E_MOCK: "true",
       VITE_CONVEX_URL: "https://e2e-mock.invalid.convex.cloud",
+      PLAYWRIGHT_PORT: String(port),
+      PLAYWRIGHT_HOST: "127.0.0.1",
     },
     command: useProductionBuild
-      ? `node ./node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${port}`
+      ? `node scripts/e2e-preview-server.mjs`
       : `npm run dev -- --port ${port}`,
     url: baseURL,
     reuseExistingServer: false,

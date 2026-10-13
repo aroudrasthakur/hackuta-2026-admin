@@ -44,6 +44,11 @@ export default defineConfig({
         // Browser entry point; only mounts <App /> (tested) into #root.
         "src/main.tsx",
         "src/vite-env.d.ts",
+        // Playwright E2E mock path (covered by tests/e2e, not Vitest).
+        "src/e2e/**",
+        "src/constants/e2eMock.ts",
+        "src/convex/reactBindings.ts",
+        "shared/admin/e2e/**",
       ],
       reporter: ["text", "text-summary", "json-summary", "html"],
       thresholds: {

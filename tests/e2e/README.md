@@ -7,7 +7,7 @@ Browser tests for the organizer admin SPA. They run against **`VITE_E2E_MOCK=tru
 | Command | Purpose |
 | --- | --- |
 | `npm run test:e2e` | Dev server on port 5373 |
-| `PLAYWRIGHT_USE_BUILD=true npm run test:e2e` | Production build preview (CI path) |
+| `PLAYWRIGHT_USE_BUILD=true npm run test:e2e` | Production `dist/` via [scripts/e2e-preview-server.mjs](../../scripts/e2e-preview-server.mjs) (CI path) |
 
 ## Coverage map
 

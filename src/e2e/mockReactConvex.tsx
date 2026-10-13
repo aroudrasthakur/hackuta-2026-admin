@@ -59,32 +59,38 @@ export function usePaginatedQuery(
   args: Record<string, unknown> | "skip",
   options: { initialNumItems: number },
 ) {
-  if (args === "skip") {
-    return { results: [], status: "Exhausted" as PaginatedStatus, loadMore: () => {}, isLoading: false };
-  }
+  const skipped = args === "skip";
   const revision = useContext(MockRevisionContext);
   const [loaded, setLoaded] = useState(options.initialNumItems);
 
   const pageResult = useMemo(() => {
+    if (skipped) {
+      return { page: [] as unknown[], isDone: true, continueCursor: null };
+    }
     void revision;
     return e2eMockRunQuery(convexRefPath(ref), {
       ...args,
       paginationOpts: { numItems: loaded, cursor: null },
     }) as { page: unknown[]; isDone: boolean; continueCursor: string | null };
-  }, [ref, args, loaded, revision]);
+  }, [ref, args, loaded, revision, skipped]);
 
-  const results = pageResult.page;
+  const loadMore = useCallback((numItems: number) => {
+    setLoaded((current) => current + numItems);
+  }, []);
+
+  if (skipped) {
+    return {
+      results: [],
+      status: "Exhausted" as PaginatedStatus,
+      loadMore: () => {},
+      isLoading: false,
+    };
+  }
+
   const status: PaginatedStatus = pageResult.isDone ? "Exhausted" : "CanLoadMore";
 
-  const loadMore = useCallback(
-    (numItems: number) => {
-      setLoaded((current) => current + numItems);
-    },
-    [],
-  );
-
   return {
-    results,
+    results: pageResult.page,
     status,
     loadMore,
     isLoading: false,
