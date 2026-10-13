@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, StrictMode } from "react";
+import { act, StrictMode, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,8 +7,11 @@ import { ApplicationDecisionControls } from "../../src/components/ApplicationDec
 import { setApplicationDecisionRef, type ApplicationDetail } from "../../src/convex/adminApi";
 
 const mocks = vi.hoisted(() => ({ mutationHook: vi.fn(), finalize: vi.fn() }));
-vi.mock("convex/react", () => ({
+vi.mock("../../src/convex/reactBindings", () => ({
+  ConvexProvider: ({ children }: { children: ReactNode }) => children,
   useMutation: mocks.mutationHook,
+  useQuery: vi.fn(),
+  usePaginatedQuery: vi.fn(),
 }));
 
 function detail(overrides: Partial<ApplicationDetail> = {}): ApplicationDetail {

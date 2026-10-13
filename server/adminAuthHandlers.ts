@@ -1,11 +1,16 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
+import { e2eMockSignIn, e2eMockSignOut } from "../shared/admin/e2e/mockAdminStore";
 import {
   clearAdminSessionCookie,
   isSecureRequest,
   readAdminSessionCookie,
   serializeAdminSessionCookie,
 } from "./adminAuthCookie.ts";
+
+function isE2eMockAuthEnabled() {
+  return process.env.VITE_E2E_MOCK === "true";
+}
 
 const adminSignInRef = makeFunctionReference<
   "mutation",
@@ -58,6 +63,19 @@ export async function handleAdminSignIn(request: Request) {
   }
 
   try {
+    if (isE2eMockAuthEnabled()) {
+      const result = e2eMockSignIn(email, password);
+      if (!result.ok) {
+        return jsonResponse({ error: result.error }, { status: 401 });
+      }
+      const headers = new Headers();
+      headers.append(
+        "Set-Cookie",
+        serializeAdminSessionCookie(result.sessionToken, secure),
+      );
+      return jsonResponse({ ok: true, expiresAt: result.expiresAt }, { headers });
+    }
+
     const client = createConvexClient();
     const result = await client.mutation(adminSignInRef, { email, password });
     const headers = new Headers();
@@ -82,8 +100,12 @@ export async function handleAdminSignOut(request: Request) {
   const sessionToken = readAdminSessionCookie(request.headers.get("cookie"));
   if (sessionToken) {
     try {
-      const client = createConvexClient();
-      await client.mutation(adminSignOutRef, { sessionToken });
+      if (isE2eMockAuthEnabled()) {
+        e2eMockSignOut(sessionToken);
+      } else {
+        const client = createConvexClient();
+        await client.mutation(adminSignOutRef, { sessionToken });
+      }
     } catch {
       // Always clear the browser cookie even if the server row is already gone.
     }

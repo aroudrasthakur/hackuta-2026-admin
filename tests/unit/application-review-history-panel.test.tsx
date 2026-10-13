@@ -7,7 +7,12 @@ import { ApplicationReviewHistory } from "../../src/components/ApplicationReview
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../../src/convex/adminApi";
 
 const mocks = vi.hoisted(() => ({ paginatedQuery: vi.fn(), loadMore: vi.fn() }));
-vi.mock("convex/react", () => ({ usePaginatedQuery: mocks.paginatedQuery }));
+vi.mock("../../src/convex/reactBindings", () => ({
+  ConvexProvider: ({ children }: { children: unknown }) => children,
+  usePaginatedQuery: mocks.paginatedQuery,
+  useQuery: vi.fn(),
+  useMutation: vi.fn(),
+}));
 
 const applicationId = "application-a" as GenericId<"applications">;
 

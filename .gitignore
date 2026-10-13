@@ -7,3 +7,5 @@ dist/
 .DS_Store
 convex/_generated/
 coverage/
+playwright-report/
+test-results/

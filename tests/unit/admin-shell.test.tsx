@@ -23,7 +23,8 @@ const mocks = vi.hoisted(() => ({
   mutationHook: vi.fn(),
   mutation: vi.fn(),
 }));
-vi.mock("convex/react", () => ({
+vi.mock("../../src/convex/reactBindings", () => ({
+  ConvexProvider: ({ children }: { children: unknown }) => children,
   useQuery: mocks.query,
   usePaginatedQuery: mocks.paginatedQuery,
   useMutation: mocks.mutationHook,

@@ -18,6 +18,7 @@
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | CI — whitespace, schema lock, lint, typecheck, build |
 | [.github/workflows/secrets.yml](../.github/workflows/secrets.yml) | Gitleaks secret scan (full history) |
 | [.github/workflows/codeql.yml](../.github/workflows/codeql.yml) | CodeQL JavaScript/TypeScript analysis |
+| [tests/e2e/README.md](../tests/e2e/README.md) | Playwright E2E suite (mock backend) |
 
 Related repos: [hackuta-2026-register](../hackuta-2026-register) (registration UI), [hackuta-2026-repository](../hackuta-2026-repository) (marketing site).
 
