@@ -120,3 +120,65 @@ export const provisionAdminAuthAccount = internalMutation({
     return { ok: true as const };
   },
 });
+
+/** Developer provisioning — creates or updates an admin row and sets password in one step. */
+export const createAndProvisionAdmin = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+    role: v.union(v.literal("reviewer"), v.literal("admin")),
+    password: v.string(),
+  },
+  handler: async (ctx, { email, name, role, password }) => {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new Error("Invalid email.");
+    }
+    validatePasswordRequirements(password);
+
+    const now = Date.now();
+    const existingAdmin = await ctx.db
+      .query("admins")
+      .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
+      .unique();
+
+    let adminId = existingAdmin?._id;
+    if (existingAdmin) {
+      await ctx.db.patch(existingAdmin._id, {
+        name,
+        role,
+        active: true,
+        updatedAt: now,
+      });
+    } else {
+      adminId = await ctx.db.insert("admins", {
+        email: normalizedEmail,
+        name,
+        role,
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const passwordHash = await hashPassword(password);
+    const existingAccount = await ctx.db
+      .query("adminAuthAccounts")
+      .withIndex("by_admin", (q) => q.eq("adminId", adminId!))
+      .unique();
+
+    if (existingAccount) {
+      await ctx.db.patch(existingAccount._id, { passwordHash, updatedAt: now });
+    } else {
+      await ctx.db.insert("adminAuthAccounts", {
+        adminId: adminId!,
+        passwordHash,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    await invalidateAdminSessions(ctx, adminId!);
+    return { adminId: adminId!, email: normalizedEmail, ok: true as const };
+  },
+});

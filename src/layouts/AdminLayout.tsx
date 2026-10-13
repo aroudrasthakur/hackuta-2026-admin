@@ -13,6 +13,12 @@ export function AdminLayout() {
           <div>
             <p className="text-xs uppercase tracking-wide text-mist">HackUTA 2026</p>
             <h1 className="font-display text-2xl text-night">Organizer admin</h1>
+            {import.meta.env.DEV &&
+            import.meta.env.VITE_DEV_AUTH_BYPASS === "true" ? (
+              <p className="mt-1 text-xs font-medium text-red-700">
+                Local development auth bypass is enabled
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-col gap-3 sm:items-end">
             <AdminNav />

@@ -8,6 +8,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | --- | --- |
 | [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
 | [staffAuth.ts](staffAuth.ts) | Session token hashing and `requireAdminSession` guard |
+| [applications.ts](applications.ts) | Read-only submitted application queue with current review state |
 | [passwordHash.ts](passwordHash.ts) | Scrypt password hash + verify |
 | [fields.ts](fields.ts) | Shared Convex validators for admin-owned tables |
 | [participantCreation.ts](participantCreation.ts) | Idempotent participant lookup/insert (`applicationId` + `authUserId`) |
@@ -31,7 +32,7 @@ Public mutations accept `sessionToken`; `requireAdminSession` resolves the activ
 
 | Area | Expected functions |
 | --- | --- |
-| Application queue | List/filter `applications` with `applicationReviews` status |
+| Application queue | Read submitted `applications` with `applicationReviews` status |
 | Single review | Read application; create/update `applicationReviews` rows |
 | Organizers | Read/write `admins` table for role checks |
 | Check-in | Participant lookup mutations (TBD) |

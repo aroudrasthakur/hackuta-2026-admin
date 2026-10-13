@@ -1,6 +1,6 @@
 # Admin pages (`src/pages/admin`)
 
-Organizer route views. Placeholder UIs until review queue and auth are implemented.
+Organizer route views.
 
 ## Overview
 
@@ -8,7 +8,7 @@ Organizer route views. Placeholder UIs until review queue and auth are implement
 | --- | --- |
 | [AdminLoginPage.tsx](AdminLoginPage.tsx) | `/admin/login` — organizer email + password sign-in |
 | [AdminDashboardPage.tsx](AdminDashboardPage.tsx) | `/admin` — Convex URL and client status |
-| [ApplicationsPage.tsx](ApplicationsPage.tsx) | `/admin/applications` — application queue placeholder |
+| [ApplicationsPage.tsx](ApplicationsPage.tsx) | `/admin/applications` — reactive submitted application review queue |
 | [ApplicationReviewPage.tsx](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` — single review placeholder |
 | [ParticipantsPage.tsx](ParticipantsPage.tsx) | `/admin/participants` — roster placeholder |
 | [CheckInPage.tsx](CheckInPage.tsx) | `/admin/check-in` — check-in tools placeholder |
@@ -28,7 +28,7 @@ Organizer route views. Placeholder UIs until review queue and auth are implement
 
 | Page | Expected Convex surface |
 | --- | --- |
-| ApplicationsPage | List `applications` + `applicationReviews` via `convex/admin/` |
+| ApplicationsPage | Read submitted `applications` + `applicationReviews` via `convex/admin/applications.ts` |
 | ApplicationReviewPage | Read application row; mutate `applicationReviews` |
 | ParticipantsPage | Accepted applicants roster |
 | CheckInPage | Event-day check-in |

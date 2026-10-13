@@ -19,12 +19,25 @@ const adminSignOutRef = makeFunctionReference<
   { ok: true }
 >("admin/auth:signOut");
 
-function convexUrl() {
-  return process.env.VITE_CONVEX_URL?.trim() || process.env.CONVEX_URL?.trim();
+export type AdminAuthApiConfig = {
+  convexUrl?: string;
+  devAuth?: {
+    enabled: boolean;
+    email?: string;
+    password?: string;
+  };
+};
+
+function convexUrl(configuredUrl?: string) {
+  return (
+    configuredUrl?.trim() ||
+    process.env.VITE_CONVEX_URL?.trim() ||
+    process.env.CONVEX_URL?.trim()
+  );
 }
 
-function createConvexClient() {
-  const url = convexUrl();
+function createConvexClient(configuredUrl?: string) {
+  const url = convexUrl(configuredUrl);
   if (!url) {
     throw new Error("Missing VITE_CONVEX_URL for organizer auth API.");
   }
@@ -41,7 +54,7 @@ async function readJsonBody<T>(request: Request): Promise<T> {
   return (await request.json()) as T;
 }
 
-export async function handleAdminSignIn(request: Request) {
+export async function handleAdminSignIn(request: Request, configuredUrl?: string) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -58,7 +71,7 @@ export async function handleAdminSignIn(request: Request) {
   }
 
   try {
-    const client = createConvexClient();
+    const client = createConvexClient(configuredUrl);
     const result = await client.mutation(adminSignInRef, { email, password });
     const headers = new Headers();
     headers.append(
@@ -73,7 +86,35 @@ export async function handleAdminSignIn(request: Request) {
   }
 }
 
-export async function handleAdminSignOut(request: Request) {
+async function handleAdminDevSignIn(
+  request: Request,
+  config: AdminAuthApiConfig,
+) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  if (!config.devAuth?.enabled) {
+    return new Response("Not Found", { status: 404 });
+  }
+  if (!config.devAuth.email || !config.devAuth.password) {
+    return jsonResponse(
+      { error: "Set ADMIN_DEV_AUTH_EMAIL and ADMIN_DEV_AUTH_PASSWORD in .env.local." },
+      { status: 503 },
+    );
+  }
+
+  const signInRequest = new Request(request.url, {
+    method: "POST",
+    headers: request.headers,
+    body: JSON.stringify({
+      email: config.devAuth.email,
+      password: config.devAuth.password,
+    }),
+  });
+  return handleAdminSignIn(signInRequest, config.convexUrl);
+}
+
+export async function handleAdminSignOut(request: Request, configuredUrl?: string) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -82,7 +123,7 @@ export async function handleAdminSignOut(request: Request) {
   const sessionToken = readAdminSessionCookie(request.headers.get("cookie"));
   if (sessionToken) {
     try {
-      const client = createConvexClient();
+      const client = createConvexClient(configuredUrl);
       await client.mutation(adminSignOutRef, { sessionToken });
     } catch {
       // Always clear the browser cookie even if the server row is already gone.
@@ -110,16 +151,22 @@ export async function handleAdminSessionToken(request: Request) {
   });
 }
 
-export async function routeAdminAuthRequest(request: Request) {
+export async function routeAdminAuthRequest(
+  request: Request,
+  config: AdminAuthApiConfig = {},
+) {
   const { pathname } = new URL(request.url);
   if (pathname === "/api/admin/sign-in") {
-    return handleAdminSignIn(request);
+    return handleAdminSignIn(request, config.convexUrl);
   }
   if (pathname === "/api/admin/sign-out") {
-    return handleAdminSignOut(request);
+    return handleAdminSignOut(request, config.convexUrl);
   }
   if (pathname === "/api/admin/session-token") {
     return handleAdminSessionToken(request);
+  }
+  if (pathname === "/api/admin/dev-sign-in") {
+    return handleAdminDevSignIn(request, config);
   }
   return new Response("Not Found", { status: 404 });
 }

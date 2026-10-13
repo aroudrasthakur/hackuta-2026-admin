@@ -10,6 +10,8 @@ export type StaffProfile = {
 
 export type AdminAuthContextValue = {
   staff: StaffProfile | null | undefined;
+  sessionToken: string | null;
+  authError: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   sessionReady: boolean;
