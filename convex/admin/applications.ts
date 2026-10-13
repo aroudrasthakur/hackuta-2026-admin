@@ -46,6 +46,7 @@ export const listSubmittedApplications = query({
         const reviewedBy = review?.reviewedBy;
         return {
           applicationId: application._id,
+          email: application.email ?? "",
           applicantName:
             formatApplicantFullName(application) ?? application.email ?? "Unknown applicant",
           school: formatApplicantSchool(application),

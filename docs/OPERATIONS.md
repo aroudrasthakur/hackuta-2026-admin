@@ -55,6 +55,8 @@ This option creates a normal, authenticated admin session; it does not disable
 Convex authorization. It is available only in Vite's development server and has no
 effect in production.
 
+Do **not** set `VITE_E2E_MOCK` on Vercel (production or preview). It enables in-memory auth and fixed test credentials. GitHub Actions may set it only for the Playwright build artifact; real Vercel deploys must build without it (`scripts/verify-production-env.mjs` enforces this).
+
 ## Register lock refresh
 
 When registration source files change in [hackuta-2026-register](../hackuta-2026-register) (rare):

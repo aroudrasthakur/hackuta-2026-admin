@@ -1,5 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
+import { e2eMockSignIn, e2eMockSignOut } from "../shared/admin/e2e/mockAdminStore.ts";
 import {
   clearAdminSessionCookie,
   isSecureRequest,
@@ -7,11 +8,18 @@ import {
   serializeAdminSessionCookie,
 } from "./adminAuthCookie.ts";
 
+function isE2eMockAuthEnabled() {
+  return process.env.VITE_E2E_MOCK === "true";
+}
+
+type AdminSignInResult =
+  | { ok: true; sessionToken: string; expiresAt: number }
+  | { ok: false; error: string };
+
 const adminSignInRef = makeFunctionReference<
   "mutation",
   { email: string; password: string },
-  | { ok: true; sessionToken: string; expiresAt: number }
-  | { ok: false; error: string }
+  AdminSignInResult
 >("admin/auth:signIn");
 
 const adminSignOutRef = makeFunctionReference<
@@ -56,6 +64,16 @@ async function readJsonBody<T>(request: Request): Promise<T> {
   return (await request.json()) as T;
 }
 
+function signInErrorStatus(error: string) {
+  if (error.includes("inactive")) {
+    return 403;
+  }
+  if (error.includes("Too many")) {
+    return 429;
+  }
+  return 401;
+}
+
 export async function handleAdminSignIn(request: Request, configuredUrl?: string) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -73,15 +91,23 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
   }
 
   try {
+    if (isE2eMockAuthEnabled()) {
+      const result = e2eMockSignIn(email, password);
+      if (!result.ok) {
+        return jsonResponse({ error: result.error }, { status: 401 });
+      }
+      const headers = new Headers();
+      headers.append(
+        "Set-Cookie",
+        serializeAdminSessionCookie(result.sessionToken, secure),
+      );
+      return jsonResponse({ ok: true, expiresAt: result.expiresAt }, { headers });
+    }
+
     const client = createConvexClient(configuredUrl);
     const result = await client.mutation(adminSignInRef, { email, password });
     if (!result.ok) {
-      const status = result.error.includes("inactive")
-        ? 403
-        : result.error.includes("Too many")
-          ? 429
-          : 401;
-      return jsonResponse({ error: result.error }, { status });
+      return jsonResponse({ error: result.error }, { status: signInErrorStatus(result.error) });
     }
     const headers = new Headers();
     headers.append(
@@ -132,8 +158,12 @@ export async function handleAdminSignOut(request: Request, configuredUrl?: strin
   const sessionToken = readAdminSessionCookie(request.headers.get("cookie"));
   if (sessionToken) {
     try {
-      const client = createConvexClient(configuredUrl);
-      await client.mutation(adminSignOutRef, { sessionToken });
+      if (isE2eMockAuthEnabled()) {
+        e2eMockSignOut(sessionToken);
+      } else {
+        const client = createConvexClient(configuredUrl);
+        await client.mutation(adminSignOutRef, { sessionToken });
+      }
     } catch {
       // Always clear the browser cookie even if the server row is already gone.
     }

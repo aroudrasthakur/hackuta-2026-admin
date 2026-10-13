@@ -1,15 +1,15 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "../_generated/server";
-import { normalizeEmail } from "../lib/normalizeEmail";
-import { validatePasswordRequirements } from "../../shared/auth/password";
-import { hashPassword, verifyPassword } from "./passwordHash";
-import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
 import {
   ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE,
   clearAdminSignInFailures,
   isAdminSignInRateLimited,
   recordFailedAdminSignIn,
 } from "./adminSignInRateLimit";
+import { normalizeEmail } from "../lib/normalizeEmail";
+import { validatePasswordRequirements } from "../../shared/auth/password";
+import { hashPassword, verifyPassword } from "./passwordHash";
+import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
 import { hashSessionToken, requireAdminRole, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
 
 const INVALID_CREDENTIALS = "Invalid email or password.";
@@ -19,12 +19,25 @@ const INACTIVE_ACCOUNT = "This account is inactive.";
 const DUMMY_PASSWORD_HASH =
   "bb6f7d995cfc347c9a863503584ff172:88566a22c94ca8c063511cad240defeb8ace7c299640b4df747b4ff19384a7805bd18f49bf3f8771ba28d81c02ee21bd17740193d9b98bc918523c14ce1da0f4";
 
+const signInResult = v.union(
+  v.object({
+    ok: v.literal(true),
+    sessionToken: v.string(),
+    expiresAt: v.number(),
+  }),
+  v.object({
+    ok: v.literal(false),
+    error: v.string(),
+  }),
+);
+
 /** Email + password sign-in for provisioned organizer accounts only. */
 export const signIn = mutation({
   args: {
     email: v.string(),
     password: v.string(),
   },
+  returns: signInResult,
   handler: async (ctx, { email, password }) => {
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail || !password) {
@@ -58,13 +71,16 @@ export const signIn = mutation({
     }
 
     if (!admin.active) {
-      await recordFailedAdminSignIn(ctx, normalizedEmail);
       return { ok: false as const, error: INACTIVE_ACCOUNT };
     }
 
     await clearAdminSignInFailures(ctx, normalizedEmail);
     const session = await createAdminSession(ctx, admin._id);
-    return { ok: true as const, ...session };
+    return {
+      ok: true as const,
+      sessionToken: session.sessionToken,
+      expiresAt: session.expiresAt,
+    };
   },
 });
 

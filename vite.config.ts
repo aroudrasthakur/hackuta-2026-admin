@@ -5,6 +5,10 @@ import { viteAdminAuthApiPlugin } from "./server/viteAdminAuthApiPlugin.ts";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  process.env.VITE_CONVEX_URL ??= env.VITE_CONVEX_URL;
+  process.env.CONVEX_URL ??= env.CONVEX_URL ?? env.VITE_CONVEX_URL;
+  process.env.VITE_E2E_MOCK ??= env.VITE_E2E_MOCK;
+
   const convexUrl =
     process.env.VITE_CONVEX_URL?.trim() ||
     process.env.CONVEX_URL?.trim() ||

@@ -2,12 +2,17 @@ import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE } from "../../convex/admin/adminSignInRateLimit";
 import {
   createStaffAuthorizationFixture,
+  mutateOrganizerSignIn,
   ORGANIZER_TEST_PASSWORD,
   seedAdminAccount,
+  seedAdminSignInFailures,
   seedSubmittedApplication,
+  signInOrganizer,
 } from "../helpers/staffTestFixtures";
+import { REVIEW_ALREADY_CLAIMED } from "../../convex/admin/reviewClaim";
 import {
   ADMIN_SESSION_TTL_MS,
   getCurrentAdmin,
@@ -15,12 +20,6 @@ import {
 } from "../../convex/admin/staffAuth";
 
 const ref = {
-  signIn: makeFunctionReference<
-    "mutation",
-    { email: string; password: string },
-    | { ok: true; sessionToken: string; expiresAt: number }
-    | { ok: false; error: string }
-  >("admin/auth:signIn"),
   signOut: makeFunctionReference<"mutation", { sessionToken: string }>("admin/auth:signOut"),
   getCurrentStaff: makeFunctionReference<
     "query",
@@ -88,28 +87,12 @@ const ref = {
 const createTest = createConvexTest;
 type TestInstance = ConvexTestInstance;
 
-type SignInResult =
-  | { ok: true; sessionToken: string; expiresAt: number }
-  | { ok: false; error: string };
-
-async function signInOrganizer(
-  t: TestInstance,
-  email: string,
-  password: string = ORGANIZER_TEST_PASSWORD,
-) {
-  const result = (await t.mutation(ref.signIn, { email, password })) as SignInResult;
-  if (!result.ok) {
-    throw new Error(result.error);
-  }
-  return result;
-}
-
 async function expectSignInFailure(
   t: TestInstance,
   args: { email: string; password: string },
   pattern: RegExp,
 ) {
-  const result = (await t.mutation(ref.signIn, args)) as SignInResult;
+  const result = await mutateOrganizerSignIn(t, args);
   expect(result.ok).toBe(false);
   if (!result.ok) {
     expect(result.error).toMatch(pattern);
@@ -123,6 +106,18 @@ async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer
 }
 
 describe("organizer auth boundary", () => {
+  it("blocks sign-in after too many failed attempts for the same email", async () => {
+    const t = createTest();
+    await seedAdminAccount(t, { email: "limited@hackuta.org", role: "admin", active: true });
+    await seedAdminSignInFailures(t, "limited@hackuta.org", 5);
+
+    const blocked = await mutateOrganizerSignIn(t, {
+      email: "limited@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+    });
+    expect(blocked).toEqual({ ok: false, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE });
+  });
+
   it("signs in with valid credentials and resolves staff from session token", async () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
@@ -516,6 +511,27 @@ describe("application review state", () => {
     const review = await getReview(t, applicationId);
     expect(review?.reviewedBy).toBe(first.adminId);
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toHaveLength(1);
+  });
+
+  it("blocks a decision while another organizer holds an active review claim", async () => {
+    const t = createTest();
+    const first = await signInAs(t, "first@hackuta.org");
+    const second = await signInAs(t, "second@hackuta.org");
+    const applicationId = await seedSubmittedApplication(t);
+
+    await t.mutation(ref.logApplicationReviewAction, {
+      sessionToken: first.sessionToken,
+      applicationId,
+      action: "started_review",
+    });
+
+    await expect(
+      t.mutation(ref.setApplicationDecision, {
+        sessionToken: second.sessionToken,
+        applicationId,
+        decision: "waitlisted",
+      }),
+    ).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
   });
 
   it("allows reclaiming a stale review and resets startedAt", async () => {

@@ -1,4 +1,4 @@
-import { useMutation } from "convex/react";
+import { useMutation } from "../convex/reactBindings";
 import { useState } from "react";
 import type { GenericId } from "convex/values";
 import { setApplicationDecisionRef, type ApplicationDetail } from "../convex/adminApi";
@@ -11,6 +11,7 @@ type PendingDecision = "accepted" | "rejected" | "waitlisted";
 type ApplicationDecisionControlsProps = {
   detail: ApplicationDetail;
   sessionToken: string;
+  blockedByOther?: boolean;
 };
 
 const confirmCopy: Record<
@@ -37,6 +38,7 @@ const confirmCopy: Record<
 export function ApplicationDecisionControls({
   detail,
   sessionToken,
+  blockedByOther = false,
 }: ApplicationDecisionControlsProps) {
   const finalizeDecision = useMutation(setApplicationDecisionRef);
   const [pendingDecision, setPendingDecision] = useState<PendingDecision | null>(null);
@@ -87,6 +89,20 @@ export function ApplicationDecisionControls({
 
   if (isFinal) {
     return null;
+  }
+
+  if (blockedByOther) {
+    return (
+      <ReviewPanelSection
+        aria-label="Application decision"
+        title="Decision"
+        description="Another organizer is actively reviewing this application. You cannot finalize a decision until their session is stale or they finish."
+      >
+        <p className="text-sm text-mist">
+          Decisions are unavailable while another organizer holds the active review claim.
+        </p>
+      </ReviewPanelSection>
+    );
   }
 
   const pendingCopy = pendingDecision ? confirmCopy[pendingDecision] : null;

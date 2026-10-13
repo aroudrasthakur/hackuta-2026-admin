@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useQuery } from "../convex/reactBindings";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getCurrentStaffRef } from "../convex/adminApi";
 import {
