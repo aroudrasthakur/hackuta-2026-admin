@@ -20,6 +20,21 @@ The example now points back to `standing-manatee-425`. Personal deployment
 settings belong in `.env.local`, and the operations guide now explains the
 separate local-development and shared-dev push workflows.
 
+## Finding 2: Unauthenticated Admin Creation/Hijacking via Public Mutation
+
+- **Severity:** High
+- **Confidence:** 10/10
+- **Affected file:** `convex/admin/auth.ts` (`createAndProvisionAdmin`)
+- **Status:** Fixed
+
+`createAndProvisionAdmin` was exported as a public Convex mutation without session
+or role verification. Any unauthenticated caller could invoke it to create an admin
+account or reset the password and credentials of existing admin accounts.
+
+The mutation now requires a valid caller session (`requireAdminSession`), validates
+that the caller has `role: "admin"`, and rejects unauthenticated or reviewer callers.
+Unit tests verify both unauthorized rejection and authorized execution.
+
 ## Review summary
 
 No exploitable authentication or data-access issue was found in the reviewed

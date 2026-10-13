@@ -4,7 +4,7 @@ import { normalizeEmail } from "../lib/normalizeEmail";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { hashPassword, verifyPassword } from "./passwordHash";
 import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
-import { hashSessionToken, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
+import { hashSessionToken, requireAdminSession, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
 
 const INVALID_CREDENTIALS = "Invalid email or password.";
 const INACTIVE_ACCOUNT = "This account is inactive.";
@@ -121,15 +121,21 @@ export const provisionAdminAuthAccount = internalMutation({
   },
 });
 
-/** Developer provisioning — creates or updates an admin row and sets password in one step. */
+/** Organizer provisioning — creates or updates an admin row and sets credentials. Restricted to existing admins. */
 export const createAndProvisionAdmin = mutation({
   args: {
+    ...sessionTokenArgs,
     email: v.string(),
     name: v.string(),
     role: v.union(v.literal("reviewer"), v.literal("admin")),
     password: v.string(),
   },
-  handler: async (ctx, { email, name, role, password }) => {
+  handler: async (ctx, { sessionToken, email, name, role, password }) => {
+    const { admin: caller } = await requireAdminSession(ctx, sessionToken);
+    if (caller.role !== "admin") {
+      throw new Error("Not authorized: admin role required.");
+    }
+
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail) {
       throw new Error("Invalid email.");

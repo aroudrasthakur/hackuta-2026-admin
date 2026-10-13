@@ -40,6 +40,17 @@ const ref = {
     },
     { page: unknown[] }
   >("admin/applicationReviewLogs:listApplicationReviewLogs"),
+  createAndProvisionAdmin: makeFunctionReference<
+    "mutation",
+    {
+      sessionToken: string;
+      email: string;
+      name: string;
+      role: "reviewer" | "admin";
+      password: string;
+    },
+    { adminId: string; email: string; ok: true }
+  >("admin/auth:createAndProvisionAdmin"),
 };
 
 const createTest = () => convexTest(schema, modules);
@@ -242,6 +253,53 @@ describe("organizer auth boundary", () => {
 
     await t.mutation(ref.signOut, { sessionToken });
     expect(await t.query(ref.getCurrentStaff, { sessionToken })).toBeNull();
+  });
+
+  it("requires an active admin session to call createAndProvisionAdmin", async () => {
+    const t = createTest();
+
+    // 1. Unauthenticated call must fail
+    await expect(
+      t.mutation(ref.createAndProvisionAdmin, {
+        sessionToken: "invalid_session_token_that_does_not_exist_32",
+        email: "newadmin@hackuta.org",
+        name: "New Admin",
+        role: "admin",
+        password: TEST_PASSWORD,
+      }),
+    ).rejects.toThrow(/not authenticated/i);
+
+    // 2. Reviewer role must be rejected
+    await seedAdmin(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
+    const { sessionToken: reviewerToken } = await t.mutation(ref.signIn, {
+      email: "reviewer1@hackuta.org",
+      password: TEST_PASSWORD,
+    });
+    await expect(
+      t.mutation(ref.createAndProvisionAdmin, {
+        sessionToken: reviewerToken,
+        email: "newadmin@hackuta.org",
+        name: "New Admin",
+        role: "admin",
+        password: TEST_PASSWORD,
+      }),
+    ).rejects.toThrow(/not authorized/i);
+
+    // 3. Admin role succeeds
+    await seedAdmin(t, { email: "superadmin@hackuta.org", role: "admin", active: true });
+    const { sessionToken: adminToken } = await t.mutation(ref.signIn, {
+      email: "superadmin@hackuta.org",
+      password: TEST_PASSWORD,
+    });
+    const result = await t.mutation(ref.createAndProvisionAdmin, {
+      sessionToken: adminToken,
+      email: "newadmin@hackuta.org",
+      name: "New Admin",
+      role: "admin",
+      password: TEST_PASSWORD,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.email).toBe("newadmin@hackuta.org");
   });
 });
 
