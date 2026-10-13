@@ -7,6 +7,7 @@ import {
   readAdminSessionCookie,
   serializeAdminSessionCookie,
 } from "./adminAuthCookie.ts";
+import { getAdminSignInClientIp, isLoopbackAdminRequest } from "./adminRequestClient.ts";
 
 function isE2eMockAuthEnabled() {
   return process.env.VITE_E2E_MOCK === "true";
@@ -18,7 +19,7 @@ type AdminSignInResult =
 
 const adminSignInRef = makeFunctionReference<
   "mutation",
-  { email: string; password: string },
+  { email: string; password: string; clientIp?: string },
   AdminSignInResult
 >("admin/auth:signIn");
 
@@ -105,7 +106,8 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
     }
 
     const client = createConvexClient(configuredUrl);
-    const result = await client.mutation(adminSignInRef, { email, password });
+    const clientIp = getAdminSignInClientIp(request);
+    const result = await client.mutation(adminSignInRef, { email, password, clientIp });
     if (!result.ok) {
       return jsonResponse({ error: result.error }, { status: signInErrorStatus(result.error) });
     }
@@ -130,6 +132,12 @@ async function handleAdminDevSignIn(
   }
   if (!config.devAuth?.enabled) {
     return new Response("Not Found", { status: 404 });
+  }
+  if (!isLoopbackAdminRequest(request)) {
+    return jsonResponse(
+      { error: "Dev sign-in is only available from localhost." },
+      { status: 403 },
+    );
   }
   if (!config.devAuth.email || !config.devAuth.password) {
     return jsonResponse(

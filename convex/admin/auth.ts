@@ -1,9 +1,12 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "../_generated/server";
 import {
+  ADMIN_SIGN_IN_CLIENT_IP_MAX_LENGTH,
   ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE,
+  buildAdminSignInRateLimitKey,
   clearAdminSignInFailures,
   isAdminSignInRateLimited,
+  normalizeRateLimitClientIp,
   recordFailedAdminSignIn,
 } from "./adminSignInRateLimit";
 import { normalizeEmail } from "../lib/normalizeEmail";
@@ -36,15 +39,28 @@ export const signIn = mutation({
   args: {
     email: v.string(),
     password: v.string(),
+    clientIp: v.optional(v.string()),
   },
   returns: signInResult,
-  handler: async (ctx, { email, password }) => {
+  handler: async (ctx, { email, password, clientIp }) => {
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail || !password) {
       return { ok: false as const, error: INVALID_CREDENTIALS };
     }
 
-    if (await isAdminSignInRateLimited(ctx, normalizedEmail)) {
+    if (clientIp !== undefined && clientIp.length > ADMIN_SIGN_IN_CLIENT_IP_MAX_LENGTH) {
+      return { ok: false as const, error: INVALID_CREDENTIALS };
+    }
+
+    const rateLimitKey = buildAdminSignInRateLimitKey(
+      clientIp === undefined ? undefined : normalizeRateLimitClientIp(clientIp),
+      normalizedEmail,
+    );
+    if (!rateLimitKey) {
+      return { ok: false as const, error: INVALID_CREDENTIALS };
+    }
+
+    if (await isAdminSignInRateLimited(ctx, rateLimitKey)) {
       return { ok: false as const, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE };
     }
 
@@ -66,7 +82,7 @@ export const signIn = mutation({
     );
 
     if (!admin || !authAccount || !valid) {
-      await recordFailedAdminSignIn(ctx, normalizedEmail);
+      await recordFailedAdminSignIn(ctx, rateLimitKey);
       return { ok: false as const, error: INVALID_CREDENTIALS };
     }
 
@@ -74,7 +90,7 @@ export const signIn = mutation({
       return { ok: false as const, error: INACTIVE_ACCOUNT };
     }
 
-    await clearAdminSignInFailures(ctx, normalizedEmail);
+    await clearAdminSignInFailures(ctx, rateLimitKey);
     const session = await createAdminSession(ctx, admin._id);
     return {
       ok: true as const,

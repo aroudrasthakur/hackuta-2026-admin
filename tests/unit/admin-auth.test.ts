@@ -114,8 +114,50 @@ describe("organizer auth boundary", () => {
     const blocked = await mutateOrganizerSignIn(t, {
       email: "limited@hackuta.org",
       password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "203.0.113.10",
     });
     expect(blocked).toEqual({ ok: false, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE });
+  });
+
+  it("rate-limits per IP and email so another IP can still attempt the same account", async () => {
+    const t = createTest();
+    await seedAdminAccount(t, { email: "limited@hackuta.org", role: "admin", active: true });
+    await seedAdminSignInFailures(t, "limited@hackuta.org", 5, "203.0.113.10");
+
+    const blockedOnSameIp = await mutateOrganizerSignIn(t, {
+      email: "limited@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "203.0.113.10",
+    });
+    expect(blockedOnSameIp.ok).toBe(false);
+
+    const allowedOnOtherIp = await mutateOrganizerSignIn(t, {
+      email: "limited@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "198.51.100.20",
+    });
+    expect(allowedOnOtherIp.ok).toBe(true);
+  });
+
+  it("rate-limits per IP and email independently for different accounts on the same IP", async () => {
+    const t = createTest();
+    await seedAdminAccount(t, { email: "first@hackuta.org", role: "admin", active: true });
+    await seedAdminAccount(t, { email: "second@hackuta.org", role: "admin", active: true });
+    await seedAdminSignInFailures(t, "first@hackuta.org", 5, "203.0.113.55");
+
+    const blockedFirst = await mutateOrganizerSignIn(t, {
+      email: "first@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "203.0.113.55",
+    });
+    expect(blockedFirst.ok).toBe(false);
+
+    const allowedSecond = await mutateOrganizerSignIn(t, {
+      email: "second@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "203.0.113.55",
+    });
+    expect(allowedSecond.ok).toBe(true);
   });
 
   it("signs in with valid credentials and resolves staff from session token", async () => {

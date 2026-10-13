@@ -50,7 +50,10 @@ describe("sign-in API", () => {
     expect(cookie).toContain(`${ADMIN_SESSION_COOKIE}=${token}`);
     expect(cookie).toContain("HttpOnly");
     expect(cookie).not.toContain("Secure");
-    expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), { email: "a@hackuta.org", password: "pw" });
+    expect(convex.mutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ email: "a@hackuta.org", password: "pw", clientIp: "127.0.0.1" }),
+    );
     expect(convex.urls).toEqual(["https://example.convex.cloud"]);
   });
 
@@ -58,7 +61,10 @@ describe("sign-in API", () => {
     convex.mutation.mockResolvedValue({ ok: true, sessionToken: token, expiresAt: 1 });
     const response = await signInRoute(post("/api/admin/sign-in", {}, { "x-forwarded-proto": "https" }));
     expect(response.headers.get("set-cookie")).toContain("Secure");
-    expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), { email: "", password: "" });
+    expect(convex.mutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ email: "", password: "", clientIp: "127.0.0.1" }),
+    );
   });
 
   it.each([

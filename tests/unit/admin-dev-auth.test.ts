@@ -26,4 +26,42 @@ describe("local development auth bypass", () => {
       error: "Set ADMIN_DEV_AUTH_EMAIL and ADMIN_DEV_AUTH_PASSWORD in .env.local.",
     });
   });
+
+  it("rejects dev sign-in from a non-loopback host even when enabled", async () => {
+    const response = await routeAdminAuthRequest(
+      new Request("http://192.168.1.50/api/admin/dev-sign-in", {
+        method: "POST",
+      }),
+      {
+        devAuth: {
+          enabled: true,
+          email: "admin@hackuta.org",
+          password: "SecurePass1",
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Dev sign-in is only available from localhost.",
+    });
+  });
+
+  it("rejects dev sign-in when forwarded from a remote client", async () => {
+    const response = await routeAdminAuthRequest(
+      new Request("http://127.0.0.1/api/admin/dev-sign-in", {
+        method: "POST",
+        headers: { "x-forwarded-for": "203.0.113.9" },
+      }),
+      {
+        devAuth: {
+          enabled: true,
+          email: "admin@hackuta.org",
+          password: "SecurePass1",
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+  });
 });

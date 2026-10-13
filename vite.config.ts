@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => {
     process.env.ADMIN_DEV_AUTH_PASSWORD ||
     env.ADMIN_DEV_AUTH_PASSWORD;
 
+  if (devAuthEnabled) {
+    console.warn(
+      "[hackuta-admin] VITE_DEV_AUTH_BYPASS is enabled. Dev sign-in is localhost-only; never enable in production or commit ADMIN_DEV_AUTH_* values.",
+    );
+  }
+
   return {
     plugins: [
       react(),

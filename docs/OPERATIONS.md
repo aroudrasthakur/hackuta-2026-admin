@@ -51,9 +51,15 @@ an active admin account on the configured dev Convex deployment. These credentia
 are read only by the local Vite server and are never exposed to the browser. Restart
 Vite after changing these settings.
 
+**Never commit** `ADMIN_DEV_AUTH_EMAIL` or `ADMIN_DEV_AUTH_PASSWORD`. Keep them in
+`.env.local` only. Production and preview builds fail if `VITE_DEV_AUTH_BYPASS=true`
+(`scripts/verify-production-env.mjs`).
+
 This option creates a normal, authenticated admin session; it does not disable
-Convex authorization. It is available only in Vite's development server and has no
-effect in production.
+Convex authorization. It is available only in Vite's **development** server (`mode === "development"`).
+The `/api/admin/dev-sign-in` route accepts requests **only from loopback**
+(`localhost`, `127.0.0.1`, `::1`) and rejects tunneled or remote `Host` / `X-Forwarded-For`
+clients. It has no effect in production builds or preview deploys.
 
 Do **not** set `VITE_E2E_MOCK` on Vercel (production or preview). It enables in-memory auth and fixed test credentials. GitHub Actions may set it only for the Playwright build artifact; real Vercel deploys must build without it (`scripts/verify-production-env.mjs` enforces this).
 
