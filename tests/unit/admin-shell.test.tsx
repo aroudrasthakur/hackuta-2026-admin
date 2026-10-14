@@ -17,6 +17,12 @@ import {
 } from "../../src/convex/adminApi";
 import { useAdminAuth } from "../../src/hooks/useAdminAuth";
 
+vi.mock("../../src/components/SignInStormBackdrop", () => ({
+  SignInStormBackdrop: ({ active }: { active?: boolean }) => (
+    <div data-testid="storm-backdrop" data-active={active ? "true" : "false"} />
+  ),
+}));
+
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   paginatedQuery: vi.fn(),

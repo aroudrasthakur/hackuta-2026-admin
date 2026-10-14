@@ -26,6 +26,7 @@
     "convex:deploy": "convex deploy"
   },
   "dependencies": {
+    "@paper-design/shaders-react": "^0.0.80",
     "@convex-dev/auth": "^0.0.96",
     "convex": "^1.45.0",
     "libphonenumber-js": "^1.13.14",

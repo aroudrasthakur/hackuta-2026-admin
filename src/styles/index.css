@@ -1,8 +1,10 @@
 @import "tailwindcss";
+@import "./storm.css";
 
 @theme {
   --font-sans: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-display: Georgia, "Times New Roman", serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --color-ink: #1a3a52;
   --color-night: #102f46;
   --color-clay: #eee3d2;
