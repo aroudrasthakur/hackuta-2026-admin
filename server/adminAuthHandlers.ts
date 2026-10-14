@@ -189,7 +189,12 @@ export async function handleAdminSessionToken(request: Request) {
 
   const sessionToken = readAdminSessionCookie(request.headers.get("cookie"));
   if (!sessionToken) {
-    return new Response(null, { status: 401 });
+    return new Response(null, {
+      status: 401,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
+    });
   }
 
   return new Response(sessionToken, {

@@ -12,15 +12,12 @@ import {
 import { normalizeEmail } from "../lib/normalizeEmail";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { hashPassword, verifyPassword } from "./passwordHash";
+import { ADMIN_SIGN_IN_DUMMY_PASSWORD_HASH } from "./signInSecurityConstants";
 import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
 import { hashSessionToken, requireAdminRole, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
 
 const INVALID_CREDENTIALS = "Invalid email or password.";
 const INACTIVE_ACCOUNT = "This account is inactive.";
-
-// Pre-computed Scrypt hash to ensure constant-time password verification on invalid email
-const DUMMY_PASSWORD_HASH =
-  "bb6f7d995cfc347c9a863503584ff172:88566a22c94ca8c063511cad240defeb8ace7c299640b4df747b4ff19384a7805bd18f49bf3f8771ba28d81c02ee21bd17740193d9b98bc918523c14ce1da0f4";
 
 const signInResult = v.union(
   v.object({
@@ -77,7 +74,7 @@ export const signIn = mutation({
       : null;
 
     const valid = await verifyPassword(
-      authAccount?.passwordHash ?? DUMMY_PASSWORD_HASH,
+      authAccount?.passwordHash ?? ADMIN_SIGN_IN_DUMMY_PASSWORD_HASH,
       password,
     );
 

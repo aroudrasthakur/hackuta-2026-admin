@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { isAdminDevAuthBypassEnabled } from "../../server/devAuthConfig";
 import { routeAdminAuthRequest } from "../../server/adminAuthHandlers";
 
 describe("local development auth bypass", () => {
+  it("treats production mode as disabled even when VITE_DEV_AUTH_BYPASS would be set", () => {
+    expect(
+      isAdminDevAuthBypassEnabled({ mode: "production", viteDevAuthBypass: "true" }),
+    ).toBe(false);
+  });
+
   it("does not expose the dev sign-in endpoint when disabled", async () => {
     const response = await routeAdminAuthRequest(
       new Request("http://localhost/api/admin/dev-sign-in", {

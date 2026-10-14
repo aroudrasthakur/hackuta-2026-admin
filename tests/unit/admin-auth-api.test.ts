@@ -55,6 +55,9 @@ describe("sign-in API", () => {
       expect.objectContaining({ email: "a@hackuta.org", password: "pw", clientIp: "127.0.0.1" }),
     );
     expect(convex.urls).toEqual(["https://example.convex.cloud"]);
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
   });
 
   it("marks the cookie Secure behind an HTTPS proxy", async () => {
@@ -67,6 +70,18 @@ describe("sign-in API", () => {
     );
   });
 
+  it("returns 429 for rate-limited sign-in", async () => {
+    convex.mutation.mockResolvedValue({
+      ok: false,
+      error: "Too many failed sign-in attempts. Please try again later.",
+    });
+    const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
+  });
+
   it.each([
     ["Invalid email or password.", 401],
     ["This account is inactive.", 403],
@@ -76,6 +91,9 @@ describe("sign-in API", () => {
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual({ error: message });
     expect(response.headers.get("set-cookie")).toBeNull();
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
   });
 
   it("returns a generic error for a non-Error failure", async () => {
@@ -140,6 +158,16 @@ describe("session-token API", () => {
   it("returns 401 without a cookie", async () => {
     const response = await sessionTokenRoute(new Request(`${base}/api/admin/session-token`));
     expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
+  });
+
+  it("never caches a session token response", async () => {
+    const response = await sessionTokenRoute(new Request(`${base}/api/admin/session-token`, { headers: { cookie: cookieHeader } }));
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
   });
 });
 

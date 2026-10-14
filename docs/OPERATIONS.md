@@ -35,6 +35,31 @@ push command continues to target `standing-manatee-425`.
 3. **Vercel:** push to `main` or promote deployment; set `VITE_CONVEX_URL`
 4. **Smoke test:** sign in, open `/admin/applications`, open one application review
 
+### Auth hardening deploy checklist
+
+Use this when shipping organizer sign-in, session, or review authorization changes:
+
+1. **Backend first:** `npm run convex:push-dev` (shared dev) or `npm run convex:deploy` (prod).
+2. **Frontend:** deploy the admin app only after Convex functions are live on that deployment.
+3. **Shared dev smoke:** sign in via `/admin/login`, open one application, log a view, sign out.
+4. **Staging / preview:** confirm `VITE_DEV_AUTH_BYPASS` and `VITE_E2E_MOCK` are unset; production build must pass `scripts/verify-production-env.mjs`.
+5. **Production:** repeat smoke test; verify failed sign-in returns 401/429 (not 500) and cookies use `HttpOnly` + `Cache-Control: no-store`.
+
+Organizer authorization is enforced **in Convex** (`sessionToken` → `resolveAdminSession` / `requireAdminRole` on every admin mutation and query). The Vite auth plugin and browser UI are not security boundaries.
+
+## Sign-in lockout and recovery
+
+Failed organizer sign-in attempts are counted per **client IP + normalized email** (5 failures within 15 minutes). While locked out, sign-in returns a generic “too many attempts” message (HTTP **429** via the sign-in API).
+
+| Situation | Recovery |
+| --- | --- |
+| Legitimate admin forgot password | Wait until failures age out of the 15-minute window, or sign in successfully from another IP if only one network path was locked. |
+| Successful sign-in | Clears the failure counter for that IP + email pair. |
+| Stuck after many tests / shared IP | In the Convex dashboard, delete `rateLimits` rows with bucket `admin_sign_in_failure` for the affected key (`<ip>:<email>`), or wait 15 minutes. |
+| Account deactivated | Separate from lockout — inactive accounts receive HTTP **403** with an explicit inactive message. |
+
+Lockouts are **not** permanent; they do not deactivate the admin account.
+
 ## Vercel environment variables
 
 | Variable | Notes |
