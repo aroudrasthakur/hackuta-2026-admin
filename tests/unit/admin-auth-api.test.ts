@@ -23,6 +23,7 @@ const cookieHeader = `${ADMIN_SESSION_COOKIE}=${token}`;
 beforeEach(() => {
   convex.mutation.mockReset();
   convex.urls.length = 0;
+  vi.stubEnv("VITE_E2E_MOCK", "false");
   vi.stubEnv("VITE_CONVEX_URL", "https://example.convex.cloud");
 });
 
@@ -49,15 +50,36 @@ describe("sign-in API", () => {
     expect(cookie).toContain(`${ADMIN_SESSION_COOKIE}=${token}`);
     expect(cookie).toContain("HttpOnly");
     expect(cookie).not.toContain("Secure");
-    expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), { email: "a@hackuta.org", password: "pw" });
+    expect(convex.mutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ email: "a@hackuta.org", password: "pw", clientIp: "127.0.0.1" }),
+    );
     expect(convex.urls).toEqual(["https://example.convex.cloud"]);
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
   });
 
   it("marks the cookie Secure behind an HTTPS proxy", async () => {
     convex.mutation.mockResolvedValue({ ok: true, sessionToken: token, expiresAt: 1 });
     const response = await signInRoute(post("/api/admin/sign-in", {}, { "x-forwarded-proto": "https" }));
     expect(response.headers.get("set-cookie")).toContain("Secure");
-    expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), { email: "", password: "" });
+    expect(convex.mutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ email: "", password: "", clientIp: "127.0.0.1" }),
+    );
+  });
+
+  it("returns 429 for rate-limited sign-in", async () => {
+    convex.mutation.mockResolvedValue({
+      ok: false,
+      error: "Too many failed sign-in attempts. Please try again later.",
+    });
+    const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
   });
 
   it.each([
@@ -69,6 +91,9 @@ describe("sign-in API", () => {
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual({ error: message });
     expect(response.headers.get("set-cookie")).toBeNull();
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
   });
 
   it("returns a generic error for a non-Error failure", async () => {
@@ -87,8 +112,9 @@ describe("sign-in API", () => {
     vi.stubEnv("VITE_CONVEX_URL", "");
     vi.stubEnv("CONVEX_URL", "");
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(500);
     expect((await response.json()).error).toMatch(/Missing VITE_CONVEX_URL/);
+    expect(convex.mutation).not.toHaveBeenCalled();
   });
 
   it("falls back to CONVEX_URL", async () => {
@@ -132,6 +158,16 @@ describe("session-token API", () => {
   it("returns 401 without a cookie", async () => {
     const response = await sessionTokenRoute(new Request(`${base}/api/admin/session-token`));
     expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
+  });
+
+  it("never caches a session token response", async () => {
+    const response = await sessionTokenRoute(new Request(`${base}/api/admin/session-token`, { headers: { cookie: cookieHeader } }));
+    expect(response.headers.get("cache-control")).toBe(
+      "no-store, no-cache, must-revalidate, private",
+    );
   });
 });
 

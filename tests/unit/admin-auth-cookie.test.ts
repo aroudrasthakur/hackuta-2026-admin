@@ -5,7 +5,6 @@ import {
   readAdminSessionCookie,
   serializeAdminSessionCookie,
 } from "../../server/adminAuthCookie";
-
 describe("organizer session cookie helpers", () => {
   it("serializes an HttpOnly SameSite=Strict cookie", () => {
     const cookie = serializeAdminSessionCookie("abc123", true);

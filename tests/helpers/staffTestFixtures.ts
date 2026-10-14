@@ -2,7 +2,10 @@ import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { hashPassword } from "../../convex/admin/passwordHash";
 import { hashSessionToken } from "../../convex/admin/staffAuth";
-import { ADMIN_SIGN_IN_FAILURE_BUCKET } from "../../convex/admin/adminSignInRateLimit";
+import {
+  ADMIN_SIGN_IN_FAILURE_BUCKET,
+  buildAdminSignInRateLimitKey,
+} from "../../convex/admin/adminSignInRateLimit";
 import type { ConvexTestInstance } from "./convexTestContext";
 
 export const ORGANIZER_TEST_PASSWORD = "SecurePass1";
@@ -13,13 +16,13 @@ export type OrganizerSignInResult =
 
 const organizerSignInRef = makeFunctionReference<
   "mutation",
-  { email: string; password: string },
+  { email: string; password: string; clientIp?: string },
   OrganizerSignInResult
 >("admin/auth:signIn");
 
 export async function mutateOrganizerSignIn(
   t: ConvexTestInstance,
-  args: { email: string; password: string },
+  args: { email: string; password: string; clientIp?: string },
 ) {
   return t.mutation(organizerSignInRef, args);
 }
@@ -41,13 +44,18 @@ export async function seedAdminSignInFailures(
   t: ConvexTestInstance,
   email: string,
   count: number,
+  clientIp = "203.0.113.10",
   now = Date.now(),
 ) {
+  const rateLimitKey = buildAdminSignInRateLimitKey(clientIp, email);
+  if (!rateLimitKey) {
+    throw new Error("Invalid email for sign-in rate-limit seed.");
+  }
   await t.run(async (ctx) => {
     for (let i = 0; i < count; i += 1) {
       await ctx.db.insert("rateLimits", {
         bucket: ADMIN_SIGN_IN_FAILURE_BUCKET,
-        key: email.toLowerCase(),
+        key: rateLimitKey,
         createdAt: now - i * 1000,
       });
     }

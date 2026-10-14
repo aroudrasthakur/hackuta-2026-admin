@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { isAdminDevAuthBypassEnabled } from "./server/devAuthConfig.ts";
 import { viteAdminAuthApiPlugin } from "./server/viteAdminAuthApiPlugin.ts";
 
 export default defineConfig(({ mode }) => {
@@ -9,8 +10,41 @@ export default defineConfig(({ mode }) => {
   process.env.CONVEX_URL ??= env.CONVEX_URL ?? env.VITE_CONVEX_URL;
   process.env.VITE_E2E_MOCK ??= env.VITE_E2E_MOCK;
 
+  const convexUrl =
+    process.env.VITE_CONVEX_URL?.trim() ||
+    process.env.CONVEX_URL?.trim() ||
+    env.VITE_CONVEX_URL?.trim() ||
+    env.CONVEX_URL?.trim();
+  const devAuthEnabled = isAdminDevAuthBypassEnabled({
+    mode,
+    viteDevAuthBypass: env.VITE_DEV_AUTH_BYPASS,
+  });
+  const devAuthEmail =
+    process.env.ADMIN_DEV_AUTH_EMAIL?.trim() ||
+    env.ADMIN_DEV_AUTH_EMAIL?.trim();
+  const devAuthPassword =
+    process.env.ADMIN_DEV_AUTH_PASSWORD ||
+    env.ADMIN_DEV_AUTH_PASSWORD;
+
+  if (devAuthEnabled) {
+    console.warn(
+      "[hackuta-admin] VITE_DEV_AUTH_BYPASS is enabled. Dev sign-in is localhost-only; never enable in production or commit ADMIN_DEV_AUTH_* values.",
+    );
+  }
+
   return {
-    plugins: [react(), tailwindcss(), viteAdminAuthApiPlugin()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      viteAdminAuthApiPlugin({
+        ...(convexUrl ? { convexUrl } : {}),
+        devAuth: {
+          enabled: devAuthEnabled,
+          ...(devAuthEmail ? { email: devAuthEmail } : {}),
+          ...(devAuthPassword ? { password: devAuthPassword } : {}),
+        },
+      }),
+    ],
     server: { port: 5373, strictPort: true },
     preview: { port: 4374, strictPort: true },
     build: { target: "es2022" },

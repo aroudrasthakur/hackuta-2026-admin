@@ -1,6 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
-import { routeAdminAuthRequest } from "./adminAuthHandlers.ts";
+import {
+  routeAdminAuthRequest,
+  type AdminAuthApiConfig,
+} from "./adminAuthHandlers.ts";
 
 async function readNodeRequestBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -33,33 +36,32 @@ function toWebRequest(req: IncomingMessage, body: Buffer) {
   return new Request(url, init);
 }
 
-function adminAuthApiMiddleware(
-  req: IncomingMessage,
-  res: ServerResponse,
-  next: () => void,
-) {
-  if (!req.url?.startsWith("/api/admin/")) {
-    next();
-    return;
-  }
-  void (async () => {
-    try {
-      const body = await readNodeRequestBody(req);
-      const request = toWebRequest(req, body);
-      const response = await routeAdminAuthRequest(request);
-      await writeNodeResponse(res, response);
-    } catch (error) {
-      res.statusCode = 500;
-      res.end(error instanceof Error ? error.message : "Internal Server Error");
+function adminAuthApiMiddleware(config: AdminAuthApiConfig) {
+  return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    if (!req.url?.startsWith("/api/admin/")) {
+      next();
+      return;
     }
-  })();
+    void (async () => {
+      try {
+        const body = await readNodeRequestBody(req);
+        const request = toWebRequest(req, body);
+        const response = await routeAdminAuthRequest(request, config);
+        await writeNodeResponse(res, response);
+      } catch (error) {
+        res.statusCode = 500;
+        res.end(error instanceof Error ? error.message : "Internal Server Error");
+      }
+    })();
+  };
 }
 
-export function viteAdminAuthApiPlugin(): Plugin {
+export function viteAdminAuthApiPlugin(config: AdminAuthApiConfig = {}): Plugin {
+  const middleware = adminAuthApiMiddleware(config);
   return {
     name: "hackuta-admin-auth-api",
     configureServer(server) {
-      server.middlewares.use(adminAuthApiMiddleware);
+      server.middlewares.use(middleware);
     },
   };
 }

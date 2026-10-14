@@ -1,14 +1,15 @@
 import { v } from "convex/values";
-import { query } from "../_generated/server";
+import { mutation, query } from "../_generated/server";
 import { SCHOOL_OTHER_OPTION } from "../../shared/registration/constants";
 import {
   applicationFormWasSubmitted,
   formatApplicantFullName,
+  getApplicationByUser,
   getApplicationReview,
 } from "../lib/applications";
 import type { ApplicationDoc } from "../lib/dataModel";
 import { ACTIVE_REVIEW_STALE_MS, isFinalReviewStatus, isReviewStale } from "./reviewClaim";
-import { requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
+import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 
 function formatApplicantSchool(application: Pick<ApplicationDoc, "school" | "otherSchool">) {
   const school = application.school?.trim();
@@ -113,5 +114,71 @@ export const getApplication = query({
         filename: application.resumeFilename ?? null,
       },
     };
+  },
+});
+
+/** Helper mutation to create sample submitted applications for testing the review dashboard. Restricted to admins. */
+export const createSampleApplication = mutation({
+  args: {
+    ...sessionTokenArgs,
+    firstName: v.string(),
+    lastName: v.string(),
+    email: v.string(),
+    school: v.string(),
+    status: v.optional(
+      v.union(
+        v.literal("unreviewed"),
+        v.literal("under_review"),
+        v.literal("accepted"),
+        v.literal("waitlisted"),
+        v.literal("rejected"),
+      ),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requireAdminRole(ctx, args.sessionToken);
+
+    const now = Date.now();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", args.email))
+      .first();
+
+    const authUserId =
+      user?._id ??
+      (await ctx.db.insert("users", {
+        name: `${args.firstName} ${args.lastName}`,
+        email: args.email,
+        emailVerificationTime: now,
+      }));
+
+    const existingApplication = await getApplicationByUser(ctx, authUserId);
+    if (existingApplication && applicationFormWasSubmitted(existingApplication)) {
+      throw new Error("Applicant already has a submitted application.");
+    }
+
+    const applicationId = await ctx.db.insert("applications", {
+      authUserId,
+      email: args.email,
+      firstName: args.firstName,
+      lastName: args.lastName,
+      school: args.school,
+      createdAt: now,
+      applicantUpdatedAt: now,
+      formSubmitted: true,
+      submittedAt: now,
+    });
+
+    if (args.status && args.status !== "unreviewed") {
+      await ctx.db.insert("applicationReviews", {
+        applicationId,
+        status: args.status,
+        reviewedBy: admin._id,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { applicationId, ok: true };
   },
 });

@@ -1,15 +1,20 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "../_generated/server";
 import {
+  ADMIN_SIGN_IN_CLIENT_IP_MAX_LENGTH,
   ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE,
+  buildAdminSignInRateLimitKey,
+  clearAdminSignInFailures,
   isAdminSignInRateLimited,
-  recordAdminSignInFailure,
+  normalizeRateLimitClientIp,
+  recordFailedAdminSignIn,
 } from "./adminSignInRateLimit";
 import { normalizeEmail } from "../lib/normalizeEmail";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { hashPassword, verifyPassword } from "./passwordHash";
+import { ADMIN_SIGN_IN_DUMMY_PASSWORD_HASH } from "./signInSecurityConstants";
 import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
-import { hashSessionToken, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
+import { hashSessionToken, requireAdminRole, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
 
 const INVALID_CREDENTIALS = "Invalid email or password.";
 const INACTIVE_ACCOUNT = "This account is inactive.";
@@ -31,15 +36,28 @@ export const signIn = mutation({
   args: {
     email: v.string(),
     password: v.string(),
+    clientIp: v.optional(v.string()),
   },
   returns: signInResult,
-  handler: async (ctx, { email, password }) => {
+  handler: async (ctx, { email, password, clientIp }) => {
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail || !password) {
       return { ok: false as const, error: INVALID_CREDENTIALS };
     }
 
-    if (await isAdminSignInRateLimited(ctx, normalizedEmail)) {
+    if (clientIp !== undefined && clientIp.length > ADMIN_SIGN_IN_CLIENT_IP_MAX_LENGTH) {
+      return { ok: false as const, error: INVALID_CREDENTIALS };
+    }
+
+    const rateLimitKey = buildAdminSignInRateLimitKey(
+      clientIp === undefined ? undefined : normalizeRateLimitClientIp(clientIp),
+      normalizedEmail,
+    );
+    if (!rateLimitKey) {
+      return { ok: false as const, error: INVALID_CREDENTIALS };
+    }
+
+    if (await isAdminSignInRateLimited(ctx, rateLimitKey)) {
       return { ok: false as const, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE };
     }
 
@@ -47,29 +65,29 @@ export const signIn = mutation({
       .query("admins")
       .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
       .unique();
-    if (!admin) {
-      await recordAdminSignInFailure(ctx, normalizedEmail);
+
+    const authAccount = admin
+      ? await ctx.db
+          .query("adminAuthAccounts")
+          .withIndex("by_admin", (q) => q.eq("adminId", admin._id))
+          .unique()
+      : null;
+
+    const valid = await verifyPassword(
+      authAccount?.passwordHash ?? ADMIN_SIGN_IN_DUMMY_PASSWORD_HASH,
+      password,
+    );
+
+    if (!admin || !authAccount || !valid) {
+      await recordFailedAdminSignIn(ctx, rateLimitKey);
       return { ok: false as const, error: INVALID_CREDENTIALS };
     }
+
     if (!admin.active) {
       return { ok: false as const, error: INACTIVE_ACCOUNT };
     }
 
-    const authAccount = await ctx.db
-      .query("adminAuthAccounts")
-      .withIndex("by_admin", (q) => q.eq("adminId", admin._id))
-      .unique();
-    if (!authAccount) {
-      await recordAdminSignInFailure(ctx, normalizedEmail);
-      return { ok: false as const, error: INVALID_CREDENTIALS };
-    }
-
-    const valid = await verifyPassword(authAccount.passwordHash, password);
-    if (!valid) {
-      await recordAdminSignInFailure(ctx, normalizedEmail);
-      return { ok: false as const, error: INVALID_CREDENTIALS };
-    }
-
+    await clearAdminSignInFailures(ctx, rateLimitKey);
     const session = await createAdminSession(ctx, admin._id);
     return {
       ok: true as const,
@@ -148,5 +166,63 @@ export const provisionAdminAuthAccount = internalMutation({
 
     await invalidateAdminSessions(ctx, adminId);
     return { ok: true as const };
+  },
+});
+
+/** Organizer provisioning — creates or updates an admin row and sets credentials. Restricted to existing admins. */
+export const createAndProvisionAdmin = mutation({
+  args: {
+    ...sessionTokenArgs,
+    email: v.string(),
+    name: v.string(),
+    role: v.union(v.literal("reviewer"), v.literal("admin")),
+    password: v.string(),
+  },
+  handler: async (ctx, { sessionToken, email, name, role, password }) => {
+    await requireAdminRole(ctx, sessionToken);
+
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new Error("Invalid email.");
+    }
+    validatePasswordRequirements(password);
+
+    const now = Date.now();
+    const existingAdmin = await ctx.db
+      .query("admins")
+      .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
+      .unique();
+
+    const profile = { name, role, active: true, updatedAt: now };
+    const adminId =
+      existingAdmin?._id ??
+      (await ctx.db.insert("admins", {
+        ...profile,
+        email: normalizedEmail,
+        createdAt: now,
+      }));
+    if (existingAdmin) {
+      await ctx.db.patch(adminId, profile);
+    }
+
+    const passwordHash = await hashPassword(password);
+    const existingAccount = await ctx.db
+      .query("adminAuthAccounts")
+      .withIndex("by_admin", (q) => q.eq("adminId", adminId))
+      .unique();
+
+    if (existingAccount) {
+      await ctx.db.patch(existingAccount._id, { passwordHash, updatedAt: now });
+    } else {
+      await ctx.db.insert("adminAuthAccounts", {
+        adminId,
+        passwordHash,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    await invalidateAdminSessions(ctx, adminId);
+    return { adminId, email: normalizedEmail, ok: true as const };
   },
 });

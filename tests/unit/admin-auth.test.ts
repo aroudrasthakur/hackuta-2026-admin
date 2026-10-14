@@ -59,10 +59,45 @@ const ref = {
     },
     { page: unknown[] }
   >("admin/applicationReviewLogs:listApplicationReviewLogs"),
+  createAndProvisionAdmin: makeFunctionReference<
+    "mutation",
+    {
+      sessionToken: string;
+      email: string;
+      name: string;
+      role: "reviewer" | "admin";
+      password: string;
+    },
+    { adminId: string; email: string; ok: true }
+  >("admin/auth:createAndProvisionAdmin"),
+  createSampleApplication: makeFunctionReference<
+    "mutation",
+    {
+      sessionToken: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      school: string;
+      status?: "unreviewed" | "under_review" | "accepted" | "waitlisted" | "rejected";
+    },
+    { applicationId: string; ok: true }
+  >("admin/applications:createSampleApplication"),
 };
 
 const createTest = createConvexTest;
 type TestInstance = ConvexTestInstance;
+
+async function expectSignInFailure(
+  t: TestInstance,
+  args: { email: string; password: string },
+  pattern: RegExp,
+) {
+  const result = await mutateOrganizerSignIn(t, args);
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    expect(result.error).toMatch(pattern);
+  }
+}
 
 async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer") {
   const t = createTest();
@@ -79,8 +114,50 @@ describe("organizer auth boundary", () => {
     const blocked = await mutateOrganizerSignIn(t, {
       email: "limited@hackuta.org",
       password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "203.0.113.10",
     });
     expect(blocked).toEqual({ ok: false, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE });
+  });
+
+  it("rate-limits per IP and email so another IP can still attempt the same account", async () => {
+    const t = createTest();
+    await seedAdminAccount(t, { email: "limited@hackuta.org", role: "admin", active: true });
+    await seedAdminSignInFailures(t, "limited@hackuta.org", 5, "203.0.113.10");
+
+    const blockedOnSameIp = await mutateOrganizerSignIn(t, {
+      email: "limited@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "203.0.113.10",
+    });
+    expect(blockedOnSameIp.ok).toBe(false);
+
+    const allowedOnOtherIp = await mutateOrganizerSignIn(t, {
+      email: "limited@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "198.51.100.20",
+    });
+    expect(allowedOnOtherIp.ok).toBe(true);
+  });
+
+  it("rate-limits per IP and email independently for different accounts on the same IP", async () => {
+    const t = createTest();
+    await seedAdminAccount(t, { email: "first@hackuta.org", role: "admin", active: true });
+    await seedAdminAccount(t, { email: "second@hackuta.org", role: "admin", active: true });
+    await seedAdminSignInFailures(t, "first@hackuta.org", 5, "203.0.113.55");
+
+    const blockedFirst = await mutateOrganizerSignIn(t, {
+      email: "first@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "203.0.113.55",
+    });
+    expect(blockedFirst.ok).toBe(false);
+
+    const allowedSecond = await mutateOrganizerSignIn(t, {
+      email: "second@hackuta.org",
+      password: ORGANIZER_TEST_PASSWORD,
+      clientIp: "203.0.113.55",
+    });
+    expect(allowedSecond.ok).toBe(true);
   });
 
   it("signs in with valid credentials and resolves staff from session token", async () => {
@@ -101,22 +178,22 @@ describe("organizer auth boundary", () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "admin@hackuta.org", role: "admin", active: true });
 
-    const wrongPassword = await mutateOrganizerSignIn(t, {
-      email: "admin@hackuta.org",
-      password: "WrongPass1",
-    });
-    expect(wrongPassword).toEqual({ ok: false, error: "Invalid email or password." });
+    await expectSignInFailure(
+      t,
+      { email: "admin@hackuta.org", password: "WrongPass1" },
+      /invalid email or password/i,
+    );
   });
 
   it("rejects inactive accounts at sign-in", async () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "inactive@hackuta.org", role: "admin", active: false });
 
-    const inactive = await mutateOrganizerSignIn(t, {
-      email: "inactive@hackuta.org",
-      password: ORGANIZER_TEST_PASSWORD,
-    });
-    expect(inactive).toEqual({ ok: false, error: "This account is inactive." });
+    await expectSignInFailure(
+      t,
+      { email: "inactive@hackuta.org", password: ORGANIZER_TEST_PASSWORD },
+      /inactive/i,
+    );
   });
 
   it("returns null for invalid session tokens", async () => {
@@ -210,6 +287,163 @@ describe("organizer auth boundary", () => {
 
     await t.mutation(ref.signOut, { sessionToken });
     expect(await t.query(ref.getCurrentStaff, { sessionToken })).toBeNull();
+  });
+
+  it("requires an active admin session to call createAndProvisionAdmin", async () => {
+    const t = createTest();
+
+    // 1. Unauthenticated call must fail
+    await expect(
+      t.mutation(ref.createAndProvisionAdmin, {
+        sessionToken: "invalid_session_token_that_does_not_exist_32",
+        email: "newadmin@hackuta.org",
+        name: "New Admin",
+        role: "admin",
+        password: ORGANIZER_TEST_PASSWORD,
+      }),
+    ).rejects.toThrow(/not authenticated/i);
+
+    // 2. Reviewer role must be rejected
+    await seedAdminAccount(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
+    const { sessionToken: reviewerToken } = await signInOrganizer(t, "reviewer1@hackuta.org");
+    await expect(
+      t.mutation(ref.createAndProvisionAdmin, {
+        sessionToken: reviewerToken,
+        email: "newadmin@hackuta.org",
+        name: "New Admin",
+        role: "admin",
+        password: ORGANIZER_TEST_PASSWORD,
+      }),
+    ).rejects.toThrow(/not authorized/i);
+
+    // 3. Admin role succeeds
+    await seedAdminAccount(t, { email: "superadmin@hackuta.org", role: "admin", active: true });
+    const { sessionToken: adminToken } = await signInOrganizer(t, "superadmin@hackuta.org");
+    const result = await t.mutation(ref.createAndProvisionAdmin, {
+      sessionToken: adminToken,
+      email: "newadmin@hackuta.org",
+      name: "New Admin",
+      role: "admin",
+      password: ORGANIZER_TEST_PASSWORD,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.email).toBe("newadmin@hackuta.org");
+  });
+
+  it("requires an active admin session to call createSampleApplication", async () => {
+    const t = createTest();
+
+    // 1. Unauthenticated call must fail
+    await expect(
+      t.mutation(ref.createSampleApplication, {
+        sessionToken: "invalid_session_token_that_does_not_exist_32",
+        firstName: "Test",
+        lastName: "Applicant",
+        email: "applicant@test.edu",
+        school: "Test University",
+      }),
+    ).rejects.toThrow(/not authenticated/i);
+
+    // 2. Reviewer role must be rejected
+    await seedAdminAccount(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
+    const { sessionToken: reviewerToken } = await signInOrganizer(t, "reviewer1@hackuta.org");
+    await expect(
+      t.mutation(ref.createSampleApplication, {
+        sessionToken: reviewerToken,
+        firstName: "Test",
+        lastName: "Applicant",
+        email: "applicant@test.edu",
+        school: "Test University",
+      }),
+    ).rejects.toThrow(/not authorized/i);
+
+    // 3. Admin role succeeds
+    await seedAdminAccount(t, { email: "admin1@hackuta.org", role: "admin", active: true });
+    const { sessionToken: adminToken } = await signInOrganizer(t, "admin1@hackuta.org");
+    const result = await t.mutation(ref.createSampleApplication, {
+      sessionToken: adminToken,
+      firstName: "Test",
+      lastName: "Applicant",
+      email: "applicant@test.edu",
+      school: "Test University",
+    });
+    expect(result.ok).toBe(true);
+    expect(result.applicationId).toBeTruthy();
+  });
+
+  it("blocks organizer sign-in after five failed attempts (durable rate limit)", async () => {
+    const t = createTest();
+    await seedAdminAccount(t, { email: "locked@hackuta.org", role: "admin", active: true });
+
+    for (let i = 0; i < 5; i++) {
+      await expectSignInFailure(
+        t,
+        { email: "locked@hackuta.org", password: "WrongPassword1!" },
+        /invalid email or password/i,
+      );
+    }
+
+    await expectSignInFailure(
+      t,
+      { email: "locked@hackuta.org", password: ORGANIZER_TEST_PASSWORD },
+      /too many failed sign-in attempts/i,
+    );
+  });
+
+  it("rejects duplicate sample applications for the same applicant email", async () => {
+    const t = createTest();
+    await seedAdminAccount(t, { email: "sample-admin@hackuta.org", role: "admin", active: true });
+    const { sessionToken: adminToken } = await signInOrganizer(t, "sample-admin@hackuta.org");
+
+    const first = await t.mutation(ref.createSampleApplication, {
+      sessionToken: adminToken,
+      firstName: "Dup",
+      lastName: "Applicant",
+      email: "dup-applicant@test.edu",
+      school: "Test University",
+    });
+    expect(first.applicationId).toBeTruthy();
+
+    await expect(
+      t.mutation(ref.createSampleApplication, {
+        sessionToken: adminToken,
+        firstName: "Dup",
+        lastName: "Applicant",
+        email: "dup-applicant@test.edu",
+        school: "Test University",
+      }),
+    ).rejects.toThrow(/already has a submitted application/i);
+  });
+
+  it("attributes sample review ownership to the authenticated admin session", async () => {
+    const t = createTest();
+    const adminId = await seedAdminAccount(t, {
+      email: "review-owner@hackuta.org",
+      role: "admin",
+      active: true,
+    });
+    const { sessionToken: adminToken } = await signInOrganizer(t, "review-owner@hackuta.org");
+
+    const { applicationId } = await t.mutation(ref.createSampleApplication, {
+      sessionToken: adminToken,
+      firstName: "Review",
+      lastName: "Target",
+      email: "review-target@test.edu",
+      school: "Test University",
+      status: "accepted",
+    });
+
+    const review = await getReview(t, applicationId as GenericId<"applications">);
+    expect(review?.reviewedBy).toBe(adminId);
+  });
+
+  it("rejects non-existent emails with standard invalid credentials error", async () => {
+    const t = createTest();
+    await expectSignInFailure(
+      t,
+      { email: "nonexistent@hackuta.org", password: "SomePassword1!" },
+      /invalid email or password/i,
+    );
   });
 });
 

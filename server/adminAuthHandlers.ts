@@ -7,6 +7,7 @@ import {
   readAdminSessionCookie,
   serializeAdminSessionCookie,
 } from "./adminAuthCookie.ts";
+import { getAdminSignInClientIp, isLoopbackAdminRequest } from "./adminRequestClient.ts";
 
 function isE2eMockAuthEnabled() {
   return process.env.VITE_E2E_MOCK === "true";
@@ -18,7 +19,7 @@ type AdminSignInResult =
 
 const adminSignInRef = makeFunctionReference<
   "mutation",
-  { email: string; password: string },
+  { email: string; password: string; clientIp?: string },
   AdminSignInResult
 >("admin/auth:signIn");
 
@@ -28,12 +29,25 @@ const adminSignOutRef = makeFunctionReference<
   { ok: true }
 >("admin/auth:signOut");
 
-function convexUrl() {
-  return process.env.VITE_CONVEX_URL?.trim() || process.env.CONVEX_URL?.trim();
+export type AdminAuthApiConfig = {
+  convexUrl?: string;
+  devAuth?: {
+    enabled: boolean;
+    email?: string;
+    password?: string;
+  };
+};
+
+function convexUrl(configuredUrl?: string) {
+  return (
+    configuredUrl?.trim() ||
+    process.env.VITE_CONVEX_URL?.trim() ||
+    process.env.CONVEX_URL?.trim()
+  );
 }
 
-function createConvexClient() {
-  const url = convexUrl();
+function createConvexClient(configuredUrl?: string) {
+  const url = convexUrl(configuredUrl);
   if (!url) {
     throw new Error("Missing VITE_CONVEX_URL for organizer auth API.");
   }
@@ -43,6 +57,7 @@ function createConvexClient() {
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
+  headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
   return new Response(JSON.stringify(body), { ...init, headers });
 }
 
@@ -50,7 +65,17 @@ async function readJsonBody<T>(request: Request): Promise<T> {
   return (await request.json()) as T;
 }
 
-export async function handleAdminSignIn(request: Request) {
+function signInErrorStatus(error: string) {
+  if (error.includes("inactive")) {
+    return 403;
+  }
+  if (error.includes("Too many")) {
+    return 429;
+  }
+  return 401;
+}
+
+export async function handleAdminSignIn(request: Request, configuredUrl?: string) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -80,11 +105,11 @@ export async function handleAdminSignIn(request: Request) {
       return jsonResponse({ ok: true, expiresAt: result.expiresAt }, { headers });
     }
 
-    const client = createConvexClient();
-    const result = await client.mutation(adminSignInRef, { email, password });
+    const client = createConvexClient(configuredUrl);
+    const clientIp = getAdminSignInClientIp(request);
+    const result = await client.mutation(adminSignInRef, { email, password, clientIp });
     if (!result.ok) {
-      const status = result.error.includes("inactive") ? 403 : 401;
-      return jsonResponse({ error: result.error }, { status });
+      return jsonResponse({ error: result.error }, { status: signInErrorStatus(result.error) });
     }
     const headers = new Headers();
     headers.append(
@@ -94,11 +119,45 @@ export async function handleAdminSignIn(request: Request) {
     return jsonResponse({ ok: true, expiresAt: result.expiresAt }, { headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Sign-in failed.";
-    return jsonResponse({ error: message }, { status: 401 });
+    return jsonResponse({ error: message }, { status: 500 });
   }
 }
 
-export async function handleAdminSignOut(request: Request) {
+async function handleAdminDevSignIn(
+  request: Request,
+  config: AdminAuthApiConfig,
+) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  if (!config.devAuth?.enabled) {
+    return new Response("Not Found", { status: 404 });
+  }
+  if (!isLoopbackAdminRequest(request)) {
+    return jsonResponse(
+      { error: "Dev sign-in is only available from localhost." },
+      { status: 403 },
+    );
+  }
+  if (!config.devAuth.email || !config.devAuth.password) {
+    return jsonResponse(
+      { error: "Set ADMIN_DEV_AUTH_EMAIL and ADMIN_DEV_AUTH_PASSWORD in .env.local." },
+      { status: 503 },
+    );
+  }
+
+  const signInRequest = new Request(request.url, {
+    method: "POST",
+    headers: request.headers,
+    body: JSON.stringify({
+      email: config.devAuth.email,
+      password: config.devAuth.password,
+    }),
+  });
+  return handleAdminSignIn(signInRequest, config.convexUrl);
+}
+
+export async function handleAdminSignOut(request: Request, configuredUrl?: string) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -110,7 +169,7 @@ export async function handleAdminSignOut(request: Request) {
       if (isE2eMockAuthEnabled()) {
         e2eMockSignOut(sessionToken);
       } else {
-        const client = createConvexClient();
+        const client = createConvexClient(configuredUrl);
         await client.mutation(adminSignOutRef, { sessionToken });
       }
     } catch {
@@ -130,25 +189,39 @@ export async function handleAdminSessionToken(request: Request) {
 
   const sessionToken = readAdminSessionCookie(request.headers.get("cookie"));
   if (!sessionToken) {
-    return new Response(null, { status: 401 });
+    return new Response(null, {
+      status: 401,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
+    });
   }
 
   return new Response(sessionToken, {
     status: 200,
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate, private",
+    },
   });
 }
 
-export async function routeAdminAuthRequest(request: Request) {
+export async function routeAdminAuthRequest(
+  request: Request,
+  config: AdminAuthApiConfig = {},
+) {
   const { pathname } = new URL(request.url);
   if (pathname === "/api/admin/sign-in") {
-    return handleAdminSignIn(request);
+    return handleAdminSignIn(request, config.convexUrl);
   }
   if (pathname === "/api/admin/sign-out") {
-    return handleAdminSignOut(request);
+    return handleAdminSignOut(request, config.convexUrl);
   }
   if (pathname === "/api/admin/session-token") {
     return handleAdminSessionToken(request);
+  }
+  if (pathname === "/api/admin/dev-sign-in") {
+    return handleAdminDevSignIn(request, config);
   }
   return new Response("Not Found", { status: 404 });
 }

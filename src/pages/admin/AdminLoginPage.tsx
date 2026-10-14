@@ -6,7 +6,7 @@ import { ADMIN_ROUTES } from "../../types/routes";
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
-  const { signIn, isAuthenticated, isLoading, staff } = useAdminAuth();
+  const { signIn, isAuthenticated, isLoading, staff, authError } = useAdminAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -73,9 +73,9 @@ export function AdminLoginPage() {
             />
           </label>
 
-          {error ? (
+          {authError || error ? (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              {error}
+              {authError ?? error}
             </p>
           ) : null}
 
