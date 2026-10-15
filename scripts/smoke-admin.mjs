@@ -119,10 +119,6 @@ try {
   try {
     if (signedIn) await context?.request.post("/api/admin/sign-out", { timeout: 15_000 });
   } finally {
-    try {
-      await browser?.close();
-    } finally {
-      await server?.close();
-    }
+    await Promise.resolve(browser?.close()).finally(() => server?.close());
   }
 }
