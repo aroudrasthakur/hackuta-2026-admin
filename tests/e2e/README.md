@@ -20,3 +20,22 @@ Browser tests for the organizer admin SPA. They run against **`VITE_E2E_MOCK=tru
 Mock organizer accounts: [shared/admin/e2e/credentials.ts](../../shared/admin/e2e/credentials.ts).
 
 Config: [playwright.config.ts](../../playwright.config.ts).
+
+## Windows runner shutdown
+
+Playwright stops its web server with Windows `taskkill /T /F`. A restricted
+execution sandbox can deny that process-tree cleanup: every test reports success,
+but the runner stops at `Terminating the WebServer` and never exits. Run the E2E
+command with permission to manage its child processes (outside the restricted
+sandbox). There is no application shutdown change needed for this case.
+
+To confirm the failure is in cleanup, enable Playwright's server logging:
+
+```powershell
+$env:DEBUG = "pw:webserver"
+npm.cmd run test:e2e
+Remove-Item Env:DEBUG
+```
+
+A successful run prints `Terminated the WebServer`, the final test summary, and
+exits with code zero. Do not treat individual passing test lines as a completed run.
