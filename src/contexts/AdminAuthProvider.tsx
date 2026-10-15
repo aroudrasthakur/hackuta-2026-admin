@@ -63,11 +63,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    try {
-      await signOutAdminCookie();
-    } catch {
-      // Clear in-memory session even if the API call fails.
-    }
+    await signOutAdminCookie();
     setSessionToken(null);
   }, []);
 

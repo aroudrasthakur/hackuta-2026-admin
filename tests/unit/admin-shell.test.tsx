@@ -388,17 +388,56 @@ describe("AdminAuthProvider", () => {
     expect(container.dataset.error).toBe(message);
   });
 
-  it("clears the session on sign-out even if the API call fails", async () => {
+  it("clears the session after a successful sign-out", async () => {
     stubApi({
       "/api/admin/session-token": () => new Response(token),
-      "/api/admin/sign-out": () => Promise.reject(new Error("offline")),
+      "/api/admin/sign-out": () => Response.json({ ok: true }),
     });
-    mocks.query.mockReturnValue(staff);
+    mocks.query.mockImplementation((_ref, args) => args === "skip" ? undefined : staff);
     await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
     expect(state().token).toBe(token);
 
     await act(async () => button("out")!.click());
     expect(state().token).toBeNull();
+    expect(state().authed).toBe(false);
+  });
+
+  it.each([
+    ["network failure", () => Promise.reject(new Error("offline"))],
+    ["HTTP failure", () => Promise.resolve(new Response(null, { status: 503 }))],
+  ] as const)("keeps the session and allows retrying sign-out after a %s", async (_label, failure) => {
+    const signOutRequest = vi.fn<() => Promise<Response>>()
+      .mockImplementationOnce(failure)
+      .mockResolvedValueOnce(Response.json({ ok: true }));
+    const fetchMock = stubApi({
+      "/api/admin/session-token": () => new Response(token),
+      "/api/admin/sign-out": signOutRequest,
+    });
+    mocks.query.mockImplementation((ref, args) => {
+      if (ref === getCurrentStaffRef) return args === "skip" ? undefined : staff;
+      return [];
+    });
+    await render(
+      <AdminAuthProvider>
+        <MemoryRouter initialEntries={["/admin/applications"]}>
+          <App />
+          <CurrentPath />
+        </MemoryRouter>
+      </AdminAuthProvider>,
+    );
+
+    await act(async () => button("Sign out")!.click());
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Unable to sign out. Please try again.");
+    expect(currentPath()).toBe("/admin/applications");
+    expect(button("Sign out")?.disabled).toBe(false);
+    expect(mocks.query.mock.calls.filter(([ref]) => ref === getCurrentStaffRef).at(-1)?.[1]).toEqual({ sessionToken: token });
+
+    await act(async () => button("Sign out")!.click());
+    expect(signOutRequest).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/sign-out", { method: "POST", credentials: "include" });
+    expect(currentPath()).toBe("/admin/login");
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(mocks.query.mock.calls.filter(([ref]) => ref === getCurrentStaffRef).at(-1)?.[1]).toBe("skip");
   });
 
   it("requires the provider", async () => {

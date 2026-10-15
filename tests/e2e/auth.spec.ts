@@ -30,4 +30,24 @@ test.describe("organizer authentication", () => {
     await page.goto("/admin/applications");
     await expect(page).toHaveURL(/\/admin\/login$/);
   });
+
+  for (const failure of ["network", "HTTP"] as const) {
+    test(`shows a retryable error after a ${failure} sign-out failure`, async ({ page }) => {
+      await signInOrganizer(page, E2E_REVIEWER);
+      await page.route("**/api/admin/sign-out", (route) => failure === "network"
+        ? route.abort("failed")
+        : route.fulfill({ status: 503, contentType: "text/plain", body: "Temporarily unavailable" }));
+
+      await page.getByRole("button", { name: "Sign out" }).click();
+      await expect(page.getByRole("alert")).toHaveText("Unable to sign out. Please try again.");
+      await expect(page).toHaveURL(/\/admin\/applications$/);
+      await expect(page.getByRole("button", { name: "Sign out" })).toBeEnabled();
+
+      await page.unroute("**/api/admin/sign-out");
+      await signOutOrganizer(page);
+      await page.reload();
+      await expect(page).toHaveURL(/\/admin\/login$/);
+      await expect(page.getByRole("heading", { name: "Organizer sign-in" })).toBeVisible();
+    });
+  }
 });

@@ -46,8 +46,11 @@ export async function signInWithAdminCookie(email: string, password: string) {
 }
 
 export async function signOutAdminCookie() {
-  await fetch("/api/admin/sign-out", {
+  const response = await fetch("/api/admin/sign-out", {
     method: "POST",
     credentials: "include",
   });
+  if (!response.ok) {
+    throw new Error("Sign-out failed. Please try again.");
+  }
 }
