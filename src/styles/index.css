@@ -27,7 +27,7 @@
 }
 
 @layer components {
-  .admin-workspace :where(a, button, input, select):focus-visible {
+  .admin-workspace :where(a, button, input, select, summary, [tabindex]):focus-visible {
     outline: 2px solid var(--color-ocean);
     outline-offset: 3px;
   }

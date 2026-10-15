@@ -19,6 +19,26 @@ test.describe("application review workflow", () => {
     await expect(page.getByText(/Review (started|activity refreshed)\./)).toBeVisible();
   });
 
+  test("puts identity and review evidence first and keeps secondary information expandable", async ({ page }, testInfo) => {
+    await signInOrganizer(page, E2E_REVIEWER);
+    await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
+    for (const width of [1440, 375, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      const name = page.getByRole("heading", { name: "Casey Decision" });
+      const responses = page.getByRole("region", { name: "Application responses" });
+      await expect(name).toBeVisible();
+      expect((await name.boundingBox())!.y).toBeLessThan((await responses.boundingBox())!.y);
+      expect((await responses.boundingBox())!.y).toBeLessThan(450);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      if (width === 1440 || width === 375) await page.screenshot({ path: testInfo.outputPath(`review-${width}.png`), fullPage: true });
+    }
+    await expect(page.getByRole("region", { name: "Personal and contact information" })).toBeHidden();
+    await page.getByText("Additional applicant information", { exact: true }).click();
+    await expect(page.getByRole("region", { name: "Personal and contact information" })).toBeVisible();
+    await page.getByText("Additional applicant information", { exact: true }).click();
+    await expect(page.getByRole("region", { name: "Personal and contact information" })).toBeHidden();
+  });
+
   test("reviewer confirms waitlist decision with two-step flow", async ({ page }) => {
     await signInOrganizer(page, E2E_REVIEWER);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);

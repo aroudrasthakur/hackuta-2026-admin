@@ -72,20 +72,21 @@ export function ApplicationReviewContent({
           We couldn’t record this application view. Please reopen the application to try again.
         </p>
       )}
-      <ApplicationReviewControls
-        detail={detail}
-        sessionToken={sessionToken}
-        staffAdminId={staffAdminId}
-      />
-      <ApplicationDecisionControls
-        detail={detail}
-        sessionToken={sessionToken}
-        blockedByOther={blockedByOther}
-      />
-      <ApplicationDetail detail={detail} />
-      {detail.reviewStatus && ["accepted", "rejected", "waitlisted"].includes(detail.reviewStatus) && (
-        <DecisionNotificationStatus detail={detail} sessionToken={sessionToken} />
-      )}
+      <ApplicationDetail detail={detail}>
+        <ApplicationReviewControls
+          detail={detail}
+          sessionToken={sessionToken}
+          staffAdminId={staffAdminId}
+        />
+        <ApplicationDecisionControls
+          detail={detail}
+          sessionToken={sessionToken}
+          blockedByOther={blockedByOther}
+        />
+        {detail.reviewStatus && ["accepted", "rejected", "waitlisted"].includes(detail.reviewStatus) && (
+          <DecisionNotificationStatus detail={detail} sessionToken={sessionToken} />
+        )}
+      </ApplicationDetail>
       {isAdmin && (
         <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />
       )}
