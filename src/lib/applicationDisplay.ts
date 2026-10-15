@@ -8,8 +8,9 @@ export function formatApplicationAnswer(value: unknown): string {
 }
 
 export const dashboardReviewStatusLabels = {
-  unreviewed: "Unreviewed",
-  under_review: "Under Review",
+  unreviewed: "Awaiting review",
+  under_review: "In review",
+  stale: "Available to reclaim",
   accepted: "Accepted",
   waitlisted: "Waitlisted",
   rejected: "Rejected",

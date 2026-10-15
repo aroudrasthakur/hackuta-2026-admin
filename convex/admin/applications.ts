@@ -8,7 +8,7 @@ import {
   getApplicationReview,
 } from "../lib/applications";
 import type { ApplicationDoc } from "../lib/dataModel";
-import { ACTIVE_REVIEW_STALE_MS, isFinalReviewStatus, isReviewStale } from "./reviewClaim";
+import { ACTIVE_REVIEW_STALE_MS, isFinalReviewStatus, isReviewStale, reviewClaimExpiresAt } from "./reviewClaim";
 import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 
 function formatApplicantSchool(application: Pick<ApplicationDoc, "school" | "otherSchool">) {
@@ -52,6 +52,9 @@ export const listSubmittedApplications = query({
           school: formatApplicantSchool(application),
           submittedAt: application.submittedAt ?? null,
           reviewStatus: review?.status ?? null,
+          ...(review?.status === "under_review" && reviewedBy ? {
+            reviewClaim: { reviewedBy, expiresAt: reviewClaimExpiresAt(review) },
+          } : {}),
           currentReviewerName: reviewedBy
             ? (reviewerNameById.get(reviewedBy) ?? "Unknown organizer")
             : null,
@@ -98,6 +101,7 @@ export const getApplication = query({
             lastActiveAt: review.lastActiveAt ?? null,
             isFinal: isFinalReviewStatus(review.status),
             isStale: isReviewStale(review, now),
+            ...(review.status === "under_review" && review.reviewedBy ? { expiresAt: reviewClaimExpiresAt(review) } : {}),
             activeReviewStaleMs: ACTIVE_REVIEW_STALE_MS,
           }
         : {

@@ -121,7 +121,7 @@ function resetStore() {
     role: E2E_ADMIN.role,
   });
 
-  const now = 1_700_000_000_000;
+  const now = Date.now();
   seedApplication(E2E_APPLICATION_IDS.unreviewed, {
     authUserId: "e2e-user-1",
     email: "taylor.unreviewed@example.com",
@@ -130,7 +130,7 @@ function resetStore() {
     school: "Example University",
     createdAt: now - 3_000,
     submittedAt: now - 2_000,
-  });
+  }, { status: "under_review", createdAt: now, updatedAt: now });
 
   seedApplication(
     E2E_APPLICATION_IDS.underReview,
@@ -274,6 +274,7 @@ function reviewActivity(review: ReviewRecord | undefined, now: number) {
     lastActiveAt,
     isFinal: isFinalStatus(review.status),
     isStale,
+    ...(review.status === "under_review" && review.reviewedBy ? { expiresAt: (review.lastActiveAt ?? review.startedAt ?? review.updatedAt) + ACTIVE_REVIEW_STALE_MS } : {}),
     activeReviewStaleMs: ACTIVE_REVIEW_STALE_MS,
   };
 }
@@ -336,6 +337,9 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
             submittedAt: application.submittedAt,
             reviewStatus: review?.status ?? null,
             currentReviewerName: reviewer?.name ?? null,
+            ...(review?.status === "under_review" && review.reviewedBy ? {
+              reviewClaim: { reviewedBy: review.reviewedBy, expiresAt: (review.lastActiveAt ?? review.startedAt ?? review.updatedAt) + ACTIVE_REVIEW_STALE_MS },
+            } : {}),
           };
         })
         .sort((left, right) => (right.submittedAt ?? 0) - (left.submittedAt ?? 0));

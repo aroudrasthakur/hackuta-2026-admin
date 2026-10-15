@@ -12,6 +12,7 @@ import { LoadingState } from "../../components/states/LoadingState";
 import { getApplicationRef, logApplicationReviewActionRef } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { ADMIN_ROUTES } from "../../types/routes";
+import { useNow } from "../../hooks/useNow";
 
 export function ApplicationReviewContent({
   applicationId,
@@ -24,7 +25,16 @@ export function ApplicationReviewContent({
   staffAdminId: string;
   isAdmin: boolean;
 }) {
-  const detail = useQuery(getApplicationRef, { sessionToken, applicationId });
+  const loadedDetail = useQuery(getApplicationRef, { sessionToken, applicationId });
+  const now = useNow();
+  const detail = loadedDetail ? {
+    ...loadedDetail,
+    reviewActivity: {
+      ...loadedDetail.reviewActivity,
+      isStale: loadedDetail.reviewActivity.expiresAt !== undefined
+        ? now > loadedDetail.reviewActivity.expiresAt : loadedDetail.reviewActivity.isStale,
+    },
+  } : loadedDetail;
   const recordView = useMutation(logApplicationReviewActionRef);
   const viewRequest = useRef<{
     applicationId: string;

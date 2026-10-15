@@ -2,6 +2,7 @@ import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
 import type { ReactNode } from "react";
 import type { ApplicationDetail as ApplicationDetailData } from "../convex/adminApi";
 import { applicationLink, formatApplicationAnswer, formatApplicationDate } from "../lib/applicationDisplay";
+import { dashboardReviewStatusLabel } from "../lib/applicationDisplay";
 
 type Field = keyof ApplicationDetailData["application"];
 type Section = { title: string; fields: readonly (readonly [Field, string])[] };
@@ -56,15 +57,13 @@ const sections: readonly Section[] = [
 
 const linkFields: readonly Field[] = ["linkedin", "github", "portfolio", "devpost"];
 const wideFields: readonly Field[] = ["builtOrWantToBuild", "shortDeadlineLearning", "accessibilityNeeds"];
-const statusLabels = {
-  under_review: "Under Review", accepted: "Accepted", waitlisted: "Waitlisted",
-  rejected: "Rejected", withdrawn: "Withdrawn",
-};
-
 const primaryTitles = ["Application responses", "Technical and hackathon background", "Education"];
 
 export function ApplicationDetail({ detail, children }: { detail: ApplicationDetailData; children?: ReactNode }) {
   const { application, reviewStatus, resume } = detail;
+  const displayedStatus = reviewStatus === "under_review"
+    ? !detail.reviewActivity.reviewedBy ? "unreviewed" : detail.reviewActivity.isStale ? "stale" : "under_review"
+    : reviewStatus;
   const name = [application.firstName, application.lastName]
     .filter((value) => typeof value === "string" && value.trim()).join(" ");
 
@@ -103,7 +102,7 @@ export function ApplicationDetail({ detail, children }: { detail: ApplicationDet
         <h2 className="text-2xl font-semibold text-night">{name || "Application review"}</h2>
         <p className="break-words text-sm text-ocean">{application.email}</p>
         <p className="text-sm">Submitted: {formatApplicationDate(application.submittedAt)}</p>
-        <p className="text-sm">Review status: {reviewStatus ? statusLabels[reviewStatus] : "Unreviewed"}</p>
+        <p className="text-sm">Review status: {dashboardReviewStatusLabel(displayedStatus)}</p>
       </header>
       <div className={`grid items-start gap-6 ${children ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}>
         <div className="min-w-0 space-y-5">

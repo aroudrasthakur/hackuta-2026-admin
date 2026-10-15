@@ -1,0 +1,16 @@
+/** UI state derived from the register's review status and the organizer's claim. */
+export type QueueApplication = {
+  reviewStatus: "unreviewed" | "under_review" | "accepted" | "rejected" | "waitlisted" | "withdrawn" | null;
+  currentReviewerName: string | null;
+  reviewClaim?: { reviewedBy: string; expiresAt: number };
+};
+
+export function queueReviewStatus(application: QueueApplication, now: number) {
+  if (application.reviewStatus !== "under_review") return application.reviewStatus ?? "unreviewed";
+  if (application.reviewClaim) return now > application.reviewClaim.expiresAt ? "stale" : "under_review";
+  return application.currentReviewerName ? "under_review" : "unreviewed";
+}
+
+export function needsApplicationReview(application: QueueApplication) {
+  return application.reviewStatus === null || application.reviewStatus === "unreviewed" || application.reviewStatus === "under_review";
+}

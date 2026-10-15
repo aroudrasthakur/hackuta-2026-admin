@@ -92,6 +92,18 @@ test.describe("application review workflow", () => {
     await expect(page.getByRole("region", { name: "Applicant notification" })).toBeVisible();
   });
 
+  test("makes an expired claim available without reloading the review page", async ({ page }) => {
+    await page.clock.install();
+    await signInOrganizer(page, E2E_ADMIN);
+    await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
+    await expect(page.getByRole("button", { name: "Start review", exact: true })).toHaveCount(0);
+    await expect(page.getByText("Review status: In review", { exact: true })).toBeVisible();
+    await page.clock.fastForward(31 * 60_000);
+    await expect(page.getByText("Review status: Available to reclaim", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Start review", exact: true }).click();
+    await expect(page.getByText("You are the current reviewer.", { exact: false })).toBeVisible();
+  });
+
   test("admin sees review history on accepted applications", async ({ page }) => {
     await signInOrganizer(page, E2E_ADMIN);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.accepted}`);

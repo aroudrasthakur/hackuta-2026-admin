@@ -120,4 +120,19 @@ test.describe("applications queue", () => {
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeFocused();
   });
+
+  test("shows fresh submissions as awaiting review and expired claims as reclaimable", async ({ page }) => {
+    await page.clock.install();
+    await page.reload();
+    await page.getByLabel("Review status").selectOption("unreviewed");
+    await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("1 of 4");
+    await page.getByLabel("Review status").selectOption("under_review");
+    await expect(page.getByRole("status")).toContainText("2 of 4");
+    await page.clock.fastForward(31 * 60_000);
+    await expect(page.getByRole("status")).toContainText("0 of 4");
+    await page.getByLabel("Review status").selectOption("stale");
+    await expect(page.getByRole("status")).toContainText("2 of 4");
+    await expect(page.getByRole("table")).toContainText("Available to reclaim");
+  });
 });

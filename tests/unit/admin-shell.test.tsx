@@ -255,8 +255,8 @@ describe("applications dashboard", () => {
 
     expect(mocks.query).toHaveBeenCalledWith(listSubmittedApplicationsRef, { sessionToken: "s".repeat(64) });
     expect(container.querySelectorAll("article")).toHaveLength(2);
-    expect(container.textContent).toContain("Under Review");
-    expect(container.textContent).toContain("Unreviewed");
+    expect(container.textContent).toContain("In review");
+    expect(container.textContent).toContain("Awaiting review");
     expect(container.querySelector('a[href="/admin/applications/app-1"]')).not.toBeNull();
     expect(mocks.mutation).not.toHaveBeenCalled();
   });

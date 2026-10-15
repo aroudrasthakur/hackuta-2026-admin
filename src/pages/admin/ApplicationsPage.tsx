@@ -9,6 +9,8 @@ import { useQuery } from "../../convex/reactBindings";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { dashboardReviewStatusLabels } from "../../lib/applicationDisplay";
 import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
+import { queueReviewStatus, needsApplicationReview } from "../../../shared/admin/reviewQueue";
+import { useNow } from "../../hooks/useNow";
 
 const controlClass = "mt-1.5 min-h-11 w-full rounded-md border border-ocean/70 bg-white px-3 py-2 text-sm text-night placeholder:text-ocean";
 const reviewStatusFilters = {
@@ -19,6 +21,8 @@ const reviewStatusFilters = {
 type ReviewStatusFilter = keyof typeof reviewStatusFilters;
 
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
+  const now = useNow();
+  const { staff } = useAdminAuth();
   const applications = useQuery(listSubmittedApplicationsRef, { sessionToken });
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("search") ?? "";
@@ -45,8 +49,6 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
     }, { replace: true });
   }
 
-  const needsReview = (applicationStatus: string | null) =>
-    applicationStatus === null || applicationStatus === "unreviewed" || applicationStatus === "under_review";
   const visibleApplications = (applications ?? [])
     .filter((application) => {
       const matchesSearch =
@@ -57,8 +59,8 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
       const matchesStatus =
         status === "all" ||
         (status === "needs_review"
-          ? needsReview(application.reviewStatus)
-          : (application.reviewStatus ?? "unreviewed") === status);
+          ? needsApplicationReview(application)
+          : queueReviewStatus(application, now) === status);
       return matchesSearch && matchesStatus;
     })
     .sort((left, right) => {
@@ -83,7 +85,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
 
   const hasCustomControls = search !== "" || status !== "needs_review" || sortOrder !== "oldest";
   const queueIsClear = status === "needs_review" && searchText === "" && visibleApplications.length === 0;
-  const needsReviewCount = applications.filter((application) => needsReview(application.reviewStatus)).length;
+  const needsReviewCount = applications.filter(needsApplicationReview).length;
 
   return (
     <div className="space-y-5">
@@ -166,7 +168,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
           )}
         </div>
       ) : (
-        <ApplicationsList applications={visibleApplications} applicationsSearch={searchParams.toString()} />
+        <ApplicationsList applications={visibleApplications} applicationsSearch={searchParams.toString()} now={now} staffAdminId={staff?.adminId} />
       )}
     </div>
   );

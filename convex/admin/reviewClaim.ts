@@ -26,6 +26,10 @@ function reviewActivityAt(review: ApplicationReviewDoc) {
   return review.lastActiveAt ?? review.startedAt ?? review.updatedAt;
 }
 
+export function reviewClaimExpiresAt(review: ApplicationReviewDoc) {
+  return reviewActivityAt(review) + ACTIVE_REVIEW_STALE_MS;
+}
+
 export function isReviewStale(review: ApplicationReviewDoc, now: number) {
   if (!review.reviewedBy || review.status !== "under_review") {
     return false;

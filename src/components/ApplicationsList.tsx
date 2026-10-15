@@ -3,14 +3,30 @@ import type { SubmittedApplicationSummary } from "../convex/adminApi";
 import { formatApplicationDate } from "../lib/applicationDisplay";
 import { ADMIN_ROUTES } from "../types/routes";
 import { ApplicationStatusBadge } from "./ApplicationStatusBadge";
+import { queueReviewStatus } from "../../shared/admin/reviewQueue";
 
 export function ApplicationsList({
   applications,
   applicationsSearch,
+  now = Date.now(),
+  staffAdminId,
 }: {
   applications: SubmittedApplicationSummary[];
   applicationsSearch: string;
+  now?: number;
+  staffAdminId?: string | undefined;
 }) {
+  function status(application: SubmittedApplicationSummary) {
+    return queueReviewStatus(application, now);
+  }
+
+  function reviewer(application: SubmittedApplicationSummary) {
+    const current = status(application);
+    if (current === "unreviewed") return "Unassigned";
+    if (current === "stale") return `Previous: ${application.currentReviewerName ?? "Unknown organizer"}`;
+    if (current === "under_review" && application.reviewClaim?.reviewedBy === staffAdminId) return "You";
+    return application.currentReviewerName ?? "Unassigned";
+  }
   function reviewLink(application: SubmittedApplicationSummary) {
     return (
       <Link
@@ -48,8 +64,8 @@ export function ApplicationsList({
                 </th>
                 <td className="break-words px-3 py-3">{application.school || "Not provided"}</td>
                 <td className="px-3 py-3 text-xs leading-5">{formatApplicationDate(application.submittedAt)}</td>
-                <td className="px-3 py-3"><ApplicationStatusBadge status={application.reviewStatus} /></td>
-                <td className="break-words px-3 py-3">{application.currentReviewerName ?? "Unassigned"}</td>
+                <td className="px-3 py-3"><ApplicationStatusBadge status={status(application)} /></td>
+                <td className="break-words px-3 py-3">{reviewer(application)}</td>
                 <td className="px-1 py-3">{reviewLink(application)}</td>
               </tr>
             ))}
@@ -63,7 +79,7 @@ export function ApplicationsList({
             <article className="h-full rounded-lg border border-sand bg-white p-4 text-sm">
               <header className="flex flex-wrap items-start justify-between gap-2">
                 <h3 className="min-w-0 break-words font-semibold text-night">{application.applicantName}</h3>
-                <ApplicationStatusBadge status={application.reviewStatus} />
+                <ApplicationStatusBadge status={status(application)} />
               </header>
               <p className="mt-1 break-words text-ocean">{application.email}</p>
               <p className="mt-1 break-words">{application.school || "Not provided"}</p>
@@ -71,7 +87,7 @@ export function ApplicationsList({
                 <dt className="text-ocean">Submitted</dt>
                 <dd>{formatApplicationDate(application.submittedAt)}</dd>
                 <dt className="text-ocean">Reviewer</dt>
-                <dd className="break-words">{application.currentReviewerName ?? "Unassigned"}</dd>
+                <dd className="break-words">{reviewer(application)}</dd>
               </dl>
               <div className="mt-3 border-t border-sand/70 pt-1">{reviewLink(application)}</div>
             </article>
