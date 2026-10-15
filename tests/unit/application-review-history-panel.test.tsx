@@ -119,17 +119,23 @@ describe("application review history panel", () => {
     expect(container.querySelectorAll("details")).toHaveLength(1);
   });
 
-  it("highlights accepted decisions only", async () => {
+  it("styles each decision distinctly and mutes views", async () => {
     await render({
       results: [
         event("log-1", "Avery Admin", "accepted", 1),
         event("log-2", "Avery Admin", "rejected", 2),
         event("log-3", "Avery Admin", "waitlisted", 3),
+        event("log-4", "Avery Admin", "viewed", 4),
       ],
       status: "Exhausted",
     });
     const actions = Array.from(container.querySelectorAll("li p span:last-child"));
-    expect(actions.map((action) => action.classList.contains("text-green-700"))).toEqual([true, false, false]);
+    expect(actions.map((action) => /text-(green|red|amber|mist)/.exec(action.className)?.[1])).toEqual([
+      "green",
+      "red",
+      "amber",
+      "mist",
+    ]);
   });
 
   it("loads more activity on request", async () => {
