@@ -20,6 +20,11 @@ function event(id: string, actorName: string, action: ReviewHistoryEvent["action
   return { _id: id as GenericId<"applicationReviewLogs">, actorName, action, createdAt };
 }
 
+function historyTime(value: number) {
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    .format(value);
+}
+
 describe("application review history panel", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -68,32 +73,39 @@ describe("application review history panel", () => {
     expect(button()).toBeNull();
   });
 
-  it("lists every event in order with organizer, action, and time, without edit controls", async () => {
+  it("lists every event newest first with action, organizer, and time", async () => {
     const events = [
-      event("log-1", "Avery Admin", "viewed", 1_700_000_000_000),
-      event("log-2", "Riley Reviewer", "started_review", 1_700_000_100_000),
-      event("log-3", "Riley Reviewer", "viewed", 1_700_000_200_000),
-      event("log-4", "Riley Reviewer", "review_ended", 1_700_000_300_000),
-      event("log-5", "Avery Admin", "accepted", 1_700_000_400_000),
-      event("log-6", "Avery Admin", "rejected", 1_700_000_500_000),
       event("log-7", "Avery Admin", "waitlisted", 1_700_000_600_000),
+      event("log-6", "Avery Admin", "rejected", 1_700_000_500_000),
+      event("log-5", "Avery Admin", "accepted", 1_700_000_400_000),
+      event("log-4", "Riley Reviewer", "review_ended", 1_700_000_300_000),
+      event("log-3", "Riley Reviewer", "viewed", 1_700_000_200_000),
+      event("log-2", "Riley Reviewer", "started_review", 1_700_000_100_000),
+      event("log-1", "Avery Admin", "viewed", 1_700_000_000_000),
     ];
     await render({ results: events, status: "Exhausted" });
     const rows = Array.from(container.querySelectorAll("li"));
     expect(rows.map((row) => row.querySelector("p")?.textContent)).toEqual([
-      "Avery Admin Viewed application",
-      "Riley Reviewer Started review",
-      "Riley Reviewer Viewed application",
-      "Riley Reviewer Ended review",
-      "Avery Admin Accepted applicant",
-      "Avery Admin Rejected applicant",
-      "Avery Admin Waitlisted applicant",
+      "Waitlisted applicant",
+      "Rejected applicant",
+      "Accepted applicant",
+      "Ended review",
+      "Viewed application",
+      "Started review",
+      "Viewed application",
     ]);
-    expect(rows[0].querySelector("time")?.textContent).toBe(
-      new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-        .format(1_700_000_000_000),
-    );
-    expect(container.querySelectorAll("button, input, textarea, select")).toHaveLength(0);
+    expect(rows.map((row) => row.querySelectorAll("p")[1]?.textContent?.split(" · ")[0])).toEqual([
+      "Avery Admin",
+      "Avery Admin",
+      "Avery Admin",
+      "Riley Reviewer",
+      "Riley Reviewer",
+      "Riley Reviewer",
+      "Avery Admin",
+    ]);
+    expect(rows[0].querySelector("time")?.textContent).toBe(historyTime(1_700_000_600_000));
+    expect(container.textContent).toContain("Decision");
+    expect(container.textContent).toContain("Review update");
   });
 
   it("folds consecutive views into a collapsed group that lists each view, newest first", async () => {
@@ -113,15 +125,24 @@ describe("application review history panel", () => {
     const group = container.querySelector("details");
     expect(group?.open).toBe(false);
     expect(group?.querySelector("summary")?.textContent).toContain("Viewed application ×3");
-    expect(group?.querySelector("summary time")?.textContent).toBe(
-      new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-        .format(1_700_000_500_000),
-    );
+    expect(group?.querySelector("summary")?.textContent).toContain("Latest: Avery Admin ·");
+    expect(group?.querySelector("summary time")?.textContent).toBe(historyTime(1_700_000_500_000));
     expect(Array.from(group!.querySelectorAll("li")).map((row) => row.querySelector("p")?.textContent)).toEqual([
-      "Avery Admin Viewed application",
-      "Sam Second Viewed application",
-      "Sam Second Viewed application",
+      "Viewed application",
+      "Viewed application",
+      "Viewed application",
     ]);
+    expect(Array.from(group!.querySelectorAll("li")).map((row) => row.querySelectorAll("p")[1]?.textContent?.split(" · ")[0])).toEqual([
+      "Avery Admin",
+      "Sam Second",
+      "Sam Second",
+    ]);
+    expect(Array.from(group!.querySelectorAll("li time")).map((time) => time.textContent)).toEqual([
+      historyTime(1_700_000_500_000),
+      historyTime(1_700_000_400_000),
+      historyTime(1_700_000_300_000),
+    ]);
+    expect(group?.querySelector("summary")?.tagName).toBe("SUMMARY");
     expect(container.querySelectorAll("details")).toHaveLength(1);
   });
 
@@ -135,12 +156,18 @@ describe("application review history panel", () => {
       ],
       status: "Exhausted",
     });
-    const actions = Array.from(container.querySelectorAll("li p span:last-child"));
-    expect(actions.map((action) => /text-(green|red|amber|mist)/.exec(action.className)?.[1])).toEqual([
-      "green",
-      "red",
-      "amber",
-      "mist",
+    const rows = Array.from(container.querySelectorAll("[data-action]"));
+    expect(rows.map((row) => row.querySelector("[data-category]")?.textContent ?? null)).toEqual([
+      "Decision",
+      "Decision",
+      "Decision",
+      null,
+    ]);
+    expect(rows.map((row) => row.firstElementChild?.className.includes("bg-") && row.firstElementChild?.className)).toEqual([
+      expect.stringContaining("bg-green-600"),
+      expect.stringContaining("bg-red-600"),
+      expect.stringContaining("bg-amber-500"),
+      expect.stringContaining("bg-sand"),
     ]);
   });
 
@@ -156,7 +183,7 @@ describe("application review history panel", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.paginatedQuery.mockImplementation(() => { throw new Error("Private backend error"); });
     await render();
-    expect(container.querySelector("h3")?.textContent).toBe("Review history");
+    expect(container.querySelector("h3")?.textContent).toBe("Review History");
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("couldn’t load the review history");
     expect(container.textContent).not.toContain("Private backend error");
   });
