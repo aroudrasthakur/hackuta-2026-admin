@@ -109,8 +109,11 @@ try {
   await expect(page).toHaveURL(/\/admin\/login$/);
   passed("sign-out clears the cookie, revokes the backend session, and blocks reentry");
 } catch (error) {
-  // Playwright fill errors can include the supplied password. Never print raw errors.
-  console.error(`FAIL: ${stage}. ${error instanceof assert.AssertionError ? error.message : "Check the frontend and backend connectivity."}`);
+  // Raw Playwright errors and assertion diffs can include passwords or tokens.
+  const detail = error instanceof assert.AssertionError
+    ? error.message.split("\n")[0]
+    : "Check the frontend and backend connectivity.";
+  console.error(`FAIL: ${stage}. ${detail}`);
   process.exitCode = 1;
 } finally {
   try {
