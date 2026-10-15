@@ -71,7 +71,7 @@ export function ApplicationDetail({ detail }: { detail: ApplicationDetailData })
         <h2 className="font-display text-2xl text-night">{name || "Application review"}</h2>
         <p className="break-all text-sm text-ocean">{application.email}</p>
         <p className="text-sm">Submitted: {formatApplicationDate(application.submittedAt)}</p>
-        <p className="text-sm">Review status: {reviewStatus ? statusLabels[reviewStatus] : "Unreviewed"}</p>
+        <p className="text-sm"> <b>Review Status: </b>{reviewStatus ? statusLabels[reviewStatus] : "Unreviewed"}</p>
       </header>
       {sections.map(({ title, fields }) => (
         <section key={title} aria-label={title} className="rounded-lg border border-sand bg-white/40 p-5">
