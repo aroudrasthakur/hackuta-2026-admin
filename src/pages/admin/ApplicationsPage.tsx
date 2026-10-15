@@ -13,6 +13,7 @@ import { needsApplicationReview } from "../../../shared/admin/reviewQueue";
 import { useNow } from "../../hooks/useNow";
 
 const controlClass = "mt-1.5 min-h-11 w-full rounded-md border border-ocean/70 bg-white px-3 py-2 text-sm text-night placeholder:text-ocean";
+const controlDefaults = { search: "", status: "needs_review", sort: "oldest", reviewer: "all" };
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const now = useNow();
   const { staff } = useAdminAuth();
@@ -21,15 +22,10 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const { search, status, sortOrder, reviewer } = queueControls(searchParams);
   const searchText = search.trim().toLowerCase();
 
-  function updateControl(key: "search" | "status" | "sort" | "reviewer", value: string) {
+  function updateControl(key: keyof typeof controlDefaults, value: string) {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous);
-      if (
-        value === "" ||
-        (key === "status" && value === "needs_review") ||
-        (key === "sort" && value === "oldest") ||
-        (key === "reviewer" && value === "all")
-      ) {
+      if (value === "" || value === controlDefaults[key]) {
         next.delete(key);
       } else {
         next.set(key, value);
