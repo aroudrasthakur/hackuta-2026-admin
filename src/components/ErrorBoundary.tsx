@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { userFacingErrorMessage } from "../lib/userFacingError";
 import { ErrorState } from "./states/ErrorState";
 
 type Props = {
@@ -27,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <ErrorState
           title="Something went wrong"
-          message={this.state.error.message}
+          message={userFacingErrorMessage(this.state.error)}
         />
       );
     }

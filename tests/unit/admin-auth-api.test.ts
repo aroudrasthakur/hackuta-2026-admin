@@ -5,6 +5,7 @@ import signOutRoute from "../../api/admin/sign-out";
 import { ADMIN_SESSION_COOKIE, isSecureRequest, readAdminSessionCookie, serializeAdminSessionCookie } from "../../server/adminAuthCookie";
 import { routeAdminAuthRequest } from "../../server/adminAuthHandlers";
 import { viteAdminAuthApiPlugin } from "../../server/viteAdminAuthApiPlugin";
+import { ADMIN_ERROR_MESSAGES, SIGN_IN_FAILED_MESSAGE } from "../../shared/admin/errors";
 
 const convex = vi.hoisted(() => ({ mutation: vi.fn(), urls: [] as string[] }));
 vi.mock("convex/browser", () => ({
@@ -19,8 +20,10 @@ vi.mock("convex/browser", () => ({
 const base = "http://127.0.0.1:5173";
 const token = "c".repeat(64);
 const cookieHeader = `${ADMIN_SESSION_COOKIE}=${token}`;
+let consoleError: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
+  consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
   convex.mutation.mockReset();
   convex.urls.length = 0;
   vi.stubEnv("VITE_E2E_MOCK", "false");
@@ -28,6 +31,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  consoleError.mockRestore();
   vi.unstubAllEnvs();
 });
 
@@ -73,7 +77,8 @@ describe("sign-in API", () => {
   it("returns 429 for rate-limited sign-in", async () => {
     convex.mutation.mockResolvedValue({
       ok: false,
-      error: "Too many failed sign-in attempts. Please try again later.",
+      code: "SIGN_IN_RATE_LIMITED",
+      error: ADMIN_ERROR_MESSAGES.SIGN_IN_RATE_LIMITED,
     });
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
     expect(response.status).toBe(429);
@@ -83,13 +88,14 @@ describe("sign-in API", () => {
   });
 
   it.each([
-    ["Invalid email or password.", 401],
-    ["This account is inactive.", 403],
-  ])("returns %s with status %i", async (message, status) => {
-    convex.mutation.mockResolvedValue({ ok: false, error: message });
+    ["INVALID_CREDENTIALS", 401],
+    ["ACCOUNT_INACTIVE", 403],
+  ] as const)("returns %s with status %i", async (code, status) => {
+    const error = ADMIN_ERROR_MESSAGES[code];
+    convex.mutation.mockResolvedValue({ ok: false, code, error });
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
     expect(response.status).toBe(status);
-    expect(await response.json()).toEqual({ error: message });
+    expect(await response.json()).toEqual({ code, error });
     expect(response.headers.get("set-cookie")).toBeNull();
     expect(response.headers.get("cache-control")).toBe(
       "no-store, no-cache, must-revalidate, private",
@@ -99,7 +105,9 @@ describe("sign-in API", () => {
   it("returns a generic error for a non-Error failure", async () => {
     convex.mutation.mockRejectedValue("boom");
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
-    expect(await response.json()).toEqual({ error: "Sign-in failed." });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: SIGN_IN_FAILED_MESSAGE });
+    expect(consoleError).toHaveBeenCalledWith("Organizer sign-in failed", "boom");
   });
 
   it("rejects a body that is not JSON", async () => {
@@ -113,7 +121,12 @@ describe("sign-in API", () => {
     vi.stubEnv("CONVEX_URL", "");
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
     expect(response.status).toBe(500);
-    expect((await response.json()).error).toMatch(/Missing VITE_CONVEX_URL/);
+    // The config problem is logged for developers but never sent to the browser.
+    expect(await response.json()).toEqual({ error: SIGN_IN_FAILED_MESSAGE });
+    expect(consoleError).toHaveBeenCalledWith(
+      "Organizer sign-in failed",
+      expect.objectContaining({ message: expect.stringMatching(/Missing VITE_CONVEX_URL/) }),
+    );
     expect(convex.mutation).not.toHaveBeenCalled();
   });
 
@@ -287,7 +300,7 @@ describe("Vite dev auth plugin", () => {
       },
     };
     mountPlugin()(broken, res, vi.fn());
-    expect(await res.ended).toBe("socket closed");
+    expect(await res.ended).toBe("Internal Server Error");
     expect(res.statusCode).toBe(500);
   });
 

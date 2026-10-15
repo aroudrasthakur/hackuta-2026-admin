@@ -2,7 +2,7 @@ import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
-import { ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE } from "../../convex/admin/adminSignInRateLimit";
+import { ADMIN_ERROR_MESSAGES } from "../../shared/admin/errors";
 import {
   createStaffAuthorizationFixture,
   mutateOrganizerSignIn,
@@ -12,7 +12,6 @@ import {
   seedSubmittedApplication,
   signInOrganizer,
 } from "../helpers/staffTestFixtures";
-import { REVIEW_ALREADY_CLAIMED } from "../../convex/admin/reviewClaim";
 import {
   ADMIN_SESSION_TTL_MS,
   getCurrentAdmin,
@@ -90,13 +89,10 @@ type TestInstance = ConvexTestInstance;
 async function expectSignInFailure(
   t: TestInstance,
   args: { email: string; password: string },
-  pattern: RegExp,
+  code: "INVALID_CREDENTIALS" | "ACCOUNT_INACTIVE" | "SIGN_IN_RATE_LIMITED",
 ) {
   const result = await mutateOrganizerSignIn(t, args);
-  expect(result.ok).toBe(false);
-  if (!result.ok) {
-    expect(result.error).toMatch(pattern);
-  }
+  expect(result).toEqual({ ok: false, code, error: ADMIN_ERROR_MESSAGES[code] });
 }
 
 async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer") {
@@ -116,7 +112,11 @@ describe("organizer auth boundary", () => {
       password: ORGANIZER_TEST_PASSWORD,
       clientIp: "203.0.113.10",
     });
-    expect(blocked).toEqual({ ok: false, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE });
+    expect(blocked).toEqual({
+      ok: false,
+      code: "SIGN_IN_RATE_LIMITED",
+      error: ADMIN_ERROR_MESSAGES.SIGN_IN_RATE_LIMITED,
+    });
   });
 
   it("rate-limits per IP and email so another IP can still attempt the same account", async () => {
@@ -181,7 +181,7 @@ describe("organizer auth boundary", () => {
     await expectSignInFailure(
       t,
       { email: "admin@hackuta.org", password: "WrongPass1" },
-      /invalid email or password/i,
+      "INVALID_CREDENTIALS",
     );
   });
 
@@ -192,7 +192,7 @@ describe("organizer auth boundary", () => {
     await expectSignInFailure(
       t,
       { email: "inactive@hackuta.org", password: ORGANIZER_TEST_PASSWORD },
-      /inactive/i,
+      "ACCOUNT_INACTIVE",
     );
   });
 
@@ -250,7 +250,7 @@ describe("organizer auth boundary", () => {
         applicationId,
         paginationOpts: { numItems: 25, cursor: null },
       }),
-    ).rejects.toThrow(/not authorized/i);
+    ).rejects.toThrow(/ADMIN_ONLY/);
   });
 
   it("allows admin role to read review history", async () => {
@@ -277,7 +277,7 @@ describe("organizer auth boundary", () => {
         applicationId,
         action: "viewed",
       }),
-    ).rejects.toThrow(/not authenticated/i);
+    ).rejects.toThrow(/NOT_AUTHENTICATED/);
   });
 
   it("sign-out removes the active session token", async () => {
@@ -301,7 +301,7 @@ describe("organizer auth boundary", () => {
         role: "admin",
         password: ORGANIZER_TEST_PASSWORD,
       }),
-    ).rejects.toThrow(/not authenticated/i);
+    ).rejects.toThrow(/NOT_AUTHENTICATED/);
 
     // 2. Reviewer role must be rejected
     await seedAdminAccount(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
@@ -314,7 +314,7 @@ describe("organizer auth boundary", () => {
         role: "admin",
         password: ORGANIZER_TEST_PASSWORD,
       }),
-    ).rejects.toThrow(/not authorized/i);
+    ).rejects.toThrow(/ADMIN_ONLY/);
 
     // 3. Admin role succeeds
     await seedAdminAccount(t, { email: "superadmin@hackuta.org", role: "admin", active: true });
@@ -342,7 +342,7 @@ describe("organizer auth boundary", () => {
         email: "applicant@test.edu",
         school: "Test University",
       }),
-    ).rejects.toThrow(/not authenticated/i);
+    ).rejects.toThrow(/NOT_AUTHENTICATED/);
 
     // 2. Reviewer role must be rejected
     await seedAdminAccount(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
@@ -355,7 +355,7 @@ describe("organizer auth boundary", () => {
         email: "applicant@test.edu",
         school: "Test University",
       }),
-    ).rejects.toThrow(/not authorized/i);
+    ).rejects.toThrow(/ADMIN_ONLY/);
 
     // 3. Admin role succeeds
     await seedAdminAccount(t, { email: "admin1@hackuta.org", role: "admin", active: true });
@@ -379,14 +379,14 @@ describe("organizer auth boundary", () => {
       await expectSignInFailure(
         t,
         { email: "locked@hackuta.org", password: "WrongPassword1!" },
-        /invalid email or password/i,
+        "INVALID_CREDENTIALS",
       );
     }
 
     await expectSignInFailure(
       t,
       { email: "locked@hackuta.org", password: ORGANIZER_TEST_PASSWORD },
-      /too many failed sign-in attempts/i,
+      "SIGN_IN_RATE_LIMITED",
     );
   });
 
@@ -412,7 +412,7 @@ describe("organizer auth boundary", () => {
         email: "dup-applicant@test.edu",
         school: "Test University",
       }),
-    ).rejects.toThrow(/already has a submitted application/i);
+    ).rejects.toThrow(/APPLICANT_ALREADY_SUBMITTED/);
   });
 
   it("attributes sample review ownership to the authenticated admin session", async () => {
@@ -442,7 +442,7 @@ describe("organizer auth boundary", () => {
     await expectSignInFailure(
       t,
       { email: "nonexistent@hackuta.org", password: "SomePassword1!" },
-      /invalid email or password/i,
+      "INVALID_CREDENTIALS",
     );
   });
 });
@@ -548,7 +548,7 @@ describe("application review state", () => {
         applicationId,
         action: "started_review",
       }),
-    ).rejects.toThrow(/already being reviewed/i);
+    ).rejects.toThrow(/REVIEW_CLAIMED/);
 
     const review = await getReview(t, applicationId);
     expect(review?.reviewedBy).toBe(first.adminId);
@@ -573,7 +573,7 @@ describe("application review state", () => {
         applicationId,
         decision: "waitlisted",
       }),
-    ).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+    ).rejects.toThrow(/REVIEW_CLAIMED/);
   });
 
   it("allows reclaiming a stale review and resets startedAt", async () => {
@@ -657,7 +657,7 @@ describe("application review state", () => {
         applicationId,
         action: "started_review",
       }),
-    ).rejects.toThrow(/final decision/i);
+    ).rejects.toThrow(/REVIEW_FINALIZED/);
   });
 
   it("ignores review_ended from an admin who is not the current reviewer", async () => {
@@ -791,7 +791,7 @@ describe("application review state", () => {
         applicationId,
         decision: "accepted",
       }),
-    ).rejects.toThrow(/not authenticated/i);
+    ).rejects.toThrow(/NOT_AUTHENTICATED/);
     expect((await getReview(t, applicationId))?.reviewedBy).toBeUndefined();
   });
 });
@@ -818,7 +818,7 @@ describe("centralized staff authorization", () => {
         const before = await snapshot();
         await expect(t.mutation(ref.setApplicationDecision, {
           sessionToken, applicationId, decision,
-        })).rejects.toThrow(/application has not been submitted/i);
+        })).rejects.toThrow(/APPLICATION_NOT_SUBMITTED/);
         expect(await snapshot()).toEqual(before);
       },
     );
@@ -885,13 +885,13 @@ describe("centralized staff authorization", () => {
         expect(await t.run((ctx) => getCurrentAdmin(ctx, sessionToken))).toBeNull();
         await expect(t.mutation(ref.logApplicationReviewAction, {
           sessionToken, applicationId, action: "viewed",
-        })).rejects.toThrow(/not authenticated/i);
+        })).rejects.toThrow(/NOT_AUTHENTICATED/);
         await expect(t.mutation(ref.setApplicationDecision, {
           sessionToken, applicationId, decision: "accepted",
-        })).rejects.toThrow(/not authenticated/i);
+        })).rejects.toThrow(/NOT_AUTHENTICATED/);
         await expect(t.query(ref.listApplicationReviewLogs, {
           sessionToken, applicationId, paginationOpts: { numItems: 25, cursor: null },
-        })).rejects.toThrow(/not authenticated/i);
+        })).rejects.toThrow(/NOT_AUTHENTICATED/);
         expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
         expect(await t.run((ctx) => ctx.db.query("participants").collect())).toEqual([]);
         const review = await t.run((ctx) => ctx.db.query("applicationReviews").unique());
@@ -911,10 +911,10 @@ describe("centralized staff authorization", () => {
     expect(await applicant.run((ctx) => getCurrentAdmin(ctx, ""))).toBeNull();
     await expect(applicant.mutation(ref.setApplicationDecision, {
       sessionToken: "", applicationId, decision: "accepted",
-    })).rejects.toThrow(/not authenticated/i);
+    })).rejects.toThrow(/NOT_AUTHENTICATED/);
     await expect(applicant.query(ref.listApplicationReviewLogs, {
       sessionToken: "", applicationId, paginationOpts: { numItems: 25, cursor: null },
-    })).rejects.toThrow(/not authenticated/i);
+    })).rejects.toThrow(/NOT_AUTHENTICATED/);
   });
 
   it("applies role changes to existing sessions", async () => {
@@ -922,7 +922,7 @@ describe("centralized staff authorization", () => {
     await t.run((ctx) => ctx.db.patch(adminId, { role: "reviewer" }));
     await expect(t.query(ref.listApplicationReviewLogs, {
       sessionToken, applicationId, paginationOpts: { numItems: 25, cursor: null },
-    })).rejects.toThrow(/not authorized/i);
+    })).rejects.toThrow(/ADMIN_ONLY/);
     await t.mutation(ref.logApplicationReviewAction, { sessionToken, applicationId, action: "viewed" });
   });
 

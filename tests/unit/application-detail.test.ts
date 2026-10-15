@@ -90,7 +90,7 @@ describe("read-only submitted application detail", () => {
     await t.run((ctx) => ctx.db.delete(applicationId));
     await expect(t.mutation(logApplicationReviewActionRef, {
       sessionToken, applicationId, action: "viewed",
-    })).rejects.toThrow(/application not found/i);
+    })).rejects.toThrow(/APPLICATION_NOT_FOUND/);
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
   });
 
@@ -164,7 +164,7 @@ describe("read-only submitted application detail", () => {
         if (condition === "inactive") await ctx.db.patch(adminId, { active: false });
       });
       const token = condition === "missing" ? "" : condition === "fake" ? "b".repeat(64) : sessionToken;
-      await expect(t.query(getApplicationRef, { sessionToken: token, applicationId })).rejects.toThrow(/not authenticated/i);
+      await expect(t.query(getApplicationRef, { sessionToken: token, applicationId })).rejects.toThrow(/NOT_AUTHENTICATED/);
     },
   );
 
@@ -172,7 +172,7 @@ describe("read-only submitted application detail", () => {
     const { t, adminId, userId, applicationId } = fixture;
     await t.run((ctx) => ctx.db.patch(adminId, { role: "admin", email: "applicant@example.com" }));
     const applicant = t.withIdentity({ subject: userId, email: "applicant@example.com" });
-    await expect(applicant.query(getApplicationRef, { sessionToken: "", applicationId })).rejects.toThrow(/not authenticated/i);
+    await expect(applicant.query(getApplicationRef, { sessionToken: "", applicationId })).rejects.toThrow(/NOT_AUTHENTICATED/);
   });
 
   it("resolves an attached resume and distinguishes a deleted file", async () => {

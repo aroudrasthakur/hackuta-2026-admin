@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ACTIVE_REVIEW_STALE_MS, REVIEW_ALREADY_CLAIMED, REVIEW_FINALIZED } from "../../convex/admin/reviewClaim";
+import { ACTIVE_REVIEW_STALE_MS } from "../../convex/admin/reviewClaim";
 import {
   getApplicationRef,
   listApplicationReviewLogsRef,
@@ -81,7 +81,7 @@ describe("view logging", () => {
     const before = await snapshotReviewState(t);
     await expect(
       t.mutation(logApplicationReviewActionRef, { sessionToken: staff.sessionToken, applicationId, action }),
-    ).rejects.toThrow(/application not found/i);
+    ).rejects.toThrow(/APPLICATION_NOT_FOUND/);
     expect(await snapshotReviewState(t)).toEqual(before);
   });
 
@@ -90,7 +90,7 @@ describe("view logging", () => {
     async (action) => {
       const { t, first, applicant, act } = await setup();
       await t.run((ctx) => ctx.db.delete(applicant.applicationId));
-      await expect(act(first, action)).rejects.toThrow(/application not found/i);
+      await expect(act(first, action)).rejects.toThrow(/APPLICATION_NOT_FOUND/);
       expect(await countRows(t, "applicationReviewLogs")).toBe(0);
     },
   );
@@ -131,7 +131,7 @@ describe("starting a review", () => {
     vi.advanceTimersByTime(ACTIVE_REVIEW_STALE_MS - 1_000);
     const before = await snapshotReviewState(t);
 
-    await expect(act(second, "started_review")).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+    await expect(act(second, "started_review")).rejects.toThrow(/REVIEW_CLAIMED/);
     expect(await snapshotReviewState(t)).toEqual(before);
     expect((await getReview(t, applicant.applicationId))?.reviewedBy).toBe(first.adminId);
   });
@@ -147,7 +147,7 @@ describe("starting a review", () => {
         applicationId: applicant.applicationId,
         decision: "waitlisted",
       }),
-    ).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+    ).rejects.toThrow(/REVIEW_CLAIMED/);
   });
 
   it("keeps ownership and start time when the same reviewer reopens", async () => {
@@ -190,7 +190,7 @@ describe("starting a review", () => {
     await act(first, "review_ended");
     vi.advanceTimersByTime(ACTIVE_REVIEW_STALE_MS - 1_000);
 
-    await expect(act(second, "started_review")).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+    await expect(act(second, "started_review")).rejects.toThrow(/REVIEW_CLAIMED/);
     expect(await countRows(t, "applicationReviewLogs")).toBe(2);
   });
 
@@ -225,7 +225,7 @@ describe("starting a review", () => {
           applicationId,
           action: "started_review",
         }),
-      ).rejects.toThrow(REVIEW_FINALIZED);
+      ).rejects.toThrow(/REVIEW_FINALIZED/);
       expect(await snapshotReviewState(t)).toEqual(before);
     },
   );
@@ -334,6 +334,6 @@ describe("audit log", () => {
         applicationId: applicant.applicationId,
         paginationOpts: { numItems: 10, cursor: null },
       }),
-    ).rejects.toThrow(/not authorized/i);
+    ).rejects.toThrow(/ADMIN_ONLY/);
   });
 });

@@ -1,6 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { e2eMockSignIn, e2eMockSignOut } from "../shared/admin/e2e/mockAdminStore.ts";
+import { SIGN_IN_FAILED_MESSAGE } from "../shared/admin/errors.ts";
 import {
   clearAdminSessionCookie,
   isSecureRequest,
@@ -13,9 +14,11 @@ function isE2eMockAuthEnabled() {
   return process.env.VITE_E2E_MOCK === "true";
 }
 
+type AdminSignInFailureCode = "INVALID_CREDENTIALS" | "ACCOUNT_INACTIVE" | "SIGN_IN_RATE_LIMITED";
+
 type AdminSignInResult =
   | { ok: true; sessionToken: string; expiresAt: number }
-  | { ok: false; error: string };
+  | { ok: false; code: AdminSignInFailureCode; error: string };
 
 const adminSignInRef = makeFunctionReference<
   "mutation",
@@ -65,11 +68,11 @@ async function readJsonBody<T>(request: Request): Promise<T> {
   return (await request.json()) as T;
 }
 
-function signInErrorStatus(error: string) {
-  if (error.includes("inactive")) {
+function signInErrorStatus(code: AdminSignInFailureCode) {
+  if (code === "ACCOUNT_INACTIVE") {
     return 403;
   }
-  if (error.includes("Too many")) {
+  if (code === "SIGN_IN_RATE_LIMITED") {
     return 429;
   }
   return 401;
@@ -95,7 +98,7 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
     if (isE2eMockAuthEnabled()) {
       const result = e2eMockSignIn(email, password);
       if (!result.ok) {
-        return jsonResponse({ error: result.error }, { status: 401 });
+        return jsonResponse({ code: result.code, error: result.error }, { status: 401 });
       }
       const headers = new Headers();
       headers.append(
@@ -109,7 +112,10 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
     const clientIp = getAdminSignInClientIp(request);
     const result = await client.mutation(adminSignInRef, { email, password, clientIp });
     if (!result.ok) {
-      return jsonResponse({ error: result.error }, { status: signInErrorStatus(result.error) });
+      return jsonResponse(
+        { code: result.code, error: result.error },
+        { status: signInErrorStatus(result.code) },
+      );
     }
     const headers = new Headers();
     headers.append(
@@ -118,8 +124,9 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
     );
     return jsonResponse({ ok: true, expiresAt: result.expiresAt }, { headers });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Sign-in failed.";
-    return jsonResponse({ error: message }, { status: 500 });
+    // Keep config and Convex details in server logs only.
+    console.error("Organizer sign-in failed", error);
+    return jsonResponse({ error: SIGN_IN_FAILED_MESSAGE }, { status: 500 });
   }
 }
 

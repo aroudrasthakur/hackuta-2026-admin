@@ -161,7 +161,7 @@ describe("confirmed acceptance participant creation (#17)", () => {
       await expect(t.mutation(setDecision, {
         sessionToken, applicationId, decision: "accepted",
       })).rejects.toThrow(failure === "missing user"
-        ? /applicant user account not found/i
+        ? /APPLICANT_ACCOUNT_MISSING/
         : /authUserId does not match application/i);
 
       expect(await snapshot(t)).toEqual(before);

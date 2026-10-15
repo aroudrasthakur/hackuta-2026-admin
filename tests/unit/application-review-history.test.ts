@@ -67,7 +67,7 @@ describe("admin-only application review history", () => {
     await seedHistory(fixture);
     await expect(fixture.t.query(listApplicationReviewLogsRef, {
       sessionToken: tokens.reviewer, applicationId: fixture.applicationId, paginationOpts: firstPage,
-    })).rejects.toThrow(/not authorized/i);
+    })).rejects.toThrow(/ADMIN_ONLY/);
   });
 
   it("returns every event newest first with organizer names, scoped to the application", async () => {
@@ -122,6 +122,6 @@ describe("admin-only application review history", () => {
     await t.run((ctx) => ctx.db.delete(applicationId));
     await expect(t.query(listApplicationReviewLogsRef, {
       sessionToken: tokens.admin, applicationId, paginationOpts: firstPage,
-    })).rejects.toThrow(/application not found/i);
+    })).rejects.toThrow(/APPLICATION_NOT_FOUND/);
   });
 });

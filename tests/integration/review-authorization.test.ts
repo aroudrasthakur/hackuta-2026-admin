@@ -86,7 +86,7 @@ describe("review access for callers without an active organizer session", () => 
       const before = await snapshotReviewState(t);
 
       await expect(protectedCalls(t, sessionToken, applicationId)[callName]()).rejects.toThrow(
-        /not authenticated/i,
+        /NOT_AUTHENTICATED/,
       );
       expect(await snapshotReviewState(t)).toEqual(before);
     });
@@ -127,7 +127,7 @@ describe("reviewer permissions", () => {
     const { sessionToken } = await seedStaff(t, { role: "reviewer" });
     const { applicationId } = await seedApplicant(t);
     await expect(protectedCalls(t, sessionToken, applicationId).viewHistory()).rejects.toThrow(
-      /not authorized/i,
+      /ADMIN_ONLY/,
     );
   });
 });
@@ -172,7 +172,7 @@ describe("account changes apply to live sessions", () => {
 
     await calls.logViewed();
     await t.run((ctx) => ctx.db.patch(adminId, { active: false }));
-    await expect(calls.startReview()).rejects.toThrow(/not authenticated/i);
+    await expect(calls.startReview()).rejects.toThrow(/NOT_AUTHENTICATED/);
   });
 
   it("removes history access when an admin is demoted to reviewer", async () => {
@@ -183,7 +183,7 @@ describe("account changes apply to live sessions", () => {
 
     await calls.viewHistory();
     await t.run((ctx) => ctx.db.patch(adminId, { role: "reviewer" }));
-    await expect(calls.viewHistory()).rejects.toThrow(/not authorized/i);
+    await expect(calls.viewHistory()).rejects.toThrow(/ADMIN_ONLY/);
   });
 
   it("ignores applicant sign-in when no staff session is sent", async () => {
@@ -192,6 +192,6 @@ describe("account changes apply to live sessions", () => {
     const asApplicant = t.withIdentity({ subject: "applicant", email: "staff-1@hackuta.org" });
     await expect(
       asApplicant.query(getApplicationRef, { sessionToken: "", applicationId }),
-    ).rejects.toThrow(/not authenticated/i);
+    ).rejects.toThrow(/NOT_AUTHENTICATED/);
   });
 });
