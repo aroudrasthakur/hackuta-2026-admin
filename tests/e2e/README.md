@@ -39,3 +39,16 @@ Remove-Item Env:DEBUG
 
 A successful run prints `Terminated the WebServer`, the final test summary, and
 exits with code zero. Do not treat individual passing test lines as a completed run.
+
+## Real-backend verification
+
+`npm run test:smoke` is separate from the mock browser suite. It targets the shared
+`standing-manatee-425` backend by default and requires a dedicated organizer
+account. Setup and the exact checks are in
+[the operations guide](../../docs/OPERATIONS.md#repeatable-live-backend-smoke-test).
+
+Issue #44 follow-up verification (2026-10-15): all 25 mock browser tests passed
+with exit code zero outside the Windows sandbox (42.1 seconds). The live smoke
+check passed against `standing-manatee-425` using a dedicated reviewer, including
+failed sign-out recovery and backend session revocation. This exercised the local
+frontend with the deployed backend; it did not verify Vercel hosting or HTTPS cookies.

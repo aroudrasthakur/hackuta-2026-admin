@@ -35,6 +35,32 @@ push command continues to target `standing-manatee-425`.
 3. **Vercel:** push to `main` or promote deployment; set `VITE_CONVEX_URL`
 4. **Smoke test:** sign in, open `/admin/applications`, open one application review
 
+### Repeatable live-backend smoke test
+
+`npm run test:smoke` serves the current frontend at `http://127.0.0.1:5377` and
+connects to `standing-manatee-425` with mock mode and development auth bypass
+disabled. It does not deploy code. Provide a dedicated reviewer account in the
+ignored `.env.smoke.local` file:
+
+```dotenv
+ADMIN_SMOKE_EMAIL=<test-organizer-email>
+ADMIN_SMOKE_PASSWORD=<test-organizer-password>
+ADMIN_SMOKE_CONVEX_URL=https://standing-manatee-425.convex.cloud
+```
+
+The check exercises unauthenticated redirects, real sign-in, an HttpOnly cookie,
+noncached session retrieval, queue loading and refresh, opening an application,
+preserved filters, failed sign-out recovery, and successful sign-out. It verifies
+the old session is invalid in Convex and cannot reopen the queue. At least one
+submitted application must exist. Opening it appends the normal `viewed` audit
+event; the check does not claim reviews, make decisions, or send emails.
+
+The command closes its own browser and Vite server, reports only check results,
+and exits nonzero on failure. It does not save screenshots, traces, passwords,
+tokens, or applicant data. Use a dedicated account because normal sign-in clears
+that organizer's earlier sessions. A Vercel deployment still needs its own smoke
+check for HTTPS cookies and hosted API routing.
+
 ### Auth hardening deploy checklist
 
 Use this when shipping organizer sign-in, session, or review authorization changes:
