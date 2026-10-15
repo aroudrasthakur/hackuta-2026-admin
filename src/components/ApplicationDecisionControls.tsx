@@ -21,19 +21,19 @@ const decisionCopy: Record<
   accepted: {
     label: "Accept",
     title: "Confirm acceptance",
-    body: "This will save the acceptance decision and schedule the acceptance email. This cannot be undone from this screen.",
+    body: "This will save the acceptance decision and schedule the acceptance email if an email address is available. This cannot be undone from this screen.",
     success: "Application accepted. Acceptance email scheduled.",
   },
   rejected: {
     label: "Reject",
     title: "Confirm rejection",
-    body: "This will save the rejection decision and schedule the rejection email. This cannot be undone from this screen.",
+    body: "This will save the rejection decision and schedule the rejection email if an email address is available. This cannot be undone from this screen.",
     success: "Application rejected. Rejection email scheduled.",
   },
   waitlisted: {
     label: "Waitlist",
     title: "Confirm waitlist",
-    body: "This will place the applicant on the waitlist and schedule their notification email. You can accept them later when a spot opens.",
+    body: "This will place the applicant on the waitlist and schedule their notification email if an email address is available. You can accept them later when a spot opens.",
     success: "Application waitlisted. Waitlist email scheduled.",
   },
 };
@@ -91,7 +91,9 @@ export function ApplicationDecisionControls({
         applicationId,
         decision: pendingDecision,
       });
-      setSuccess(decisionCopy[pendingDecision].success);
+      setSuccess(detail.application.email?.trim()
+        ? decisionCopy[pendingDecision].success
+        : `Application ${pendingDecision}. No email scheduled: applicant email is missing.`);
       setPendingDecision(null);
     } catch (caught) {
       setError(formatMutationError(caught, "Unable to finalize decision."));

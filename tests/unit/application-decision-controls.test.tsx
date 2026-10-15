@@ -118,6 +118,15 @@ describe("ApplicationDecisionControls", () => {
     expect(container.textContent).toContain("email scheduled.");
   });
 
+  it.each([undefined, "   "])("does not claim an email was scheduled for a missing address (%s)", async (email) => {
+    await renderControls({ detail: detail({ application: { ...detail().application, email } }) });
+    await act(async () => button("Reject")!.click());
+    await act(async () => button("Confirm rejection")!.click());
+    expect(container.querySelector('[role="status"]')?.textContent).toBe(
+      "Application rejected. No email scheduled: applicant email is missing.",
+    );
+  });
+
   it("sends only one request while finalization is pending", async () => {
     let resolveDecision!: (result: { logId: string; duplicate: boolean }) => void;
     mocks.finalize.mockReturnValue(
