@@ -19,7 +19,8 @@ if (!root) {
 const app = (
   <React.StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
+      {/* Queue inputs use URL state and need each change committed before the next input event. */}
+      <BrowserRouter useTransitions={false}>
         <App />
       </BrowserRouter>
     </ErrorBoundary>

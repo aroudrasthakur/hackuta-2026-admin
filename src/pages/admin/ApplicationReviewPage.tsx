@@ -93,10 +93,12 @@ export function ApplicationReviewPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const location = useLocation();
   const { sessionToken, staff } = useAdminAuth();
+  const applicationsSearch = typeof location.state?.applicationsSearch === "string"
+    ? location.state.applicationsSearch : "";
 
   return (
     <div className="space-y-5">
-      <Link className="inline-block text-sm underline" to={ADMIN_ROUTES.applications}>Back to Applications</Link>
+      <Link className="inline-flex min-h-11 items-center rounded-md text-sm font-medium text-ocean underline underline-offset-4" to={`${ADMIN_ROUTES.applications}${applicationsSearch ? `?${applicationsSearch}` : ""}`}>Back to Applications</Link>
       {sessionToken && applicationId && staff ? (
         <ErrorBoundary
           key={`${location.key}:${applicationId}:${staff.adminId}`}
