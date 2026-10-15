@@ -6,7 +6,7 @@ import {
   applicationReviewStatus,
   applicationSubmissionLogRecord,
 } from "./applicationFields";
-import { applicationReviewLogAction, decisionNotification } from "./admin/fields";
+import { applicationReviewLogAction } from "./admin/fields";
 import { emailDeliveryKind } from "./lib/emailDeliveries";
 
 /**
@@ -59,8 +59,6 @@ export default defineSchema({
     lastActiveAt: v.optional(v.number()),
     /** When the current final decision was made. */
     completedAt: v.optional(v.number()),
-    /** Latest decision email attempt; separate from the review decision itself. */
-    notification: v.optional(decisionNotification),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

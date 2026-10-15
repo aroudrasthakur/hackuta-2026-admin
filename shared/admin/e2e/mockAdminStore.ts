@@ -1,5 +1,4 @@
 import { E2E_ADMIN, E2E_APPLICATION_IDS, E2E_REVIEWER } from "./credentials.ts";
-import { notificationCanRetry } from "../decisionNotification.ts";
 
 const ACTIVE_REVIEW_STALE_MS = 30 * 60 * 1000;
 
@@ -33,11 +32,6 @@ type ReviewRecord = {
   lastActiveAt?: number;
   createdAt: number;
   updatedAt: number;
-  notification?: {
-    logId: string; attempt: number; requestedBy: string; recipient: string;
-    status: "scheduled" | "sending" | "queued" | "sent" | "failed" | "unknown" | "unavailable";
-    serviceId?: string; updatedAt: number;
-  };
 };
 
 type LogRecord = {
@@ -354,7 +348,6 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
       const now = Date.now();
       return {
         application,
-        ...(review?.notification ? { notification: review.notification } : {}),
         reviewStatus: review?.status ?? null,
         reviewActivity: reviewActivity(review, now),
         resume: { status: "none" as const, url: null, filename: null },
@@ -391,29 +384,6 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
   const now = Date.now();
 
   switch (path) {
-    case "admin/notificationActions:checkDecisionNotification": {
-      requireReviewer(sessionToken);
-      const review = reviews.get(String(args.applicationId));
-      if (!review?.notification?.serviceId) throw new Error("No email service ID is available to check.");
-      review.notification.status = "sent";
-      bump();
-      return;
-    }
-    case "admin/decisionNotifications:retryDecisionNotification": {
-      const admin = requireReviewer(sessionToken);
-      const applicationId = String(args.applicationId);
-      const review = reviews.get(applicationId);
-      if (!review || !isFinalStatus(review.status)) throw new Error("A decision is required before sending a notification.");
-      if (!notificationCanRetry(review.notification, now)) throw new Error("This notification is already in progress or has been sent.");
-      const log = [...logs].reverse().find((entry) => entry.applicationId === applicationId && entry.action === review.status);
-      if (!log) throw new Error("No recorded decision is available to notify.");
-      review.notification = {
-        logId: log._id, attempt: (review.notification?.attempt ?? 0) + 1, requestedBy: admin.adminId,
-        recipient: applications.get(applicationId)!.email, status: "queued", serviceId: "mock-email", updatedAt: now,
-      };
-      bump();
-      return;
-    }
     case "admin/applicationReviewLogs:logApplicationReviewAction": {
       const admin = requireReviewer(sessionToken);
       const applicationId = String(args.applicationId ?? "");
@@ -494,10 +464,6 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
         action: decision,
         createdAt: now,
       });
-      review.notification = {
-        logId, attempt: 1, requestedBy: admin.adminId, recipient: applications.get(applicationId)!.email,
-        status: "queued", serviceId: `mock-email-${logId}`, updatedAt: now,
-      };
       bump();
       return { logId, duplicate: false };
     }

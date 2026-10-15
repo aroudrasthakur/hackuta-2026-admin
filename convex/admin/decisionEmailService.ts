@@ -12,8 +12,8 @@ type Decision = keyof typeof decisionEmailServiceNote;
 
 /**
  * Queues decision email through the shared HackUTA email service client (same HTTP path as
- * register's `sendTrackedEmail`). The caller tracks decision delivery separately in
- * applicationReviews.notification, preserving the register-owned email tables.
+ * register's `sendTrackedEmail`). Does not write `emailDeliveries` rows until register adds
+ * matching delivery kinds.
  */
 export async function sendDecisionEmailMessage(
   _ctx: Pick<GenericActionCtx<GenericDataModel>, "runMutation">,

@@ -52,8 +52,6 @@ export function useMutation(ref: unknown) {
   );
 }
 
-export const useAction = useMutation;
-
 type PaginatedStatus = "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted";
 
 export function usePaginatedQuery(
