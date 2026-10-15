@@ -1,13 +1,18 @@
 import { usePaginatedQuery } from "../convex/reactBindings";
 import type { GenericId } from "convex/values";
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../convex/adminApi";
-import { formatApplicationDate } from "../lib/applicationDisplay";
 import { reviewActionLabels } from "../lib/reviewActionLabels";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { EmptyState } from "./states/EmptyState";
 import { LoadingState } from "./states/LoadingState";
 
 const PAGE_SIZE = 50;
+const reviewHistoryDateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 type ReviewHistoryProps = {
   applicationId: GenericId<"applications">;
@@ -48,7 +53,7 @@ function isDecision(action: Action) {
 function EventTime({ value }: { value: number }) {
   return (
     <time dateTime={new Date(value).toISOString()} className="text-mist">
-      {formatApplicationDate(value)}
+      {reviewHistoryDateFormatter.format(value)}
     </time>
   );
 }

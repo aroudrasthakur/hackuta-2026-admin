@@ -89,7 +89,10 @@ describe("application review history panel", () => {
       "Avery Admin Rejected applicant",
       "Avery Admin Waitlisted applicant",
     ]);
-    expect(rows[0].querySelector("time")?.textContent).toBe(new Date(1_700_000_000_000).toLocaleString());
+    expect(rows[0].querySelector("time")?.textContent).toBe(
+      new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+        .format(1_700_000_000_000),
+    );
     expect(container.querySelectorAll("button, input, textarea, select")).toHaveLength(0);
   });
 
@@ -110,7 +113,10 @@ describe("application review history panel", () => {
     const group = container.querySelector("details");
     expect(group?.open).toBe(false);
     expect(group?.querySelector("summary")?.textContent).toContain("Viewed application ×3");
-    expect(group?.querySelector("summary time")?.textContent).toBe(new Date(1_700_000_500_000).toLocaleString());
+    expect(group?.querySelector("summary time")?.textContent).toBe(
+      new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+        .format(1_700_000_500_000),
+    );
     expect(Array.from(group!.querySelectorAll("li")).map((row) => row.querySelector("p")?.textContent)).toEqual([
       "Avery Admin Viewed application",
       "Sam Second Viewed application",
