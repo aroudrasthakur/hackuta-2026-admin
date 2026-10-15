@@ -1,9 +1,7 @@
-import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import type { DocumentByName } from "convex/server";
-import { formatApplicantFullName } from "../lib/applications";
 import type { ApplicationDoc, DataModel, MutationCtx } from "../lib/dataModel";
-import { getHackathonName } from "../lib/eventConfig";
+import { scheduleDecisionNotification } from "./decisionNotifications";
 import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
 import { isActiveReviewClaimHeldByOther, isFinalReviewStatus, REVIEW_ALREADY_CLAIMED } from "./reviewClaim";
 import { decisionPatch } from "./reviewState";
@@ -11,36 +9,6 @@ import { decisionPatch } from "./reviewState";
 type ApplicationReviewDoc = DocumentByName<DataModel, "applicationReviews">;
 type AdminDoc = DocumentByName<DataModel, "admins">;
 type ReviewDecision = "accepted" | "rejected" | "waitlisted";
-
-const sendDecisionEmailRef = makeFunctionReference<
-  "action",
-  {
-    decision: ReviewDecision;
-    email: string;
-    applicantName: string;
-    hackathonName: string;
-  }
->("admin/sendDecisionEmails:sendDecisionEmail");
-
-async function scheduleDecisionEmail(
-  ctx: MutationCtx,
-  application: ApplicationDoc,
-  decision: ReviewDecision,
-) {
-  const hackathonName = await getHackathonName(ctx);
-  const applicantName =
-    formatApplicantFullName(application) ?? application.email ?? "Applicant";
-  const email = application.email?.trim();
-  if (!email) {
-    return;
-  }
-  await ctx.scheduler.runAfter(0, sendDecisionEmailRef, {
-    decision,
-    email,
-    applicantName,
-    hackathonName,
-  });
-}
 
 async function findLatestDecisionLog(
   ctx: MutationCtx,
@@ -108,6 +76,8 @@ export async function finalizeApplicationDecision(
     });
   }
 
-  await scheduleDecisionEmail(ctx, args.application, args.decision);
+  await scheduleDecisionNotification(ctx, {
+    application: args.application, decision: args.decision, logId, requestedBy: args.admin._id,
+  });
   return { logId, duplicate: false as const };
 }
