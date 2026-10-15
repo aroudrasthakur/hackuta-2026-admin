@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { logApplicationReviewActionRef, setApplicationDecisionRef } from "../../src/convex/adminApi";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+// Load the action before fake-timer pumps can race its asynchronous module transform.
+import "../../convex/admin/sendDecisionEmails";
 import {
   countRows,
   EMAIL_SERVICE_URL,
