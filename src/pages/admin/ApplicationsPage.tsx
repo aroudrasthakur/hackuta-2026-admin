@@ -1,19 +1,13 @@
 import { useQuery } from "../../convex/reactBindings";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { ApplicationsList } from "../../components/ApplicationsList";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
 import {
   listSubmittedApplicationsRef,
-  type SubmittedApplicationSummary,
 } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
-import {
-  dashboardReviewStatusLabel,
-  formatApplicationDate,
-} from "../../lib/applicationDisplay";
-import { ADMIN_ROUTES } from "../../types/routes";
 
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const applications = useQuery(listSubmittedApplicationsRef, { sessionToken });
@@ -130,46 +124,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
           description="Try another search or change the status filter."
         />
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {visibleApplications.map((application: SubmittedApplicationSummary) => (
-            <li key={application.applicationId}>
-              <article className="flex h-full flex-col rounded-lg border border-sand bg-white/60 p-5 shadow-sm">
-                <header className="space-y-1">
-                  <h3 className="font-display text-lg text-night">
-                    {application.applicantName}
-                  </h3>
-                  <p className="text-sm text-ocean">{application.school}</p>
-                </header>
-
-                <dl className="mt-4 space-y-2 text-sm">
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-mist">Submitted</dt>
-                    <dd>{formatApplicationDate(application.submittedAt)}</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-mist">Status</dt>
-                    <dd>
-                      {dashboardReviewStatusLabel(application.reviewStatus)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-mist">Current reviewer</dt>
-                    <dd>{application.currentReviewerName ?? "—"}</dd>
-                  </div>
-                </dl>
-
-                <div className="mt-auto pt-5">
-                  <Link
-                    className="inline-flex w-full items-center justify-center rounded-md border border-ocean bg-ocean px-4 py-2 text-sm font-medium text-light transition hover:bg-ink"
-                    to={ADMIN_ROUTES.applicationReview(application.applicationId)}
-                  >
-                    Review Application
-                  </Link>
-                </div>
-              </article>
-            </li>
-          ))}
-        </ul>
+        <ApplicationsList applications={visibleApplications} applicationsSearch="" />
       )}
     </div>
   );

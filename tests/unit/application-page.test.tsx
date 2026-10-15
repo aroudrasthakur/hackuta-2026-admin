@@ -126,7 +126,7 @@ describe.each(["reviewer", "admin"] as const)(
     }
 
     function names() {
-      return Array.from(container.querySelectorAll("article h3")).map(
+      return Array.from(container.querySelectorAll('tbody th[scope="row"] > span:first-child')).map(
         (element) => element.textContent,
       );
     }

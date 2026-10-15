@@ -9,19 +9,19 @@ test.describe("applications queue", () => {
   });
 
   test("lists seeded applications with filters and search", async ({ page }) => {
-    await expect(page.getByText("Taylor Unreviewed")).toBeVisible();
-    await expect(page.getByText("Jordan Review")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Review application for Jordan Review" })).toBeVisible();
     await expect(page.getByRole("status")).toContainText("4 of 4 applications");
 
     await page.getByLabel("Search applications").fill("taylor");
     await expect(page.getByRole("status")).toContainText("1 of 4 applications");
-    await expect(page.getByText("Taylor Unreviewed")).toBeVisible();
-    await expect(page.getByText("Jordan Review")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Review application for Jordan Review" })).toHaveCount(0);
 
     await page.getByLabel("Search applications").fill("");
     await page.getByLabel("Review status").selectOption("accepted");
-    await expect(page.getByText("Alex Accepted")).toBeVisible();
-    await expect(page.getByText("Taylor Unreviewed")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Review application for Alex Accepted" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toHaveCount(0);
 
     await page.getByLabel("Review status").selectOption("all");
     await page.getByLabel("Submission time").selectOption("oldest");
@@ -33,11 +33,7 @@ test.describe("applications queue", () => {
   });
 
   test("navigates to application review detail", async ({ page }) => {
-    await page
-      .getByRole("article")
-      .filter({ hasText: "Taylor Unreviewed" })
-      .getByRole("link", { name: "Review Application" })
-      .click();
+    await page.getByRole("link", { name: "Review application for Taylor Unreviewed" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/admin/applications/${E2E_APPLICATION_IDS.unreviewed}$`),
     );
