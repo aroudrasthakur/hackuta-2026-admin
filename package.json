@@ -16,6 +16,7 @@
     "pretest:coverage": "node scripts/ensure-convex-server-stub.mjs",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:smoke": "node scripts/smoke-admin.mjs",
     "check:whitespace": "node scripts/check-whitespace.mjs",
     "verify:register-schema-lock": "node scripts/verify-register-schema-lock.mjs",
     "register-schema-lock:refresh": "node scripts/refresh-register-schema-lock.mjs",
