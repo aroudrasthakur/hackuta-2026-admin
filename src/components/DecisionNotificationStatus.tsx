@@ -4,6 +4,8 @@ import { checkDecisionNotificationRef, retryDecisionNotificationRef, type Applic
 import { formatMutationError } from "../lib/formatMutationError";
 import { reviewSecondaryButtonClass } from "../lib/reviewButtonClasses";
 import { ReviewPanelSection } from "./ReviewPanelSection";
+import { notificationAttemptExpired, notificationCanRetry } from "../../shared/admin/decisionNotification";
+import { useNow } from "../hooks/useNow";
 
 const statusCopy = {
   scheduled: "Decision saved. Email is scheduled.",
@@ -25,6 +27,8 @@ export function DecisionNotificationStatus({ detail, sessionToken }: { detail: A
   const resendRef = useRef<HTMLButtonElement>(null);
   const statusRef = useRef<HTMLParagraphElement>(null);
   const notification = detail.notification;
+  const now = useNow();
+  const expired = notificationAttemptExpired(notification, now);
   useEffect(() => { if (confirming) confirmRef.current?.focus(); }, [confirming]);
 
   async function run(action: () => Promise<unknown>) {
@@ -35,11 +39,12 @@ export function DecisionNotificationStatus({ detail, sessionToken }: { detail: A
     finally { setPending(false); }
   }
 
-  const canRetry = !notification || ["failed", "unknown", "unavailable"].includes(notification.status);
+  const canRetry = notificationCanRetry(notification, now);
   return (
     <ReviewPanelSection aria-label="Applicant notification" title="Applicant notification">
       <p ref={statusRef} tabIndex={-1} role="status" className="text-sm text-ocean">
-        {notification ? statusCopy[notification.status] : "This earlier decision has no tracked email status. Sending cannot be verified here."}
+        {expired ? "This email attempt has not completed. Its outcome is unknown; you can confirm a resend."
+          : notification ? statusCopy[notification.status] : "This earlier decision has no tracked email status. Sending cannot be verified here."}
       </p>
       <p className="break-words text-sm">Recipient: {notification?.recipient || detail.application.email || "Not provided"}</p>
       {error && <p role="alert" className="text-sm text-red-800">{error}</p>}

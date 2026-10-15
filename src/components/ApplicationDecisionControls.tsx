@@ -20,17 +20,17 @@ const confirmCopy: Record<
 > = {
   accepted: {
     title: "Confirm acceptance",
-    body: "This will finalize the acceptance decision and send the acceptance email to the applicant. This cannot be undone from this screen.",
+    body: "This will save the acceptance decision and schedule the acceptance email. This cannot be undone from this screen.",
     confirmLabel: "Confirm acceptance",
   },
   rejected: {
     title: "Confirm rejection",
-    body: "This will finalize the rejection decision and send the rejection email to the applicant. This cannot be undone from this screen.",
+    body: "This will save the rejection decision and schedule the rejection email. This cannot be undone from this screen.",
     confirmLabel: "Confirm rejection",
   },
   waitlisted: {
     title: "Confirm waitlist",
-    body: "This will finalize the waitlist decision and send the waitlist email to the applicant. This cannot be undone from this screen.",
+    body: "This will place the applicant on the waitlist and schedule their notification email. You can accept them later when a spot opens.",
     confirmLabel: "Confirm waitlist",
   },
 };

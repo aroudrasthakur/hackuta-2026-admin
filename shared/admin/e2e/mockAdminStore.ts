@@ -1,4 +1,5 @@
 import { E2E_ADMIN, E2E_APPLICATION_IDS, E2E_REVIEWER } from "./credentials.ts";
+import { notificationCanRetry } from "../decisionNotification";
 
 const ACTIVE_REVIEW_STALE_MS = 30 * 60 * 1000;
 
@@ -403,7 +404,7 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       const applicationId = String(args.applicationId);
       const review = reviews.get(applicationId);
       if (!review || !isFinalStatus(review.status)) throw new Error("A decision is required before sending a notification.");
-      if (review.notification && !["failed", "unknown", "unavailable"].includes(review.notification.status)) throw new Error("This notification is already in progress or has been sent.");
+      if (!notificationCanRetry(review.notification, now)) throw new Error("This notification is already in progress or has been sent.");
       const log = [...logs].reverse().find((entry) => entry.applicationId === applicationId && entry.action === review.status);
       if (!log) throw new Error("No recorded decision is available to notify.");
       review.notification = {

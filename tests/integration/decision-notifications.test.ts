@@ -3,6 +3,7 @@ import { makeFunctionReference } from "convex/server";
 import { checkDecisionNotificationRef, retryDecisionNotificationRef, setApplicationDecisionRef } from "../../src/convex/adminApi";
 import { createConvexTest } from "../helpers/convexTestContext";
 import { getReview, seedApplicant, seedStaff, stubEmailService } from "../helpers/reviewTestKit";
+import { NOTIFICATION_ATTEMPT_STALE_MS } from "../../shared/admin/decisionNotification";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
@@ -128,5 +129,32 @@ describe("decision notification recovery", () => {
     await f.t.run((ctx) => ctx.db.patch(f.reviewId, { status: "accepted" }));
     await expect(f.t.mutation(retryDecisionNotificationRef, f.args)).rejects.toThrow(/No recorded decision/);
     await expect(f.t.action(checkDecisionNotificationRef, f.args)).rejects.toThrow(/No email service ID/);
+  });
+
+  it.each(["scheduled", "sending"] as const)("recovers an interrupted %s attempt without sending its old job again", async (status) => {
+    const f = await setup();
+    await f.decide("accepted");
+    const previous = await f.notification();
+    await f.t.run((ctx) => ctx.db.patch(f.reviewId, { notification: { ...previous, status } }));
+    await expect(f.t.mutation(retryDecisionNotificationRef, f.args)).rejects.toThrow(/already in progress/);
+    vi.setSystemTime(Date.now() + NOTIFICATION_ATTEMPT_STALE_MS + 1);
+    await f.t.mutation(retryDecisionNotificationRef, f.args);
+    await f.flush();
+    expect(await f.notification()).toMatchObject({ status: "queued", attempt: 2 });
+    expect(f.email.fetchMock).toHaveBeenCalledTimes(1);
+    await f.t.mutation(makeFunctionReference<"mutation">("admin/decisionNotifications:recordNotification"), {
+      applicationId: f.applicationId, logId: previous.logId, attempt: previous.attempt, status: "unknown",
+    });
+    expect(await f.notification()).toMatchObject({ status: "queued", attempt: 2 });
+  });
+
+  it("does not let a late pending lookup undo a sent status", async () => {
+    const f = await setup();
+    await f.decide("accepted"); await f.flush();
+    f.email.fetchMock.mockResolvedValueOnce(Response.json({ status: "sent" }));
+    await f.t.action(checkDecisionNotificationRef, f.args);
+    f.email.fetchMock.mockResolvedValueOnce(Response.json({ status: "pending" }));
+    await f.t.action(checkDecisionNotificationRef, f.args);
+    expect(await f.notification()).toMatchObject({ status: "sent", serviceStatus: "sent" });
   });
 });

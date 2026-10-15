@@ -7,6 +7,7 @@ import { getHackathonName } from "../lib/eventConfig";
 import { decisionNotificationStatus } from "./fields";
 import { requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
 import type { GenericId } from "convex/values";
+import { notificationCanRetry } from "../../shared/admin/decisionNotification";
 
 type Decision = "accepted" | "rejected" | "waitlisted";
 
@@ -42,7 +43,7 @@ export const retryDecisionNotification = mutation({
       throw new Error("A decision is required before sending a notification.");
     }
     const previous = review.notification;
-    if (previous && !["failed", "unknown", "unavailable"].includes(previous.status)) {
+    if (!notificationCanRetry(previous, Date.now())) {
       throw new Error("This notification is already in progress or has been sent.");
     }
     // Legacy decisions have no delivery record; require a real decision log to resend.
@@ -78,6 +79,8 @@ export const recordNotification = internalMutation({
     const review = await getApplicationReview(ctx, args.applicationId);
     const current = review?.notification;
     if (!review || !current || current.logId !== args.logId || current.attempt !== args.attempt) return;
+    // An older pending lookup must not overwrite a newer sent result.
+    if (current.status === "sent" && args.status === "queued") return;
     await ctx.db.patch(review._id, { notification: {
       ...current, status: args.status,
       ...(args.serviceId ? { serviceId: args.serviceId } : {}),

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GenericId } from "convex/values";
 import { DecisionNotificationStatus } from "../../src/components/DecisionNotificationStatus";
 import type { ApplicationDetail } from "../../src/convex/adminApi";
+import { NOTIFICATION_ATTEMPT_STALE_MS } from "../../shared/admin/decisionNotification";
 
 const mocks = vi.hoisted(() => ({ retry: vi.fn(), check: vi.fn() }));
 vi.mock("../../src/convex/reactBindings", () => ({ useMutation: () => mocks.retry, useAction: () => mocks.check }));
@@ -25,7 +26,7 @@ describe("decision notification status", () => {
     mocks.check.mockReset().mockResolvedValue(null);
     container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   });
-  afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+  afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
   function button(text: string) { return Array.from(container.querySelectorAll("button")).find((el) => el.textContent === text)!; }
   async function render(status?: NonNullable<ApplicationDetail["notification"]>["status"], serviceId?: string) {
     const value = { ...detail };
@@ -60,5 +61,15 @@ describe("decision notification status", () => {
   it.each(["scheduled", "sending", "sent", "unavailable"] as const)("explains %s without implying delivery", async (status) => {
     await render(status);
     expect(container.querySelector('[role="status"]')?.textContent).toBeTruthy();
+  });
+
+  it("offers manual recovery when a sending attempt stops completing", async () => {
+    vi.useFakeTimers();
+    await render("sending");
+    expect(button("Resend decision email")).toBeUndefined();
+    await act(async () => { vi.advanceTimersByTime(NOTIFICATION_ATTEMPT_STALE_MS + 15_000); });
+    expect(container.textContent).toContain("Its outcome is unknown");
+    expect(button("Resend decision email")).toBeDefined();
+    expect(mocks.retry).not.toHaveBeenCalled();
   });
 });
