@@ -14,24 +14,27 @@ type ApplicationDecisionControlsProps = {
   blockedByOther?: boolean;
 };
 
-const confirmCopy: Record<
+const decisionCopy: Record<
   PendingDecision,
-  { title: string; body: string; confirmLabel: string }
+  { label: string; title: string; body: string; success: string }
 > = {
   accepted: {
+    label: "Accept",
     title: "Confirm acceptance",
     body: "This will save the acceptance decision and schedule the acceptance email. This cannot be undone from this screen.",
-    confirmLabel: "Confirm acceptance",
+    success: "Application accepted. Acceptance email scheduled.",
   },
   rejected: {
+    label: "Reject",
     title: "Confirm rejection",
     body: "This will save the rejection decision and schedule the rejection email. This cannot be undone from this screen.",
-    confirmLabel: "Confirm rejection",
+    success: "Application rejected. Rejection email scheduled.",
   },
   waitlisted: {
+    label: "Waitlist",
     title: "Confirm waitlist",
     body: "This will place the applicant on the waitlist and schedule their notification email. You can accept them later when a spot opens.",
-    confirmLabel: "Confirm waitlist",
+    success: "Application waitlisted. Waitlist email scheduled.",
   },
 };
 
@@ -47,9 +50,7 @@ export function ApplicationDecisionControls({
   const [success, setSuccess] = useState<string | null>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const completionRef = useRef<HTMLParagraphElement>(null);
-  const acceptRef = useRef<HTMLButtonElement>(null);
-  const rejectRef = useRef<HTMLButtonElement>(null);
-  const waitlistRef = useRef<HTMLButtonElement>(null);
+  const choiceRefs = useRef<Partial<Record<PendingDecision, HTMLButtonElement | null>>>({});
   const lastChoice = useRef<PendingDecision>("accepted");
   const restoreChoice = useRef(false);
 
@@ -57,7 +58,7 @@ export function ApplicationDecisionControls({
     if (pendingDecision) confirmRef.current?.focus();
     else if (success) completionRef.current?.focus();
     else if (restoreChoice.current) {
-      ({ accepted: acceptRef, rejected: rejectRef, waitlisted: waitlistRef })[lastChoice.current].current?.focus();
+      choiceRefs.current[lastChoice.current]?.focus();
       restoreChoice.current = false;
     }
   }, [pendingDecision, success, detail.reviewStatus, detail.reviewActivity.isFinal]);
@@ -90,13 +91,7 @@ export function ApplicationDecisionControls({
         applicationId,
         decision: pendingDecision,
       });
-      setSuccess(
-        pendingDecision === "accepted"
-          ? "Application accepted. Acceptance email scheduled."
-          : pendingDecision === "rejected"
-            ? "Application rejected. Rejection email scheduled."
-            : "Application waitlisted. Waitlist email scheduled.",
-      );
+      setSuccess(decisionCopy[pendingDecision].success);
       setPendingDecision(null);
     } catch (caught) {
       setError(formatMutationError(caught, "Unable to finalize decision."));
@@ -127,7 +122,8 @@ export function ApplicationDecisionControls({
     );
   }
 
-  const pendingCopy = pendingDecision ? confirmCopy[pendingDecision] : null;
+  const choices: PendingDecision[] = promotingWaitlist ? ["accepted"] : ["accepted", "rejected", "waitlisted"];
+  const pendingCopy = pendingDecision ? decisionCopy[pendingDecision] : null;
 
   return (
     <ReviewPanelSection
@@ -146,30 +142,17 @@ export function ApplicationDecisionControls({
 
       {!pendingDecision && (
         <div className="flex flex-wrap gap-2">
-          <button
-            ref={acceptRef}
-            type="button"
-            className={reviewPrimaryButtonClass}
-            onClick={() => selectDecision("accepted")}
-          >
-            {promotingWaitlist ? "Accept from waitlist" : "Accept"}
-          </button>
-          {!promotingWaitlist && <button
-            ref={rejectRef}
-            type="button"
-            className={reviewSecondaryButtonClass}
-            onClick={() => selectDecision("rejected")}
-          >
-            Reject
-          </button>}
-          {!promotingWaitlist && <button
-            ref={waitlistRef}
-            type="button"
-            className={reviewSecondaryButtonClass}
-            onClick={() => selectDecision("waitlisted")}
-          >
-            Waitlist
-          </button>}
+          {choices.map((decision) => (
+            <button
+              key={decision}
+              ref={(element) => { choiceRefs.current[decision] = element; }}
+              type="button"
+              className={decision === "accepted" ? reviewPrimaryButtonClass : reviewSecondaryButtonClass}
+              onClick={() => selectDecision(decision)}
+            >
+              {promotingWaitlist ? "Accept from waitlist" : decisionCopy[decision].label}
+            </button>
+          ))}
         </div>
       )}
 
@@ -189,7 +172,7 @@ export function ApplicationDecisionControls({
               className={reviewPrimaryButtonClass}
               onClick={() => void confirmDecision()}
             >
-              {confirming ? "Finalizing…" : pendingCopy.confirmLabel}
+              {confirming ? "Finalizing…" : pendingCopy.title}
             </button>
             <button
               type="button"
