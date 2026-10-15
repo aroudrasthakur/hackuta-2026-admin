@@ -65,7 +65,8 @@ export async function finalizeApplicationDecision(
     decision: ReviewDecision;
   },
 ) {
-  if (isFinalReviewStatus(args.review.status)) {
+  const promotingWaitlist = args.review.status === "waitlisted" && args.decision === "accepted";
+  if (isFinalReviewStatus(args.review.status) && !promotingWaitlist) {
     if (args.review.status !== args.decision) {
       throw new Error("Application already has a final decision.");
     }

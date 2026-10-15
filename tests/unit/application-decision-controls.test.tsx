@@ -183,4 +183,14 @@ describe("ApplicationDecisionControls", () => {
     });
     expect(container.querySelector('section[aria-label="Application decision"]')).toBeNull();
   });
+
+  it("offers only confirmed acceptance for a waitlisted applicant", async () => {
+    await renderControls({ detail: detail({ reviewStatus: "waitlisted", reviewActivity: { ...detail().reviewActivity, isFinal: true } }) });
+    expect(button("Reject")).toBeUndefined();
+    expect(button("Waitlist")).toBeUndefined();
+    await act(async () => button("Accept from waitlist")!.click());
+    expect(mocks.finalize).not.toHaveBeenCalled();
+    await act(async () => button("Confirm acceptance")!.click());
+    expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ decision: "accepted" }));
+  });
 });

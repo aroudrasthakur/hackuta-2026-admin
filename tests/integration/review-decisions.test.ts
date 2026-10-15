@@ -138,7 +138,7 @@ describe.each(decisions)("$decision decision", ({ decision, note, subject }) => 
     await flushScheduled(t);
     const before = await snapshotReviewState(t);
 
-    const other = decisions.find((entry) => entry.decision !== decision)!.decision;
+    const other = decision === "waitlisted" ? "rejected" : "waitlisted";
     await expect(decide(other)).rejects.toThrow(/already has a final decision/i);
     expect(await snapshotReviewState(t)).toEqual(before);
     expect(email.fetchMock).toHaveBeenCalledTimes(1);
@@ -164,6 +164,23 @@ describe.each(decisions)("$decision decision", ({ decision, note, subject }) => 
 });
 
 describe("acceptance", () => {
+  it("promotes a waitlisted applicant once, preserving both decisions in history", async () => {
+    const { t, applicant, decide } = await setup();
+    await decide("waitlisted");
+    await flushScheduled(t);
+    expect(await countRows(t, "participants")).toBe(0);
+    const accepted = await decide("accepted");
+    await flushScheduled(t);
+    expect((await getReview(t, applicant.applicationId))?.status).toBe("accepted");
+    expect((await getLogs(t, applicant.applicationId)).map((log) => log.action)).toEqual(["waitlisted", "accepted"]);
+    expect(await countRows(t, "participants")).toBe(1);
+    expect(email.sentEmails().map((sent) => sent.body.note)).toEqual(["application_waitlisted", "application_accepted"]);
+    expect(await decide("accepted")).toEqual({ logId: accepted.logId, duplicate: true });
+    await flushScheduled(t);
+    expect(await countRows(t, "participants")).toBe(1);
+    expect(email.fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("creates exactly one participant linked to the applicant", async () => {
     const { t, staff, applicant, decide } = await setup();
     await decide("accepted");

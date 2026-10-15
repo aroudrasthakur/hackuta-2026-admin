@@ -436,7 +436,7 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       if (!applications.has(applicationId)) throw new Error("Application not found");
       const review = reviews.get(applicationId);
       if (!review) throw new Error("Application review not found");
-      if (isFinalStatus(review.status)) {
+      if (isFinalStatus(review.status) && !(review.status === "waitlisted" && decision === "accepted")) {
         throw new Error("This application already has a final decision.");
       }
       if (

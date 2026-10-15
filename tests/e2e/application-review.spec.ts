@@ -31,6 +31,11 @@ test.describe("application review workflow", () => {
     await page.getByRole("button", { name: "Waitlist" }).click();
     await page.getByRole("button", { name: "Confirm waitlist" }).click();
     await expect(page.getByText("Review status: Waitlisted")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Accept from waitlist", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reject", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Accept from waitlist", exact: true }).click();
+    await page.getByRole("button", { name: "Confirm acceptance", exact: true }).click();
+    await expect(page.getByText("Review status: Accepted")).toBeVisible();
     await expect(page.getByRole("region", { name: "Application decision" })).toHaveCount(0);
   });
 

@@ -55,7 +55,9 @@ export function ApplicationReviewControls({
   if (activity.isFinal) {
     return (
       <p className="rounded-lg border border-sand bg-white/60 p-4 text-sm text-mist">
-        This application has a final decision and cannot be returned to active review.
+        {detail.reviewStatus === "waitlisted"
+          ? "This applicant is on the waitlist and can be accepted when a spot opens."
+          : "This application has a final decision and cannot be returned to active review."}
       </p>
     );
   }

@@ -87,7 +87,8 @@ export function ApplicationDecisionControls({
     }
   }
 
-  if (isFinal) {
+  const promotingWaitlist = detail.reviewStatus === "waitlisted";
+  if (isFinal && !promotingWaitlist) {
     return null;
   }
 
@@ -111,7 +112,9 @@ export function ApplicationDecisionControls({
     <ReviewPanelSection
       aria-label="Application decision"
       title="Decision"
-      description="Choose accept, reject, or waitlist. Nothing is saved until you confirm on the next step."
+      description={promotingWaitlist
+        ? "A spot opened up? Accept this applicant from the waitlist. Nothing is saved until you confirm."
+        : "Choose accept, reject, or waitlist. Nothing is saved until you confirm on the next step."}
     >
       {error && (
         <p role="alert" className="text-sm text-ink">
@@ -131,22 +134,22 @@ export function ApplicationDecisionControls({
             className={reviewPrimaryButtonClass}
             onClick={() => selectDecision("accepted")}
           >
-            Accept
+            {promotingWaitlist ? "Accept from waitlist" : "Accept"}
           </button>
-          <button
+          {!promotingWaitlist && <button
             type="button"
             className={reviewSecondaryButtonClass}
             onClick={() => selectDecision("rejected")}
           >
             Reject
-          </button>
-          <button
+          </button>}
+          {!promotingWaitlist && <button
             type="button"
             className={reviewSecondaryButtonClass}
             onClick={() => selectDecision("waitlisted")}
           >
             Waitlist
-          </button>
+          </button>}
         </div>
       )}
 
