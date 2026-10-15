@@ -6,6 +6,7 @@ import { ApplicationDecisionControls } from "../../components/ApplicationDecisio
 import { ApplicationReviewControls } from "../../components/ApplicationReviewControls";
 import { ApplicationReviewHistory } from "../../components/ApplicationReviewHistory";
 import { DecisionNotificationStatus } from "../../components/DecisionNotificationStatus";
+import { NextApplicationLink } from "../../components/NextApplicationLink";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
@@ -19,11 +20,13 @@ export function ApplicationReviewContent({
   sessionToken,
   staffAdminId,
   isAdmin,
+  applicationsSearch = "",
 }: {
   applicationId: string;
   sessionToken: string;
   staffAdminId: string;
   isAdmin: boolean;
+  applicationsSearch?: string;
 }) {
   const loadedDetail = useQuery(getApplicationRef, { sessionToken, applicationId });
   const now = useNow();
@@ -96,6 +99,9 @@ export function ApplicationReviewContent({
         {detail.reviewStatus && ["accepted", "rejected", "waitlisted"].includes(detail.reviewStatus) && (
           <DecisionNotificationStatus detail={detail} sessionToken={sessionToken} />
         )}
+        <ErrorBoundary fallback={<p className="text-sm text-ocean">Next application is unavailable. Return to Applications to continue.</p>}>
+          <NextApplicationLink applicationId={applicationId} sessionToken={sessionToken} staffAdminId={staffAdminId} applicationsSearch={applicationsSearch} />
+        </ErrorBoundary>
       </ApplicationDetail>
       {isAdmin && (
         <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />
@@ -129,6 +135,7 @@ export function ApplicationReviewPage() {
             sessionToken={sessionToken}
             staffAdminId={staff.adminId}
             isAdmin={staff.role === "admin"}
+            applicationsSearch={applicationsSearch}
           />
         </ErrorBoundary>
       ) : <LoadingState message="Verifying organizer session…" />}

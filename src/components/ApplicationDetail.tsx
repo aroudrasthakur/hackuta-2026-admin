@@ -1,5 +1,5 @@
 import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { ApplicationDetail as ApplicationDetailData } from "../convex/adminApi";
 import { applicationLink, formatApplicationAnswer, formatApplicationDate } from "../lib/applicationDisplay";
 import { dashboardReviewStatusLabel } from "../lib/applicationDisplay";
@@ -61,6 +61,11 @@ const primaryTitles = ["Application responses", "Technical and hackathon backgro
 
 export function ApplicationDetail({ detail, children }: { detail: ApplicationDetailData; children?: ReactNode }) {
   const { application, reviewStatus, resume } = detail;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    headingRef.current?.focus({ preventScroll: true });
+  }, [application._id]);
   const displayedStatus = reviewStatus === "under_review"
     ? !detail.reviewActivity.reviewedBy ? "unreviewed" : detail.reviewActivity.isStale ? "stale" : "under_review"
     : reviewStatus;
@@ -99,7 +104,7 @@ export function ApplicationDetail({ detail, children }: { detail: ApplicationDet
   return (
     <article className="space-y-6">
       <header className="space-y-2">
-        <h2 className="text-2xl font-semibold text-night">{name || "Application review"}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-night">{name || "Application review"}</h2>
         <p className="break-words text-sm text-ocean">{application.email}</p>
         <p className="text-sm">Submitted: {formatApplicationDate(application.submittedAt)}</p>
         <p className="text-sm">Review status: {dashboardReviewStatusLabel(displayedStatus)}</p>

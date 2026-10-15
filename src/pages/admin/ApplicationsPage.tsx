@@ -7,39 +7,28 @@ import { LoadingState } from "../../components/states/LoadingState";
 import { listSubmittedApplicationsRef } from "../../convex/adminApi";
 import { useQuery } from "../../convex/reactBindings";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
-import { dashboardReviewStatusLabels } from "../../lib/applicationDisplay";
+import { applicationsInQueue, queueControls, reviewStatusFilters, reviewerFilters } from "../../lib/applicationQueue";
 import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
-import { queueReviewStatus, needsApplicationReview } from "../../../shared/admin/reviewQueue";
+import { needsApplicationReview } from "../../../shared/admin/reviewQueue";
 import { useNow } from "../../hooks/useNow";
 
 const controlClass = "mt-1.5 min-h-11 w-full rounded-md border border-ocean/70 bg-white px-3 py-2 text-sm text-night placeholder:text-ocean";
-const reviewStatusFilters = {
-  needs_review: "Needs review",
-  all: "All applications",
-  ...dashboardReviewStatusLabels,
-};
-type ReviewStatusFilter = keyof typeof reviewStatusFilters;
-
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const now = useNow();
   const { staff } = useAdminAuth();
   const applications = useQuery(listSubmittedApplicationsRef, { sessionToken });
   const [searchParams, setSearchParams] = useSearchParams();
-  const search = searchParams.get("search") ?? "";
-  const requestedStatus = searchParams.get("status") ?? "needs_review";
-  const status = Object.hasOwn(reviewStatusFilters, requestedStatus)
-    ? requestedStatus as ReviewStatusFilter
-    : "needs_review";
-  const sortOrder = searchParams.get("sort") === "newest" ? "newest" : "oldest";
+  const { search, status, sortOrder, reviewer } = queueControls(searchParams);
   const searchText = search.trim().toLowerCase();
 
-  function updateControl(key: "search" | "status" | "sort", value: string) {
+  function updateControl(key: "search" | "status" | "sort" | "reviewer", value: string) {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous);
       if (
         value === "" ||
         (key === "status" && value === "needs_review") ||
-        (key === "sort" && value === "oldest")
+        (key === "sort" && value === "oldest") ||
+        (key === "reviewer" && value === "all")
       ) {
         next.delete(key);
       } else {
@@ -49,24 +38,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
     }, { replace: true });
   }
 
-  const visibleApplications = (applications ?? [])
-    .filter((application) => {
-      const matchesSearch =
-        searchText === "" ||
-        [application.applicantName, application.email, application.school].some(
-          (value) => (value ?? "").toLowerCase().includes(searchText),
-        );
-      const matchesStatus =
-        status === "all" ||
-        (status === "needs_review"
-          ? needsApplicationReview(application)
-          : queueReviewStatus(application, now) === status);
-      return matchesSearch && matchesStatus;
-    })
-    .sort((left, right) => {
-      const difference = (left.submittedAt ?? 0) - (right.submittedAt ?? 0);
-      return sortOrder === "oldest" ? difference : -difference;
-    });
+  const visibleApplications = applicationsInQueue(applications ?? [], searchParams, staff?.adminId ?? "", now);
 
   if (applications === undefined) {
     return (
@@ -83,8 +55,8 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
     );
   }
 
-  const hasCustomControls = search !== "" || status !== "needs_review" || sortOrder !== "oldest";
-  const queueIsClear = status === "needs_review" && searchText === "" && visibleApplications.length === 0;
+  const hasCustomControls = search !== "" || status !== "needs_review" || sortOrder !== "oldest" || reviewer !== "all";
+  const queueIsClear = status === "needs_review" && searchText === "" && reviewer === "all" && visibleApplications.length === 0;
   const needsReviewCount = applications.filter(needsApplicationReview).length;
 
   return (
@@ -95,8 +67,8 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
         <span>{applications.length} total applications</span>
       </p>
 
-      <div className="grid gap-4 rounded-lg border border-sand bg-white p-4 min-[360px]:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_12rem_12rem]">
-        <label className="block text-sm font-medium text-night min-[360px]:col-span-2 lg:col-span-1">
+      <div className="grid gap-4 rounded-lg border border-sand bg-white p-4 min-[360px]:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_11rem_10rem_12rem]">
+        <label className="block text-sm font-medium text-night min-[360px]:col-span-2 xl:col-span-1">
           Search applications
           <input
             type="search"
@@ -129,12 +101,18 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
             <option value="newest">Newest first</option>
           </select>
         </label>
+        <label className="block text-sm font-medium text-night">
+          Review assignment
+          <select value={reviewer} onChange={(event) => updateControl("reviewer", event.target.value)} className={controlClass}>
+            {Object.entries(reviewerFilters).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
       </div>
 
       <div className="flex min-h-11 flex-wrap items-center justify-between gap-3">
         <p role="status" className="text-sm text-ocean">
           Showing {visibleApplications.length} of {applications.length} applications
-          <span className="sr-only">. Filter: {reviewStatusFilters[status]}</span>
+          <span className="sr-only">. Filter: {reviewStatusFilters[status]}. Assignment: {reviewerFilters[reviewer]}</span>
         </p>
         {hasCustomControls && (
           <button
@@ -155,7 +133,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
           <p className="mt-2 text-sm text-ocean">
             {queueIsClear
               ? "You're up to date. Past decisions are available under All applications."
-              : "Try another search or change the review status filter."}
+              : "Try another search or change the review status or assignment filter."}
           </p>
           {status !== "all" && (
             <button

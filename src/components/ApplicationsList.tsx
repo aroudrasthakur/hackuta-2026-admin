@@ -8,12 +8,12 @@ import { queueReviewStatus } from "../../shared/admin/reviewQueue";
 export function ApplicationsList({
   applications,
   applicationsSearch,
-  now = Date.now(),
+  now,
   staffAdminId,
 }: {
   applications: SubmittedApplicationSummary[];
   applicationsSearch: string;
-  now?: number;
+  now: number;
   staffAdminId?: string | undefined;
 }) {
   function status(application: SubmittedApplicationSummary) {

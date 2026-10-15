@@ -14,3 +14,8 @@ export function queueReviewStatus(application: QueueApplication, now: number) {
 export function needsApplicationReview(application: QueueApplication) {
   return application.reviewStatus === null || application.reviewStatus === "unreviewed" || application.reviewStatus === "under_review";
 }
+
+export function availableToReview(application: QueueApplication, staffAdminId: string, now: number) {
+  if (!needsApplicationReview(application)) return false;
+  return queueReviewStatus(application, now) !== "under_review" || application.reviewClaim?.reviewedBy === staffAdminId;
+}

@@ -118,6 +118,8 @@ test.describe("applications queue", () => {
     await page.keyboard.press("Tab");
     await expect(page.getByLabel("Submission time")).toBeFocused();
     await page.keyboard.press("Tab");
+    await expect(page.getByLabel("Review assignment")).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeFocused();
   });
 
@@ -134,5 +136,25 @@ test.describe("applications queue", () => {
     await page.getByLabel("Review status").selectOption("stale");
     await expect(page.getByRole("status")).toContainText("2 of 4");
     await expect(page.getByRole("table")).toContainText("Available to reclaim");
+  });
+
+  test("filters assignments and continues reviewing with the original queue controls", async ({ page }) => {
+    await page.getByLabel("Review assignment").selectOption("mine");
+    await expect(page.getByRole("status")).toContainText("2 of 4");
+    await page.getByLabel("Review assignment").selectOption("available");
+    await expect(page.getByRole("status")).toContainText("3 of 4");
+    await page.getByLabel("Submission time").selectOption("newest");
+    const queueUrl = page.url();
+    await page.getByRole("link", { name: "Review application for Casey Decision" }).click();
+    await page.getByRole("button", { name: "Accept", exact: true }).click();
+    await page.getByRole("button", { name: "Confirm acceptance", exact: true }).click();
+    await expect(page.getByText("Review status: Accepted", { exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "Review next application", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Jordan Review", exact: true })).toBeFocused();
+    await page.getByRole("link", { name: "Back to Applications" }).click();
+    await expect(page).toHaveURL(queueUrl);
+    await expect(page.getByLabel("Review assignment")).toHaveValue("available");
+    await expect(page.getByLabel("Submission time")).toHaveValue("newest");
+    await expect(page.getByRole("status")).toContainText("2 of 4");
   });
 });

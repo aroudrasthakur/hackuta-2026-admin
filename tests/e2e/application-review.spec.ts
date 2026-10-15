@@ -118,4 +118,11 @@ test.describe("application review workflow", () => {
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.accepted}`);
     await expect(page.getByRole("region", { name: "Review history" })).toHaveCount(0);
   });
+
+  test("skips applications actively held by other reviewers", async ({ page }) => {
+    await signInOrganizer(page, E2E_ADMIN);
+    await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.unreviewed}`);
+    await expect(page.getByRole("navigation", { name: "Review navigation" })).toContainText("No more available applications in this queue.");
+    await expect(page.getByRole("link", { name: "Review next application", exact: true })).toHaveCount(0);
+  });
 });
