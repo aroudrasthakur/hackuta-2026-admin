@@ -40,7 +40,4 @@
     overflow-wrap: anywhere;
   }
 
-  .admin-workspace .text-mist {
-    color: var(--color-ocean);
-  }
 }

@@ -1,5 +1,5 @@
 import { useMutation } from "../convex/reactBindings";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GenericId } from "convex/values";
 import { setApplicationDecisionRef, type ApplicationDetail } from "../convex/adminApi";
 import { formatMutationError } from "../lib/formatMutationError";
@@ -45,11 +45,28 @@ export function ApplicationDecisionControls({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const completionRef = useRef<HTMLParagraphElement>(null);
+  const acceptRef = useRef<HTMLButtonElement>(null);
+  const rejectRef = useRef<HTMLButtonElement>(null);
+  const waitlistRef = useRef<HTMLButtonElement>(null);
+  const lastChoice = useRef<PendingDecision>("accepted");
+  const restoreChoice = useRef(false);
+
+  useEffect(() => {
+    if (pendingDecision) confirmRef.current?.focus();
+    else if (success) completionRef.current?.focus();
+    else if (restoreChoice.current) {
+      ({ accepted: acceptRef, rejected: rejectRef, waitlisted: waitlistRef })[lastChoice.current].current?.focus();
+      restoreChoice.current = false;
+    }
+  }, [pendingDecision, success, detail.reviewStatus, detail.reviewActivity.isFinal]);
 
   const applicationId = detail.application._id as GenericId<"applications">;
   const isFinal = detail.reviewActivity.isFinal;
 
   function selectDecision(decision: PendingDecision) {
+    lastChoice.current = decision;
     setError(null);
     setSuccess(null);
     setPendingDecision(decision);
@@ -57,6 +74,7 @@ export function ApplicationDecisionControls({
 
   function cancelPending() {
     if (confirming) return;
+    restoreChoice.current = true;
     setPendingDecision(null);
     setError(null);
   }
@@ -74,10 +92,10 @@ export function ApplicationDecisionControls({
       });
       setSuccess(
         pendingDecision === "accepted"
-          ? "Application accepted. The applicant will receive an email shortly."
+          ? "Application accepted. See applicant notification status below."
           : pendingDecision === "rejected"
-            ? "Application rejected. The applicant will receive an email shortly."
-            : "Application waitlisted. The applicant will receive an email shortly.",
+            ? "Application rejected. See applicant notification status below."
+            : "Application waitlisted. See applicant notification status below.",
       );
       setPendingDecision(null);
     } catch (caught) {
@@ -88,8 +106,11 @@ export function ApplicationDecisionControls({
   }
 
   const promotingWaitlist = detail.reviewStatus === "waitlisted";
+  const completion = success && (
+    <p ref={completionRef} tabIndex={-1} role="status" className="rounded-md border border-sand bg-white p-4 text-sm text-ocean">{success}</p>
+  );
   if (isFinal && !promotingWaitlist) {
-    return null;
+    return completion;
   }
 
   if (blockedByOther) {
@@ -99,7 +120,7 @@ export function ApplicationDecisionControls({
         title="Decision"
         description="Another organizer is actively reviewing this application. You cannot finalize a decision until their session is stale or they finish."
       >
-        <p className="text-sm text-mist">
+        <p className="text-sm text-ocean">
           Decisions are unavailable while another organizer holds the active review claim.
         </p>
       </ReviewPanelSection>
@@ -121,15 +142,12 @@ export function ApplicationDecisionControls({
           {error}
         </p>
       )}
-      {success && (
-        <p role="status" className="text-sm text-ocean">
-          {success}
-        </p>
-      )}
+      {completion}
 
       {!pendingDecision && (
         <div className="flex flex-wrap gap-2">
           <button
+            ref={acceptRef}
             type="button"
             className={reviewPrimaryButtonClass}
             onClick={() => selectDecision("accepted")}
@@ -137,6 +155,7 @@ export function ApplicationDecisionControls({
             {promotingWaitlist ? "Accept from waitlist" : "Accept"}
           </button>
           {!promotingWaitlist && <button
+            ref={rejectRef}
             type="button"
             className={reviewSecondaryButtonClass}
             onClick={() => selectDecision("rejected")}
@@ -144,6 +163,7 @@ export function ApplicationDecisionControls({
             Reject
           </button>}
           {!promotingWaitlist && <button
+            ref={waitlistRef}
             type="button"
             className={reviewSecondaryButtonClass}
             onClick={() => selectDecision("waitlisted")}
@@ -156,9 +176,14 @@ export function ApplicationDecisionControls({
       {pendingCopy && (
         <div className="space-y-3 rounded-md border border-sand bg-clay/20 p-4">
           <h4 className="font-medium text-night">{pendingCopy.title}</h4>
-          <p className="text-sm text-mist">{pendingCopy.body}</p>
+          <p className="break-words text-sm text-night">
+            Applicant: <strong>{[detail.application.firstName, detail.application.lastName].filter(Boolean).join(" ") || "Applicant"}</strong>
+            {detail.application.email ? ` (${detail.application.email})` : ""}
+          </p>
+          <p className="text-sm text-ocean">{pendingCopy.body}</p>
           <div className="flex flex-wrap gap-2">
             <button
+              ref={confirmRef}
               type="button"
               disabled={confirming}
               className={reviewPrimaryButtonClass}

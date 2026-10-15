@@ -23,13 +23,14 @@ export function DecisionNotificationStatus({ detail, sessionToken }: { detail: A
   const [error, setError] = useState<string | null>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const resendRef = useRef<HTMLButtonElement>(null);
+  const statusRef = useRef<HTMLParagraphElement>(null);
   const notification = detail.notification;
   useEffect(() => { if (confirming) confirmRef.current?.focus(); }, [confirming]);
 
   async function run(action: () => Promise<unknown>) {
     setPending(true);
     setError(null);
-    try { await action(); setConfirming(false); }
+    try { await action(); setConfirming(false); requestAnimationFrame(() => statusRef.current?.focus()); }
     catch (caught) { setError(formatMutationError(caught, "Unable to update notification status.")); }
     finally { setPending(false); }
   }
@@ -37,7 +38,7 @@ export function DecisionNotificationStatus({ detail, sessionToken }: { detail: A
   const canRetry = !notification || ["failed", "unknown", "unavailable"].includes(notification.status);
   return (
     <ReviewPanelSection aria-label="Applicant notification" title="Applicant notification">
-      <p role="status" className="text-sm text-ocean">
+      <p ref={statusRef} tabIndex={-1} role="status" className="text-sm text-ocean">
         {notification ? statusCopy[notification.status] : "This earlier decision has no tracked email status. Sending cannot be verified here."}
       </p>
       <p className="break-words text-sm">Recipient: {notification?.recipient || detail.application.email || "Not provided"}</p>

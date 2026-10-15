@@ -31,7 +31,7 @@ const rowClassName = "flex flex-wrap items-baseline justify-between gap-x-4 gap-
 
 function EventTime({ value }: { value: number }) {
   return (
-    <time dateTime={new Date(value).toISOString()} className="text-mist">
+    <time dateTime={new Date(value).toISOString()} className="text-ocean">
       {formatApplicationDate(value)}
     </time>
   );

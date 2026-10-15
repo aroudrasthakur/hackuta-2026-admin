@@ -22,6 +22,7 @@ test.describe("application review workflow", () => {
   test("puts identity and review evidence first and keeps secondary information expandable", async ({ page }, testInfo) => {
     await signInOrganizer(page, E2E_REVIEWER);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
+    await expect(page.getByRole("region", { name: "Review claim" }).locator("p").first()).toHaveCSS("color", "rgb(48, 88, 115)");
     for (const width of [1440, 375, 320]) {
       await page.setViewportSize({ width, height: 900 });
       const name = page.getByRole("heading", { name: "Casey Decision" });
@@ -68,6 +69,27 @@ test.describe("application review workflow", () => {
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.accepted}`);
     await expect(page.getByText(/final decision/i)).toBeVisible();
     await expect(page.getByRole("region", { name: "Application decision" })).toHaveCount(0);
+  });
+
+  test("supports keyboard confirmation and announces the saved decision", async ({ page }) => {
+    await signInOrganizer(page, E2E_REVIEWER);
+    await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
+    const accept = page.getByRole("button", { name: "Accept", exact: true });
+    await accept.focus();
+    await page.keyboard.press("Enter");
+    const confirm = page.getByRole("button", { name: "Confirm acceptance", exact: true });
+    await expect(confirm).toBeFocused();
+    await expect(page.getByRole("region", { name: "Application decision" })).toContainText("Casey Decision (casey.decision@example.com)");
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(accept).toBeFocused();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+    const completion = page.getByRole("status").filter({ hasText: "Application accepted." });
+    await expect(completion).toBeVisible();
+    await expect(completion).toBeFocused();
+    await expect(page.getByRole("region", { name: "Applicant notification" })).toBeVisible();
   });
 
   test("admin sees review history on accepted applications", async ({ page }) => {

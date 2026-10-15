@@ -21,7 +21,7 @@ export function ReviewPanelSection({
     >
       <div className="space-y-1">
         <h3 className="font-display text-lg text-night">{title}</h3>
-        {description ? <p className="text-sm text-mist">{description}</p> : null}
+        {description ? <p className="text-sm text-ocean">{description}</p> : null}
       </div>
       {children}
     </section>
