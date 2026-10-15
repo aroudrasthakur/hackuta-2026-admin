@@ -22,19 +22,15 @@ export function isFinalReviewStatus(status: ApplicationReviewDoc["status"]) {
   );
 }
 
-function reviewActivityAt(review: ApplicationReviewDoc) {
-  return review.lastActiveAt ?? review.startedAt ?? review.updatedAt;
-}
-
 export function reviewClaimExpiresAt(review: ApplicationReviewDoc) {
-  return reviewActivityAt(review) + ACTIVE_REVIEW_STALE_MS;
+  return (review.lastActiveAt ?? review.startedAt ?? review.updatedAt) + ACTIVE_REVIEW_STALE_MS;
 }
 
 export function isReviewStale(review: ApplicationReviewDoc, now: number) {
   if (!review.reviewedBy || review.status !== "under_review") {
     return false;
   }
-  return now - reviewActivityAt(review) > ACTIVE_REVIEW_STALE_MS;
+  return now > reviewClaimExpiresAt(review);
 }
 
 function isActiveReviewClaim(review: ApplicationReviewDoc, now: number) {
