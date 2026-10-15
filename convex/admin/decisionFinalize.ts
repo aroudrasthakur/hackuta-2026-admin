@@ -77,7 +77,7 @@ export async function finalizeApplicationDecision(
   }
 
   await scheduleDecisionNotification(ctx, {
-    application: args.application, decision: args.decision, logId, requestedBy: args.admin._id,
+    application: args.application, reviewId: args.review._id, decision: args.decision, logId, requestedBy: args.admin._id,
   });
   return { logId, duplicate: false as const };
 }

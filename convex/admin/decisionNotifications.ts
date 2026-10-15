@@ -14,13 +14,11 @@ type Decision = "accepted" | "rejected" | "waitlisted";
 /** Persist the attempt in the same transaction as scheduling its email. */
 export async function scheduleDecisionNotification(
   ctx: MutationCtx,
-  args: { application: ApplicationDoc; decision: Decision; logId: GenericId<"applicationReviewLogs">; requestedBy: GenericId<"admins">; attempt?: number },
+  args: { application: ApplicationDoc; reviewId: GenericId<"applicationReviews">; decision: Decision; logId: GenericId<"applicationReviewLogs">; requestedBy: GenericId<"admins">; attempt?: number },
 ) {
-  const review = await getApplicationReview(ctx, args.application._id);
-  if (!review) throw new Error("Application review not found.");
   const recipient = args.application.email?.trim() ?? "";
   const attempt = args.attempt ?? 1;
-  await ctx.db.patch(review._id, { notification: {
+  await ctx.db.patch(args.reviewId, { notification: {
     logId: args.logId, attempt, requestedBy: args.requestedBy, recipient,
     status: recipient ? "scheduled" : "unavailable", updatedAt: Date.now(),
   } });
@@ -53,7 +51,7 @@ export const retryDecisionNotification = mutation({
     if (!logId) throw new Error("No recorded decision is available to notify.");
     if (!application.email?.trim()) throw new Error("This applicant has no email address.");
     await scheduleDecisionNotification(ctx, {
-      application, decision: review.status as Decision, logId,
+      application, reviewId: review._id, decision: review.status as Decision, logId,
       requestedBy: admin._id, attempt: (previous?.attempt ?? 0) + 1,
     });
   },
