@@ -115,7 +115,7 @@ describe("ApplicationDecisionControls", () => {
     await act(async () => button(confirm)!.click());
     expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ decision }));
     expect(container.textContent).toContain(message);
-    expect(container.textContent).toContain("See applicant notification status below");
+    expect(container.textContent).toContain("email scheduled.");
   });
 
   it("sends only one request while finalization is pending", async () => {

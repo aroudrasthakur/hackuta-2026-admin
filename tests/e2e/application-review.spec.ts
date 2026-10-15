@@ -58,10 +58,6 @@ test.describe("application review workflow", () => {
     await page.getByRole("button", { name: "Confirm acceptance", exact: true }).click();
     await expect(page.getByText("Review status: Accepted")).toBeVisible();
     await expect(page.getByRole("region", { name: "Application decision" })).toHaveCount(0);
-    const notification = page.getByRole("region", { name: "Applicant notification" });
-    await expect(notification).toContainText("Sending has not yet been confirmed");
-    await notification.getByRole("button", { name: "Check email status" }).click();
-    await expect(notification).toContainText("notification was sent");
   });
 
   test("finalized application hides decision controls", async ({ page }) => {
@@ -89,7 +85,6 @@ test.describe("application review workflow", () => {
     const completion = page.getByRole("status").filter({ hasText: "Application accepted." });
     await expect(completion).toBeVisible();
     await expect(completion).toBeFocused();
-    await expect(page.getByRole("region", { name: "Applicant notification" })).toBeVisible();
   });
 
   test("makes an expired claim available without reloading the review page", async ({ page }) => {

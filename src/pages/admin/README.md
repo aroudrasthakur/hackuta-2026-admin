@@ -14,4 +14,4 @@ Search (`search`), status (`status`), sort (`sort`), and assignment (`reviewer=a
 
 “Review next application” respects the queue controls and order, wraps when needed, and skips completed applications and active claims held by others. Opening the next application focuses its heading. The next-link query has its own error boundary so it cannot block a decision.
 
-Waitlisted applicants remain outside the default queue but can be accepted when a spot opens. Decision notification status, service checks, and explicitly confirmed resends appear with the review controls. Queued and sent are presented separately; earlier untracked decisions are never represented as successfully emailed.
+Waitlisted applicants remain outside the default queue but can be accepted when a spot opens. Decision confirmation schedules the existing decision email; the completion message confirms scheduling without claiming delivery.

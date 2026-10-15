@@ -5,7 +5,6 @@ import { ApplicationDetail } from "../../components/ApplicationDetail";
 import { ApplicationDecisionControls } from "../../components/ApplicationDecisionControls";
 import { ApplicationReviewControls } from "../../components/ApplicationReviewControls";
 import { ApplicationReviewHistory } from "../../components/ApplicationReviewHistory";
-import { DecisionNotificationStatus } from "../../components/DecisionNotificationStatus";
 import { NextApplicationLink } from "../../components/NextApplicationLink";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
@@ -96,9 +95,6 @@ export function ApplicationReviewContent({
           sessionToken={sessionToken}
           blockedByOther={blockedByOther}
         />
-        {detail.reviewStatus && ["accepted", "rejected", "waitlisted"].includes(detail.reviewStatus) && (
-          <DecisionNotificationStatus detail={detail} sessionToken={sessionToken} />
-        )}
         <ErrorBoundary fallback={<p className="text-sm text-ocean">Next application is unavailable. Return to Applications to continue.</p>}>
           <NextApplicationLink applicationId={applicationId} sessionToken={sessionToken} staffAdminId={staffAdminId} applicationsSearch={applicationsSearch} />
         </ErrorBoundary>

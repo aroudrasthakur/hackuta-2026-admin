@@ -92,10 +92,10 @@ export function ApplicationDecisionControls({
       });
       setSuccess(
         pendingDecision === "accepted"
-          ? "Application accepted. See applicant notification status below."
+          ? "Application accepted. Acceptance email scheduled."
           : pendingDecision === "rejected"
-            ? "Application rejected. See applicant notification status below."
-            : "Application waitlisted. See applicant notification status below.",
+            ? "Application rejected. Rejection email scheduled."
+            : "Application waitlisted. Waitlist email scheduled.",
       );
       setPendingDecision(null);
     } catch (caught) {
