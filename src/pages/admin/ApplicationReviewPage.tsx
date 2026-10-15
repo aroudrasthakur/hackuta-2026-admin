@@ -5,6 +5,7 @@ import { ApplicationDetail } from "../../components/ApplicationDetail";
 import { ApplicationDecisionControls } from "../../components/ApplicationDecisionControls";
 import { ApplicationReviewControls } from "../../components/ApplicationReviewControls";
 import { ApplicationReviewHistory } from "../../components/ApplicationReviewHistory";
+import { DecisionNotificationStatus } from "../../components/DecisionNotificationStatus";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
@@ -82,6 +83,9 @@ export function ApplicationReviewContent({
         blockedByOther={blockedByOther}
       />
       <ApplicationDetail detail={detail} />
+      {detail.reviewStatus && ["accepted", "rejected", "waitlisted"].includes(detail.reviewStatus) && (
+        <DecisionNotificationStatus detail={detail} sessionToken={sessionToken} />
+      )}
       {isAdmin && (
         <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />
       )}

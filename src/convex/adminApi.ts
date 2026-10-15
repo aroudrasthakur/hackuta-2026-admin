@@ -11,10 +11,12 @@ import type {
   logApplicationReviewAction,
   setApplicationDecision,
 } from "../../convex/admin/applicationReviewLogs";
+import type { retryDecisionNotification } from "../../convex/admin/decisionNotifications";
+import type { checkDecisionNotification } from "../../convex/admin/notificationActions";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
-  Kind extends "query" | "mutation",
+  Kind extends "query" | "mutation" | "action",
   Args extends DefaultFunctionArgs,
   Returns,
 >(path: string) {
@@ -75,3 +77,10 @@ export const setApplicationDecisionRef = adminModuleRef<
   FunctionArgs<SetApplicationDecisionMutation>,
   FunctionReturnType<SetApplicationDecisionMutation>
 >("admin/applicationReviewLogs:setApplicationDecision");
+
+type NotificationApi = ApiFromModules<{ notifications: {
+  retryDecisionNotification: typeof retryDecisionNotification;
+  checkDecisionNotification: typeof checkDecisionNotification;
+} }>["notifications"];
+export const retryDecisionNotificationRef = adminModuleRef<"mutation", FunctionArgs<NotificationApi["retryDecisionNotification"]>, FunctionReturnType<NotificationApi["retryDecisionNotification"]>>("admin/decisionNotifications:retryDecisionNotification");
+export const checkDecisionNotificationRef = adminModuleRef<"action", FunctionArgs<NotificationApi["checkDecisionNotification"]>, FunctionReturnType<NotificationApi["checkDecisionNotification"]>>("admin/notificationActions:checkDecisionNotification");

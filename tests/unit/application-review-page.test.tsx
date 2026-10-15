@@ -34,6 +34,7 @@ vi.mock("../../src/convex/reactBindings", () => ({
   useQuery: mocks.query,
   usePaginatedQuery: mocks.paginatedQuery,
   useMutation: mocks.mutationHook,
+  useAction: () => vi.fn(),
 }));
 
 function applicationDetail(): ApplicationDetail {

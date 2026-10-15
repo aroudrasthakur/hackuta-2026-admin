@@ -5,6 +5,8 @@ import {
   listSubmittedApplicationsRef,
   logApplicationReviewActionRef,
   setApplicationDecisionRef,
+  retryDecisionNotificationRef,
+  checkDecisionNotificationRef,
 } from "../convex/adminApi";
 
 const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
@@ -14,6 +16,8 @@ const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
   [listApplicationReviewLogsRef, "admin/applicationReviewLogs:listApplicationReviewLogs"],
   [logApplicationReviewActionRef, "admin/applicationReviewLogs:logApplicationReviewAction"],
   [setApplicationDecisionRef, "admin/applicationReviewLogs:setApplicationDecision"],
+  [retryDecisionNotificationRef, "admin/decisionNotifications:retryDecisionNotification"],
+  [checkDecisionNotificationRef, "admin/notificationActions:checkDecisionNotification"],
 ];
 
 export function convexRefPath(ref: unknown): string {

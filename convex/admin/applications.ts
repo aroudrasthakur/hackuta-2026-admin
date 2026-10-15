@@ -88,6 +88,7 @@ export const getApplication = query({
 
     return {
       application,
+      ...(review?.notification ? { notification: review.notification } : {}),
       reviewStatus: review?.status ?? null,
       reviewActivity: review
         ? {
