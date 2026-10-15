@@ -18,6 +18,8 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [decisionEmailTemplates.ts](decisionEmailTemplates.ts) | Plain-text copy for acceptance, rejection, and waitlist emails |
 | [decisionEmailService.ts](decisionEmailService.ts) | Decision mail via register-locked `sendMailMessage` (same email service HTTP client) |
 | [sendDecisionEmails.ts](sendDecisionEmails.ts) | Internal action that sends decision notifications |
+| [decisionNotifications.ts](decisionNotifications.ts) | Stores email attempts, guards duplicate jobs, and authorizes manual resends |
+| [notificationActions.ts](notificationActions.ts) | Authenticated email service status lookup |
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
 
 ## Authentication
@@ -54,6 +56,25 @@ After detail loads, the page calls `logApplicationReviewAction` with `action: "v
 - `participants` — admin-only table; one row per accepted application (reuses `users`, no applicant data copied).
 
 Registration reads/writes for applicants remain in register-locked modules ([applications.ts](../applications.ts), [registrations.ts](../registrations.ts), etc.).
+
+## Decisions and notifications
+
+Waitlisted applicants can be accepted through the same confirmed decision mutation. This appends an acceptance event, creates the participant atomically, and schedules an acceptance email. The earlier waitlist event remains in history. Accepted, rejected, and withdrawn decisions cannot be changed through this workflow; repeated confirmation of the same recorded decision is idempotent.
+
+`applicationReviews.notification` tracks the latest decision email attempt independently of the decision. It stores the decision log ID, attempt number, requesting organizer, recipient, timestamp, and service queue ID when available. Existing reviews need no migration; earlier decisions without tracking are identified as untracked in the UI.
+
+| Status | Meaning |
+| --- | --- |
+| `scheduled` / `sending` | Scheduled action has not yet recorded a service response |
+| `queued` | Email service returned a queue ID; sending is not yet confirmed |
+| `sent` | Service status lookup reports sent or delivered; this does not prove inbox receipt |
+| `failed` | Configuration prevented sending, or the service reports a failure |
+| `unknown` | Sending failed or timed out; the service may still have queued the message |
+| `unavailable` | The applicant has no email address |
+
+Reviewers and admins can check the service status or confirm a manual resend for a failed, unknown, or untracked attempt. Interrupted scheduled/sending attempts become eligible for manual recovery after five minutes. Resends warn about duplicate delivery and never change the decision. There are no automatic retries. Attempt identity guards prevent duplicate scheduled jobs and late results from superseded decisions from changing current notification state. A waitlist email that has not begun sending is skipped if acceptance supersedes it.
+
+No register-owned email tables or validators are changed. Deployment requires the admin schema and functions together; the optional notification field is compatible with existing records, and the send action accepts jobs scheduled by the previous version.
 
 ## Related
 

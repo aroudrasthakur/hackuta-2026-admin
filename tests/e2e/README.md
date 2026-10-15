@@ -14,8 +14,8 @@ Browser tests for the organizer admin SPA. They run against **`VITE_E2E_MOCK=tru
 | Spec | Flows |
 | --- | --- |
 | [auth.spec.ts](auth.spec.ts) | Login redirect, invalid credentials, sign-out, home redirect |
-| [applications-queue.spec.ts](applications-queue.spec.ts) | Queue list, search, status filter, sort, reset, navigate to detail |
-| [application-review.spec.ts](application-review.spec.ts) | Start review, two-step decision, final-state UI, admin review history |
+| [applications-queue.spec.ts](applications-queue.spec.ts) | Search/status/assignment/sort controls, preserved queue context, next review, live claim expiry, desktop/mobile layout, keyboard navigation |
+| [application-review.spec.ts](application-review.spec.ts) | Evidence-first layout, start/reclaim review, keyboard confirmation/completion, waitlist promotion, notification status checks, busy-review skipping, admin history |
 
 Mock organizer accounts: [shared/admin/e2e/credentials.ts](../../shared/admin/e2e/credentials.ts).
 
