@@ -163,6 +163,29 @@ describe("app routes", () => {
     expect(context.signOut).toHaveBeenCalledOnce();
     expect(currentPath()).toBe("/admin/login");
   });
+
+  it("disables sign-out while the request is pending", async () => {
+    let finish!: () => void;
+    const context = authContext({ signOut: vi.fn(() => new Promise<void>((resolve) => { finish = resolve; })) });
+    await renderApp("/admin/applications", context);
+    await act(async () => button("Sign out")!.click());
+    expect(button("Signing out…")?.disabled).toBe(true);
+    await act(async () => button("Signing out…")!.click());
+    expect(context.signOut).toHaveBeenCalledOnce();
+    await act(async () => finish());
+    expect(currentPath()).toBe("/admin/login");
+  });
+
+  it("allows retrying a failed sign-out", async () => {
+    const signOut = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(undefined);
+    await renderApp("/admin/applications", authContext({ signOut }));
+    await act(async () => button("Sign out")!.click());
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to sign out");
+    expect(button("Sign out")?.disabled).toBe(false);
+    expect(currentPath()).toBe("/admin/applications");
+    await act(async () => button("Sign out")!.click());
+    expect(currentPath()).toBe("/admin/login");
+  });
 });
 
 describe("sign-in page", () => {
