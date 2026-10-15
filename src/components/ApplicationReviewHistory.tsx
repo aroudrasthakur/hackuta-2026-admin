@@ -70,6 +70,13 @@ function isDecision(action: Action) {
   return action === "accepted" || action === "rejected" || action === "waitlisted";
 }
 
+function prioritizeDecisionEvents(events: ReviewHistoryEvent[]) {
+  return [
+    ...events.filter((event) => isDecision(event.action)),
+    ...events.filter((event) => !isDecision(event.action)),
+  ];
+}
+
 function EventTime({ value }: { value: number }) {
   return (
     <time dateTime={new Date(value).toISOString()} className="text-mist">
@@ -153,7 +160,7 @@ function ReviewHistoryEvents({ applicationId, sessionToken }: ReviewHistoryProps
   return (
     <>
       <ol className="relative space-y-1 before:absolute before:bottom-2 before:left-[4px] before:top-3 before:w-px before:bg-sand">
-        {groupConsecutiveViews(results).map((group) => (
+        {groupConsecutiveViews(prioritizeDecisionEvents(results)).map((group) => (
           <li key={group[0]._id} className="py-1.5 text-sm">
             {group.length === 1 ? <EventRow event={group[0]} /> : <ViewsGroup events={group} />}
           </li>

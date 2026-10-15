@@ -108,6 +108,35 @@ describe("application review history panel", () => {
     expect(container.textContent).toContain("Review update");
   });
 
+  it.each(["accepted", "rejected", "waitlisted"] as const)(
+    "prioritizes the final %s event above newer activity",
+    async (decision) => {
+      await render({
+        results: [
+          event("log-4", "Avery Admin", "viewed", 1_700_000_500_000),
+          event("log-3", "Riley Reviewer", "started_review", 1_700_000_400_000),
+          event("log-2", "Avery Admin", decision, 1_700_000_300_000),
+          event("log-1", "Riley Reviewer", "review_ended", 1_700_000_200_000),
+        ],
+        status: "Exhausted",
+      });
+
+      const actions = Array.from(container.querySelectorAll("ol > li > [data-action]"));
+      expect(actions.map((row) => row.getAttribute("data-action"))).toEqual([
+        decision,
+        "viewed",
+        "started_review",
+        "review_ended",
+      ]);
+      expect(actions.map((row) => row.querySelector("time")?.dateTime)).toEqual([
+        new Date(1_700_000_300_000).toISOString(),
+        new Date(1_700_000_500_000).toISOString(),
+        new Date(1_700_000_400_000).toISOString(),
+        new Date(1_700_000_200_000).toISOString(),
+      ]);
+    },
+  );
+
   it("folds consecutive views into a collapsed group that lists each view, newest first", async () => {
     await render({
       results: [
