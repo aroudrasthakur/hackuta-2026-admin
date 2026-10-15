@@ -7,13 +7,12 @@ import { LoadingState } from "../../components/states/LoadingState";
 import { listSubmittedApplicationsRef } from "../../convex/adminApi";
 import { useQuery } from "../../convex/reactBindings";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
-import { applicationsInQueue, queueControls, reviewStatusFilters, reviewerFilters } from "../../lib/applicationQueue";
+import { applicationsInQueue, queueControls, queueDefaults, reviewStatusFilters, reviewerFilters } from "../../lib/applicationQueue";
 import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { needsApplicationReview } from "../../../shared/admin/reviewQueue";
 import { useNow } from "../../hooks/useNow";
 
 const controlClass = "mt-1.5 min-h-11 w-full rounded-md border border-ocean/70 bg-white px-3 py-2 text-sm text-night placeholder:text-ocean";
-const controlDefaults = { search: "", status: "needs_review", sort: "oldest", reviewer: "all" };
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const now = useNow();
   const { staff } = useAdminAuth();
@@ -22,10 +21,10 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const { search, status, sortOrder, reviewer } = queueControls(searchParams);
   const searchText = search.trim().toLowerCase();
 
-  function updateControl(key: keyof typeof controlDefaults, value: string) {
+  function updateControl(key: keyof typeof queueDefaults, value: string) {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous);
-      if (value === "" || value === controlDefaults[key]) {
+      if (value === "" || value === queueDefaults[key]) {
         next.delete(key);
       } else {
         next.set(key, value);
@@ -51,8 +50,12 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
     );
   }
 
-  const hasCustomControls = search !== "" || status !== "needs_review" || sortOrder !== "oldest" || reviewer !== "all";
-  const queueIsClear = status === "needs_review" && searchText === "" && reviewer === "all" && visibleApplications.length === 0;
+  const hasCustomControls =
+    search !== queueDefaults.search || status !== queueDefaults.status ||
+    sortOrder !== queueDefaults.sort || reviewer !== queueDefaults.reviewer;
+  const queueIsClear =
+    status === queueDefaults.status && searchText === "" &&
+    reviewer === queueDefaults.reviewer && visibleApplications.length === 0;
   const needsReviewCount = applications.filter(needsApplicationReview).length;
 
   return (

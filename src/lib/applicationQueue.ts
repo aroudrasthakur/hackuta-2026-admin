@@ -4,15 +4,16 @@ import { dashboardReviewStatusLabels } from "./applicationDisplay";
 
 export const reviewStatusFilters = { needs_review: "Needs review", all: "All applications", ...dashboardReviewStatusLabels };
 export const reviewerFilters = { all: "All reviewers", mine: "My active reviews", available: "Available to review" };
+export const queueDefaults = { search: "", status: "needs_review", sort: "oldest", reviewer: "all" } as const;
 
 export function queueControls(params: URLSearchParams) {
-  const requestedStatus = params.get("status") ?? "needs_review";
-  const requestedReviewer = params.get("reviewer") ?? "all";
+  const requestedStatus = params.get("status") ?? queueDefaults.status;
+  const requestedReviewer = params.get("reviewer") ?? queueDefaults.reviewer;
   return {
-    search: params.get("search") ?? "",
-    status: Object.hasOwn(reviewStatusFilters, requestedStatus) ? requestedStatus as keyof typeof reviewStatusFilters : "needs_review" as const,
-    reviewer: Object.hasOwn(reviewerFilters, requestedReviewer) ? requestedReviewer as keyof typeof reviewerFilters : "all" as const,
-    sortOrder: params.get("sort") === "newest" ? "newest" as const : "oldest" as const,
+    search: params.get("search") ?? queueDefaults.search,
+    status: Object.hasOwn(reviewStatusFilters, requestedStatus) ? requestedStatus as keyof typeof reviewStatusFilters : queueDefaults.status,
+    reviewer: Object.hasOwn(reviewerFilters, requestedReviewer) ? requestedReviewer as keyof typeof reviewerFilters : queueDefaults.reviewer,
+    sortOrder: params.get("sort") === "newest" ? "newest" as const : queueDefaults.sort,
   };
 }
 
