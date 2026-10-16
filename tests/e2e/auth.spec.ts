@@ -19,7 +19,7 @@ test.describe("organizer authentication", () => {
     await page.getByLabel("Email").fill(E2E_REVIEWER.email);
     await page.getByLabel("Password").fill("WrongPassword1!");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText(/invalid email or password/i)).toBeVisible();
+    await expect(page.getByText(/incorrect email or password/i)).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/login$/);
   });
 

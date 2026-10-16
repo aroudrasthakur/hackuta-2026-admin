@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { hashSessionToken } from "../../convex/admin/staffAuth";
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../../src/convex/adminApi";
 import { createConvexTest } from "../helpers/convexTestContext";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
 const tokens = { admin: "a".repeat(64), reviewer: "b".repeat(64) };
 const firstPage = { numItems: 25, cursor: null };
 
@@ -65,9 +66,9 @@ describe("admin-only application review history", () => {
   it("rejects direct backend requests from reviewer sessions", async () => {
     const fixture = await createFixture();
     await seedHistory(fixture);
-    await expect(fixture.t.query(listApplicationReviewLogsRef, {
+    await expectAdminErrorCode(fixture.t.query(listApplicationReviewLogsRef, {
       sessionToken: tokens.reviewer, applicationId: fixture.applicationId, paginationOpts: firstPage,
-    })).rejects.toThrow(/not authorized/i);
+    }), "ADMIN_ONLY");
   });
 
   it("returns every event newest first with organizer names, scoped to the application", async () => {
@@ -120,8 +121,8 @@ describe("admin-only application review history", () => {
   it("rejects applications that do not exist", async () => {
     const { t, applicationId } = await createFixture();
     await t.run((ctx) => ctx.db.delete(applicationId));
-    await expect(t.query(listApplicationReviewLogsRef, {
+    await expectAdminErrorCode(t.query(listApplicationReviewLogsRef, {
       sessionToken: tokens.admin, applicationId, paginationOpts: firstPage,
-    })).rejects.toThrow(/application not found/i);
+    }), "APPLICATION_NOT_FOUND");
   });
 });

@@ -5,6 +5,7 @@ import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApplicationDecisionControls } from "../../src/components/ApplicationDecisionControls";
 import { setApplicationDecisionRef, type ApplicationDetail } from "../../src/convex/adminApi";
+import { ADMIN_ERROR_MESSAGES, adminError } from "../../shared/admin/errors";
 
 const mocks = vi.hoisted(() => ({ mutationHook: vi.fn(), finalize: vi.fn() }));
 vi.mock("../../src/convex/reactBindings", () => ({
@@ -146,23 +147,28 @@ describe("ApplicationDecisionControls", () => {
   });
 
   it("shows the server error and keeps the confirmation open", async () => {
-    mocks.finalize.mockRejectedValue(new Error("This application already has a final decision."));
+    mocks.finalize.mockRejectedValue(adminError("REVIEW_FINALIZED"));
     await renderControls();
     await act(async () => button("Reject")!.click());
     await act(async () => button("Confirm rejection")!.click());
 
     expect(container.querySelector('[role="alert"]')?.textContent).toBe(
-      "This application already has a final decision.",
+      ADMIN_ERROR_MESSAGES.REVIEW_FINALIZED,
     );
     expect(button("Confirm rejection")).toBeDefined();
   });
 
-  it("shows a fallback message for a non-Error failure", async () => {
-    mocks.finalize.mockRejectedValue("boom");
+  it.each([
+    ["a non-Error failure", "boom"],
+    ["a redacted Convex server error", new Error("[CONVEX M(admin/x)] [Request ID: abc123] Server Error")],
+  ])("shows a fallback message for %s", async (_label, failure) => {
+    mocks.finalize.mockRejectedValue(failure);
     await renderControls();
     await act(async () => button("Accept")!.click());
     await act(async () => button("Confirm acceptance")!.click());
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Unable to finalize decision.");
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      "We couldn't save this decision. Please try again.",
+    );
   });
 
   it("hides decision actions when another organizer holds the active claim", async () => {

@@ -4,8 +4,9 @@ import type { DocumentByName } from "convex/server";
 import { formatApplicantFullName } from "../lib/applications";
 import type { ApplicationDoc, DataModel, MutationCtx } from "../lib/dataModel";
 import { getHackathonName } from "../lib/eventConfig";
+import { adminError } from "../../shared/admin/errors";
 import { applyAcceptedApplicationDecision } from "./acceptanceDecision";
-import { isActiveReviewClaimHeldByOther, isFinalReviewStatus, REVIEW_ALREADY_CLAIMED } from "./reviewClaim";
+import { isActiveReviewClaimHeldByOther, isFinalReviewStatus } from "./reviewClaim";
 import { decisionPatch } from "./reviewState";
 
 type ApplicationReviewDoc = DocumentByName<DataModel, "applicationReviews">;
@@ -67,7 +68,7 @@ export async function finalizeApplicationDecision(
 ) {
   if (isFinalReviewStatus(args.review.status)) {
     if (args.review.status !== args.decision) {
-      throw new Error("Application already has a final decision.");
+      throw adminError("REVIEW_FINALIZED");
     }
     const existingLog = await findLatestDecisionLog(
       ctx,
@@ -77,12 +78,12 @@ export async function finalizeApplicationDecision(
     if (existingLog) {
       return { logId: existingLog._id, duplicate: true as const };
     }
-    throw new Error("Application already has a final decision.");
+    throw adminError("REVIEW_FINALIZED");
   }
 
   const now = Date.now();
   if (isActiveReviewClaimHeldByOther(args.review, args.admin._id, now)) {
-    throw new Error(REVIEW_ALREADY_CLAIMED);
+    throw adminError("REVIEW_CLAIMED");
   }
 
   let logId: GenericId<"applicationReviewLogs">;

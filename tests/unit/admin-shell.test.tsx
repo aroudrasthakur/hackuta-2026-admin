@@ -16,6 +16,13 @@ import {
   type ApplicationDetail,
 } from "../../src/convex/adminApi";
 import { useAdminAuth } from "../../src/hooks/useAdminAuth";
+import { UserFacingError } from "../../src/lib/userFacingError";
+import {
+  ADMIN_ERROR_MESSAGES,
+  adminError,
+  GENERIC_ERROR_MESSAGE,
+  SIGN_IN_FAILED_MESSAGE,
+} from "../../shared/admin/errors";
 
 vi.mock("../../src/components/SignInStormBackdrop", () => ({
   SignInStormBackdrop: ({ active }: { active?: boolean }) => (
@@ -190,19 +197,25 @@ describe("sign-in page", () => {
   });
 
   it("shows the sign-in error and stays on the page", async () => {
-    const context = signedOut({ signIn: vi.fn().mockRejectedValue(new Error("Invalid email or password.")) });
+    const context = signedOut({
+      signIn: vi.fn().mockRejectedValue(new UserFacingError(ADMIN_ERROR_MESSAGES.INVALID_CREDENTIALS)),
+    });
     await renderApp("/admin/login", context);
     await submitLogin();
-    expect(container.textContent).toContain("Invalid email or password.");
+    expect(container.textContent).toContain(ADMIN_ERROR_MESSAGES.INVALID_CREDENTIALS);
     expect(currentPath()).toBe("/admin/login");
     expect(button("Sign in")?.disabled).toBe(false);
   });
 
-  it("shows a fallback for a non-Error failure", async () => {
-    await renderApp("/admin/login", signedOut({ signIn: vi.fn().mockRejectedValue("nope") }));
-    await submitLogin();
-    expect(container.textContent).toContain("Sign-in failed. Please try again.");
-  });
+  it.each([["a non-Error failure", "nope"], ["a raw network error", new TypeError("Failed to fetch")]])(
+    "shows a fallback for %s",
+    async (_label, failure) => {
+      await renderApp("/admin/login", signedOut({ signIn: vi.fn().mockRejectedValue(failure) }));
+      await submitLogin();
+      expect(container.textContent).toContain(SIGN_IN_FAILED_MESSAGE);
+      expect(container.textContent).not.toContain("Failed to fetch");
+    },
+  );
 });
 
 describe("applications dashboard", () => {
@@ -273,6 +286,7 @@ describe("AdminAuthProvider", () => {
             authed: auth.isAuthenticated,
           })}
         </output>
+        <output data-testid="auth-error">{auth.authError ?? ""}</output>
         <button type="button" onClick={() => void auth.signIn("a@hackuta.org", "pw").catch((e: Error) => {
           container.dataset.error = e.message;
         })}>
@@ -286,6 +300,7 @@ describe("AdminAuthProvider", () => {
   }
 
   const state = () => JSON.parse(container.querySelector('[data-testid="state"]')!.textContent!);
+  const authErrorText = () => container.querySelector('[data-testid="auth-error"]')!.textContent;
   const token = "k".repeat(64);
 
   function stubApi(routes: Record<string, () => Response | Promise<Response>>) {
@@ -348,16 +363,18 @@ describe("AdminAuthProvider", () => {
     mocks.query.mockReturnValue(undefined);
     await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
     await act(async () => button("in")!.click());
-    expect(container.dataset.error).toMatch(/no session cookie/);
+    expect(container.dataset.error).toMatch(/couldn't start your session/);
   });
 
   it.each([
-    [{ error: "This account is inactive." }, "This account is inactive."],
-    [{}, "Sign-in failed."],
-  ])("passes on the sign-in API error %#", async (body, message) => {
+    [Response.json({ code: "ACCOUNT_INACTIVE", error: "x" }, { status: 403 }), ADMIN_ERROR_MESSAGES.ACCOUNT_INACTIVE],
+    [Response.json({ error: "Raw server detail" }, { status: 500 }), SIGN_IN_FAILED_MESSAGE],
+    [Response.json({ code: "UNKNOWN", error: "Raw server detail" }, { status: 401 }), SIGN_IN_FAILED_MESSAGE],
+    [new Response("Internal Server Error", { status: 500 }), SIGN_IN_FAILED_MESSAGE],
+  ])("maps the sign-in API error %#", async (response, message) => {
     stubApi({
       "/api/admin/session-token": () => new Response(null, { status: 401 }),
-      "/api/admin/sign-in": () => Response.json(body, { status: 403 }),
+      "/api/admin/sign-in": () => response,
     });
     mocks.query.mockReturnValue(undefined);
     await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
@@ -378,11 +395,69 @@ describe("AdminAuthProvider", () => {
     expect(state().token).toBeNull();
   });
 
-  it("requires the provider", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("requires the provider and keeps the developer error out of the page", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     await render(<ErrorBoundary><Probe /></ErrorBoundary>);
-    expect(container.textContent).toContain("useAdminAuth must be used within AdminAuthProvider");
-    expect(container.textContent).toContain("Something went wrong");
+    expect(container.textContent).toContain(GENERIC_ERROR_MESSAGE);
+    expect(container.textContent).not.toContain("useAdminAuth must be used within AdminAuthProvider");
+    expect(consoleError).toHaveBeenCalledWith(
+      "Uncaught render error",
+      expect.objectContaining({ message: "useAdminAuth must be used within AdminAuthProvider" }),
+      expect.anything(),
+    );
+  });
+
+  it("shows the catalog message for a coded error in the boundary", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    function Thrower(): ReactNode {
+      throw adminError("ADMIN_ONLY");
+    }
+    await render(<ErrorBoundary><Thrower /></ErrorBoundary>);
+    expect(container.textContent).toContain(ADMIN_ERROR_MESSAGES.ADMIN_ONLY);
+    expect(container.textContent).not.toContain("{");
+  });
+
+  it("tells the organizer when a live session expires", async () => {
+    stubApi({ "/api/admin/session-token": () => new Response(token) });
+    mocks.query.mockReturnValue(staff);
+    await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
+    expect(state().authed).toBe(true);
+    expect(authErrorText()).toBe("");
+
+    mocks.query.mockReturnValue(null);
+    await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
+    expect(authErrorText()).toBe(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
+  });
+
+  it("hides network details when the session check fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    stubApi({ "/api/admin/session-token": () => Promise.reject(new TypeError("Failed to fetch")) });
+    mocks.query.mockReturnValue(undefined);
+    await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
+    expect(authErrorText()).toBe("We couldn't check your sign-in status. Refresh the page to try again.");
+    expect(state().ready).toBe(true);
+    expect(consoleError).toHaveBeenCalledWith("Unable to initialize organizer authentication", {
+      source: "AdminAuthProvider.bootstrap",
+      convexRequestId: null,
+      errorName: "TypeError",
+      errorMessage: "Failed to fetch",
+    });
+  });
+
+  it("keeps the local dev sign-in hint for developers", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("VITE_DEV_AUTH_BYPASS", "true");
+    try {
+      stubApi({
+        "/api/admin/dev-sign-in": () =>
+          Response.json({ error: "Set ADMIN_DEV_AUTH_EMAIL and ADMIN_DEV_AUTH_PASSWORD in .env.local." }, { status: 503 }),
+      });
+      mocks.query.mockReturnValue(undefined);
+      await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
+      expect(authErrorText()).toBe("Set ADMIN_DEV_AUTH_EMAIL and ADMIN_DEV_AUTH_PASSWORD in .env.local.");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 
@@ -453,8 +528,9 @@ describe("review claim controls", () => {
   });
 
   it.each([
-    [new Error("Application is already being reviewed by another organizer."), "Application is already being reviewed by another organizer."],
-    ["x", "Unable to start review."],
+    [adminError("REVIEW_CLAIMED"), ADMIN_ERROR_MESSAGES.REVIEW_CLAIMED],
+    [new Error("[CONVEX M(admin/x)] [Request ID: abc] Server Error"), "We couldn't start the review. Please try again."],
+    ["x", "We couldn't start the review. Please try again."],
   ])("shows the claim error %#", async (failure, message) => {
     mocks.mutation.mockRejectedValue(failure);
     await renderControls(detail());

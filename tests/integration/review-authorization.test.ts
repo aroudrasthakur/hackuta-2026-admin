@@ -10,6 +10,7 @@ import {
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 import { insertStaffSession } from "../helpers/staffTestFixtures";
 import { seedApplicant, seedStaff, snapshotReviewState } from "../helpers/reviewTestKit";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 const page = { numItems: 10, cursor: null };
 
@@ -85,9 +86,7 @@ describe("review access for callers without an active organizer session", () => 
       const sessionToken = await makeToken(t);
       const before = await snapshotReviewState(t);
 
-      await expect(protectedCalls(t, sessionToken, applicationId)[callName]()).rejects.toThrow(
-        /not authenticated/i,
-      );
+      await expectAdminErrorCode(protectedCalls(t, sessionToken, applicationId)[callName](), "NOT_AUTHENTICATED");
       expect(await snapshotReviewState(t)).toEqual(before);
     });
 
@@ -126,9 +125,7 @@ describe("reviewer permissions", () => {
     const t = createConvexTest();
     const { sessionToken } = await seedStaff(t, { role: "reviewer" });
     const { applicationId } = await seedApplicant(t);
-    await expect(protectedCalls(t, sessionToken, applicationId).viewHistory()).rejects.toThrow(
-      /not authorized/i,
-    );
+    await expectAdminErrorCode(protectedCalls(t, sessionToken, applicationId).viewHistory(), "ADMIN_ONLY");
   });
 });
 
@@ -172,7 +169,7 @@ describe("account changes apply to live sessions", () => {
 
     await calls.logViewed();
     await t.run((ctx) => ctx.db.patch(adminId, { active: false }));
-    await expect(calls.startReview()).rejects.toThrow(/not authenticated/i);
+    await expectAdminErrorCode(calls.startReview(), "NOT_AUTHENTICATED");
   });
 
   it("removes history access when an admin is demoted to reviewer", async () => {
@@ -183,15 +180,16 @@ describe("account changes apply to live sessions", () => {
 
     await calls.viewHistory();
     await t.run((ctx) => ctx.db.patch(adminId, { role: "reviewer" }));
-    await expect(calls.viewHistory()).rejects.toThrow(/not authorized/i);
+    await expectAdminErrorCode(calls.viewHistory(), "ADMIN_ONLY");
   });
 
   it("ignores applicant sign-in when no staff session is sent", async () => {
     const t = createConvexTest();
     const { applicationId } = await seedApplicant(t);
     const asApplicant = t.withIdentity({ subject: "applicant", email: "staff-1@hackuta.org" });
-    await expect(
+    await expectAdminErrorCode(
       asApplicant.query(getApplicationRef, { sessionToken: "", applicationId }),
-    ).rejects.toThrow(/not authenticated/i);
+      "NOT_AUTHENTICATED",
+    );
   });
 });

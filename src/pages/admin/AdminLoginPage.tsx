@@ -4,6 +4,8 @@ import { StormPageFrame } from "../../components/StormPageFrame";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { LoadingState } from "../../components/states/LoadingState";
 import { ADMIN_ROUTES } from "../../types/routes";
+import { SIGN_IN_FAILED_MESSAGE } from "../../../shared/admin/errors";
+import { reportUserFacingError } from "../../lib/userFacingError";
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
@@ -35,9 +37,7 @@ export function AdminLoginPage() {
       await signIn(email.trim(), password);
       navigate(ADMIN_ROUTES.applications, { replace: true });
     } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : "Sign-in failed. Please try again.";
-      setError(message);
+      setError(reportUserFacingError("Organizer sign-in failed", caught, SIGN_IN_FAILED_MESSAGE));
     } finally {
       setPending(false);
     }

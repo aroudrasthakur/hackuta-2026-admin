@@ -2,7 +2,6 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query } from "../_generated/server";
 import {
   ADMIN_SIGN_IN_CLIENT_IP_MAX_LENGTH,
-  ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE,
   buildAdminSignInRateLimitKey,
   clearAdminSignInFailures,
   isAdminSignInRateLimited,
@@ -10,14 +9,18 @@ import {
   recordFailedAdminSignIn,
 } from "./adminSignInRateLimit";
 import { normalizeEmail } from "../lib/normalizeEmail";
+import { ADMIN_ERROR_MESSAGES, adminError } from "../../shared/admin/errors";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { hashPassword, verifyPassword } from "./passwordHash";
 import { ADMIN_SIGN_IN_DUMMY_PASSWORD_HASH } from "./signInSecurityConstants";
 import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
 import { hashSessionToken, requireAdminRole, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
 
-const INVALID_CREDENTIALS = "Invalid email or password.";
-const INACTIVE_ACCOUNT = "This account is inactive.";
+type SignInFailureCode = "INVALID_CREDENTIALS" | "ACCOUNT_INACTIVE" | "SIGN_IN_RATE_LIMITED";
+
+function signInFailure(code: SignInFailureCode) {
+  return { ok: false as const, code, error: ADMIN_ERROR_MESSAGES[code] };
+}
 
 const signInResult = v.union(
   v.object({
@@ -27,6 +30,11 @@ const signInResult = v.union(
   }),
   v.object({
     ok: v.literal(false),
+    code: v.union(
+      v.literal("INVALID_CREDENTIALS"),
+      v.literal("ACCOUNT_INACTIVE"),
+      v.literal("SIGN_IN_RATE_LIMITED"),
+    ),
     error: v.string(),
   }),
 );
@@ -42,11 +50,11 @@ export const signIn = mutation({
   handler: async (ctx, { email, password, clientIp }) => {
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail || !password) {
-      return { ok: false as const, error: INVALID_CREDENTIALS };
+      return signInFailure("INVALID_CREDENTIALS");
     }
 
     if (clientIp !== undefined && clientIp.length > ADMIN_SIGN_IN_CLIENT_IP_MAX_LENGTH) {
-      return { ok: false as const, error: INVALID_CREDENTIALS };
+      return signInFailure("INVALID_CREDENTIALS");
     }
 
     const rateLimitKey = buildAdminSignInRateLimitKey(
@@ -54,11 +62,11 @@ export const signIn = mutation({
       normalizedEmail,
     );
     if (!rateLimitKey) {
-      return { ok: false as const, error: INVALID_CREDENTIALS };
+      return signInFailure("INVALID_CREDENTIALS");
     }
 
     if (await isAdminSignInRateLimited(ctx, rateLimitKey)) {
-      return { ok: false as const, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE };
+      return signInFailure("SIGN_IN_RATE_LIMITED");
     }
 
     const admin = await ctx.db
@@ -80,11 +88,11 @@ export const signIn = mutation({
 
     if (!admin || !authAccount || !valid) {
       await recordFailedAdminSignIn(ctx, rateLimitKey);
-      return { ok: false as const, error: INVALID_CREDENTIALS };
+      return signInFailure("INVALID_CREDENTIALS");
     }
 
     if (!admin.active) {
-      return { ok: false as const, error: INACTIVE_ACCOUNT };
+      return signInFailure("ACCOUNT_INACTIVE");
     }
 
     await clearAdminSignInFailures(ctx, rateLimitKey);
@@ -183,7 +191,7 @@ export const createAndProvisionAdmin = mutation({
 
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail) {
-      throw new Error("Invalid email.");
+      throw adminError("INVALID_EMAIL");
     }
     validatePasswordRequirements(password);
 

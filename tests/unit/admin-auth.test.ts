@@ -2,7 +2,7 @@ import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
-import { ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE } from "../../convex/admin/adminSignInRateLimit";
+import { ADMIN_ERROR_MESSAGES } from "../../shared/admin/errors";
 import {
   createStaffAuthorizationFixture,
   mutateOrganizerSignIn,
@@ -12,12 +12,12 @@ import {
   seedSubmittedApplication,
   signInOrganizer,
 } from "../helpers/staffTestFixtures";
-import { REVIEW_ALREADY_CLAIMED } from "../../convex/admin/reviewClaim";
 import {
   ADMIN_SESSION_TTL_MS,
   getCurrentAdmin,
   hashSessionToken,
 } from "../../convex/admin/staffAuth";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 const ref = {
   signOut: makeFunctionReference<"mutation", { sessionToken: string }>("admin/auth:signOut"),
@@ -90,13 +90,10 @@ type TestInstance = ConvexTestInstance;
 async function expectSignInFailure(
   t: TestInstance,
   args: { email: string; password: string },
-  pattern: RegExp,
+  code: "INVALID_CREDENTIALS" | "ACCOUNT_INACTIVE" | "SIGN_IN_RATE_LIMITED",
 ) {
   const result = await mutateOrganizerSignIn(t, args);
-  expect(result.ok).toBe(false);
-  if (!result.ok) {
-    expect(result.error).toMatch(pattern);
-  }
+  expect(result).toEqual({ ok: false, code, error: ADMIN_ERROR_MESSAGES[code] });
 }
 
 async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer") {
@@ -116,7 +113,11 @@ describe("organizer auth boundary", () => {
       password: ORGANIZER_TEST_PASSWORD,
       clientIp: "203.0.113.10",
     });
-    expect(blocked).toEqual({ ok: false, error: ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE });
+    expect(blocked).toEqual({
+      ok: false,
+      code: "SIGN_IN_RATE_LIMITED",
+      error: ADMIN_ERROR_MESSAGES.SIGN_IN_RATE_LIMITED,
+    });
   });
 
   it("rate-limits per IP and email so another IP can still attempt the same account", async () => {
@@ -181,7 +182,7 @@ describe("organizer auth boundary", () => {
     await expectSignInFailure(
       t,
       { email: "admin@hackuta.org", password: "WrongPass1" },
-      /invalid email or password/i,
+      "INVALID_CREDENTIALS",
     );
   });
 
@@ -192,7 +193,7 @@ describe("organizer auth boundary", () => {
     await expectSignInFailure(
       t,
       { email: "inactive@hackuta.org", password: ORGANIZER_TEST_PASSWORD },
-      /inactive/i,
+      "ACCOUNT_INACTIVE",
     );
   });
 
@@ -244,13 +245,14 @@ describe("organizer auth boundary", () => {
     const applicationId = await seedSubmittedApplication(t);
     const { sessionToken } = await signInOrganizer(t, "reviewer@hackuta.org");
 
-    await expect(
+    await expectAdminErrorCode(
       t.query(ref.listApplicationReviewLogs, {
         sessionToken,
         applicationId,
         paginationOpts: { numItems: 25, cursor: null },
       }),
-    ).rejects.toThrow(/not authorized/i);
+      "ADMIN_ONLY",
+    );
   });
 
   it("allows admin role to read review history", async () => {
@@ -271,13 +273,14 @@ describe("organizer auth boundary", () => {
     const t = createTest();
     const applicationId = await seedSubmittedApplication(t);
 
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.logApplicationReviewAction, {
         sessionToken: "deadbeef".repeat(8),
         applicationId,
         action: "viewed",
       }),
-    ).rejects.toThrow(/not authenticated/i);
+      "NOT_AUTHENTICATED",
+    );
   });
 
   it("sign-out removes the active session token", async () => {
@@ -293,7 +296,7 @@ describe("organizer auth boundary", () => {
     const t = createTest();
 
     // 1. Unauthenticated call must fail
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.createAndProvisionAdmin, {
         sessionToken: "invalid_session_token_that_does_not_exist_32",
         email: "newadmin@hackuta.org",
@@ -301,12 +304,13 @@ describe("organizer auth boundary", () => {
         role: "admin",
         password: ORGANIZER_TEST_PASSWORD,
       }),
-    ).rejects.toThrow(/not authenticated/i);
+      "NOT_AUTHENTICATED",
+    );
 
     // 2. Reviewer role must be rejected
     await seedAdminAccount(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
     const { sessionToken: reviewerToken } = await signInOrganizer(t, "reviewer1@hackuta.org");
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.createAndProvisionAdmin, {
         sessionToken: reviewerToken,
         email: "newadmin@hackuta.org",
@@ -314,7 +318,8 @@ describe("organizer auth boundary", () => {
         role: "admin",
         password: ORGANIZER_TEST_PASSWORD,
       }),
-    ).rejects.toThrow(/not authorized/i);
+      "ADMIN_ONLY",
+    );
 
     // 3. Admin role succeeds
     await seedAdminAccount(t, { email: "superadmin@hackuta.org", role: "admin", active: true });
@@ -334,7 +339,7 @@ describe("organizer auth boundary", () => {
     const t = createTest();
 
     // 1. Unauthenticated call must fail
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.createSampleApplication, {
         sessionToken: "invalid_session_token_that_does_not_exist_32",
         firstName: "Test",
@@ -342,12 +347,13 @@ describe("organizer auth boundary", () => {
         email: "applicant@test.edu",
         school: "Test University",
       }),
-    ).rejects.toThrow(/not authenticated/i);
+      "NOT_AUTHENTICATED",
+    );
 
     // 2. Reviewer role must be rejected
     await seedAdminAccount(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
     const { sessionToken: reviewerToken } = await signInOrganizer(t, "reviewer1@hackuta.org");
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.createSampleApplication, {
         sessionToken: reviewerToken,
         firstName: "Test",
@@ -355,7 +361,8 @@ describe("organizer auth boundary", () => {
         email: "applicant@test.edu",
         school: "Test University",
       }),
-    ).rejects.toThrow(/not authorized/i);
+      "ADMIN_ONLY",
+    );
 
     // 3. Admin role succeeds
     await seedAdminAccount(t, { email: "admin1@hackuta.org", role: "admin", active: true });
@@ -379,14 +386,14 @@ describe("organizer auth boundary", () => {
       await expectSignInFailure(
         t,
         { email: "locked@hackuta.org", password: "WrongPassword1!" },
-        /invalid email or password/i,
+        "INVALID_CREDENTIALS",
       );
     }
 
     await expectSignInFailure(
       t,
       { email: "locked@hackuta.org", password: ORGANIZER_TEST_PASSWORD },
-      /too many failed sign-in attempts/i,
+      "SIGN_IN_RATE_LIMITED",
     );
   });
 
@@ -404,7 +411,7 @@ describe("organizer auth boundary", () => {
     });
     expect(first.applicationId).toBeTruthy();
 
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.createSampleApplication, {
         sessionToken: adminToken,
         firstName: "Dup",
@@ -412,7 +419,8 @@ describe("organizer auth boundary", () => {
         email: "dup-applicant@test.edu",
         school: "Test University",
       }),
-    ).rejects.toThrow(/already has a submitted application/i);
+      "APPLICANT_ALREADY_SUBMITTED",
+    );
   });
 
   it("attributes sample review ownership to the authenticated admin session", async () => {
@@ -442,7 +450,7 @@ describe("organizer auth boundary", () => {
     await expectSignInFailure(
       t,
       { email: "nonexistent@hackuta.org", password: "SomePassword1!" },
-      /invalid email or password/i,
+      "INVALID_CREDENTIALS",
     );
   });
 });
@@ -542,13 +550,14 @@ describe("application review state", () => {
       action: "started_review",
     });
 
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.logApplicationReviewAction, {
         sessionToken: second.sessionToken,
         applicationId,
         action: "started_review",
       }),
-    ).rejects.toThrow(/already being reviewed/i);
+      "REVIEW_CLAIMED",
+    );
 
     const review = await getReview(t, applicationId);
     expect(review?.reviewedBy).toBe(first.adminId);
@@ -567,13 +576,14 @@ describe("application review state", () => {
       action: "started_review",
     });
 
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.setApplicationDecision, {
         sessionToken: second.sessionToken,
         applicationId,
         decision: "waitlisted",
       }),
-    ).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+      "REVIEW_CLAIMED",
+    );
   });
 
   it("allows reclaiming a stale review and resets startedAt", async () => {
@@ -651,13 +661,14 @@ describe("application review state", () => {
       decision: "accepted",
     });
 
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.logApplicationReviewAction, {
         sessionToken,
         applicationId,
         action: "started_review",
       }),
-    ).rejects.toThrow(/final decision/i);
+      "REVIEW_FINALIZED",
+    );
   });
 
   it("ignores review_ended from an admin who is not the current reviewer", async () => {
@@ -785,13 +796,14 @@ describe("application review state", () => {
     const t = createTest();
     const applicationId = await seedSubmittedApplication(t);
 
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(ref.setApplicationDecision, {
         sessionToken: "deadbeef".repeat(8),
         applicationId,
         decision: "accepted",
       }),
-    ).rejects.toThrow(/not authenticated/i);
+      "NOT_AUTHENTICATED",
+    );
     expect((await getReview(t, applicationId))?.reviewedBy).toBeUndefined();
   });
 });
@@ -816,9 +828,9 @@ describe("centralized staff authorization", () => {
           participants: await ctx.db.query("participants").collect(),
         }));
         const before = await snapshot();
-        await expect(t.mutation(ref.setApplicationDecision, {
+        await expectAdminErrorCode(t.mutation(ref.setApplicationDecision, {
           sessionToken, applicationId, decision,
-        })).rejects.toThrow(/application has not been submitted/i);
+        }), "APPLICATION_NOT_SUBMITTED");
         expect(await snapshot()).toEqual(before);
       },
     );
@@ -883,15 +895,15 @@ describe("centralized staff authorization", () => {
           }
         });
         expect(await t.run((ctx) => getCurrentAdmin(ctx, sessionToken))).toBeNull();
-        await expect(t.mutation(ref.logApplicationReviewAction, {
+        await expectAdminErrorCode(t.mutation(ref.logApplicationReviewAction, {
           sessionToken, applicationId, action: "viewed",
-        })).rejects.toThrow(/not authenticated/i);
-        await expect(t.mutation(ref.setApplicationDecision, {
+        }), "NOT_AUTHENTICATED");
+        await expectAdminErrorCode(t.mutation(ref.setApplicationDecision, {
           sessionToken, applicationId, decision: "accepted",
-        })).rejects.toThrow(/not authenticated/i);
-        await expect(t.query(ref.listApplicationReviewLogs, {
+        }), "NOT_AUTHENTICATED");
+        await expectAdminErrorCode(t.query(ref.listApplicationReviewLogs, {
           sessionToken, applicationId, paginationOpts: { numItems: 25, cursor: null },
-        })).rejects.toThrow(/not authenticated/i);
+        }), "NOT_AUTHENTICATED");
         expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
         expect(await t.run((ctx) => ctx.db.query("participants").collect())).toEqual([]);
         const review = await t.run((ctx) => ctx.db.query("applicationReviews").unique());
@@ -909,20 +921,20 @@ describe("centralized staff authorization", () => {
       subject: application!.authUserId, email: "applicant@example.com",
     });
     expect(await applicant.run((ctx) => getCurrentAdmin(ctx, ""))).toBeNull();
-    await expect(applicant.mutation(ref.setApplicationDecision, {
+    await expectAdminErrorCode(applicant.mutation(ref.setApplicationDecision, {
       sessionToken: "", applicationId, decision: "accepted",
-    })).rejects.toThrow(/not authenticated/i);
-    await expect(applicant.query(ref.listApplicationReviewLogs, {
+    }), "NOT_AUTHENTICATED");
+    await expectAdminErrorCode(applicant.query(ref.listApplicationReviewLogs, {
       sessionToken: "", applicationId, paginationOpts: { numItems: 25, cursor: null },
-    })).rejects.toThrow(/not authenticated/i);
+    }), "NOT_AUTHENTICATED");
   });
 
   it("applies role changes to existing sessions", async () => {
     const { t, adminId, applicationId, sessionToken } = await createAuthorizationFixture("admin");
     await t.run((ctx) => ctx.db.patch(adminId, { role: "reviewer" }));
-    await expect(t.query(ref.listApplicationReviewLogs, {
+    await expectAdminErrorCode(t.query(ref.listApplicationReviewLogs, {
       sessionToken, applicationId, paginationOpts: { numItems: 25, cursor: null },
-    })).rejects.toThrow(/not authorized/i);
+    }), "ADMIN_ONLY");
     await t.mutation(ref.logApplicationReviewAction, { sessionToken, applicationId, action: "viewed" });
   });
 

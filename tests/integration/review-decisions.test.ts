@@ -14,6 +14,8 @@ import {
   stubEmailService,
   type Decision,
 } from "../helpers/reviewTestKit";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
+import type { AdminErrorCode } from "../../shared/admin/errors";
 
 const decisions: Array<{ decision: Decision; note: string; subject: RegExp }> = [
   { decision: "accepted", note: "application_accepted", subject: /accepted/i },
@@ -139,7 +141,7 @@ describe.each(decisions)("$decision decision", ({ decision, note, subject }) => 
     const before = await snapshotReviewState(t);
 
     const other = decisions.find((entry) => entry.decision !== decision)!.decision;
-    await expect(decide(other)).rejects.toThrow(/already has a final decision/i);
+    await expectAdminErrorCode(decide(other), "REVIEW_FINALIZED");
     expect(await snapshotReviewState(t)).toEqual(before);
     expect(email.fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -190,7 +192,7 @@ describe("acceptance", () => {
     await t.run((ctx) => ctx.db.delete(applicant.userId));
     const before = await snapshotReviewState(t);
 
-    await expect(decide("accepted")).rejects.toThrow(/user account not found/i);
+    await expectAdminErrorCode(decide("accepted"), "APPLICANT_ACCOUNT_MISSING");
     expect(await snapshotReviewState(t)).toEqual(before);
   });
 
@@ -214,7 +216,7 @@ describe("acceptance", () => {
     });
     const before = await snapshotReviewState(t);
 
-    await expect(decide("accepted")).rejects.toThrow(/different application/i);
+    await expectAdminErrorCode(decide("accepted"), "PARTICIPANT_CONFLICT");
     expect(await snapshotReviewState(t)).toEqual(before);
   });
 });
@@ -262,10 +264,11 @@ describe("invalid application requests", () => {
   async function expectNoWrites(
     t: ConvexTestInstance,
     run: () => Promise<unknown>,
-    message: RegExp,
+    expected: AdminErrorCode | RegExp,
   ) {
     const before = await snapshotReviewState(t);
-    await expect(run()).rejects.toThrow(message);
+    if (typeof expected === "string") await expectAdminErrorCode(run, expected);
+    else await expect(run()).rejects.toThrow(expected);
     expect(await snapshotReviewState(t)).toEqual(before);
     expect(email.fetchMock).not.toHaveBeenCalled();
   }
@@ -273,7 +276,7 @@ describe("invalid application requests", () => {
   it.each(decisions.map((entry) => entry.decision))("rejects %s on a deleted application", async (decision) => {
     const { t, applicant, decide } = await setup();
     await t.run((ctx) => ctx.db.delete(applicant.applicationId));
-    await expectNoWrites(t, () => decide(decision), /application not found/i);
+    await expectNoWrites(t, () => decide(decision), "APPLICATION_NOT_FOUND");
   });
 
   it.each(decisions.map((entry) => entry.decision))("rejects %s on a draft application", async (decision) => {
@@ -283,7 +286,7 @@ describe("invalid application requests", () => {
     await expectNoWrites(
       t,
       () => t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision }),
-      /not been submitted/i,
+      "APPLICATION_NOT_SUBMITTED",
     );
   });
 
@@ -336,7 +339,7 @@ describe("invalid application requests", () => {
     await expectNoWrites(
       t,
       () => t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "accepted" }),
-      /already has a final decision/i,
+      "REVIEW_FINALIZED",
     );
   });
 
@@ -347,7 +350,7 @@ describe("invalid application requests", () => {
     await expectNoWrites(
       t,
       () => t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "rejected" }),
-      /already has a final decision/i,
+      "REVIEW_FINALIZED",
     );
   });
 });
