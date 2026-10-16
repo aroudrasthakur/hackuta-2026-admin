@@ -74,6 +74,7 @@ export function ApplicationDetail({ detail }: { detail: ApplicationDetailData })
         <p className="text-sm">Submitted: {formatApplicationDate(application.submittedAt)}</p>
         <p className="text-sm">Review status: {reviewStatus ? statusLabels[reviewStatus] : "Unreviewed"}</p>
       </header>
+      <ResumePreview key={application._id} resume={resume} />
       {sections.map(({ title, fields }) => (
         <section key={title} aria-label={title} className="rounded-lg border border-sand bg-white/40 p-5">
           <h3 className="font-display text-lg text-night">{title}</h3>
@@ -100,7 +101,6 @@ export function ApplicationDetail({ detail }: { detail: ApplicationDetailData })
           </dl>
         </section>
       ))}
-      <ResumePreview key={application._id} resume={resume} />
     </article>
   );
 }
