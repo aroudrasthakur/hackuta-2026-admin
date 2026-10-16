@@ -83,6 +83,7 @@ function staffContext(role: "reviewer" | "admin"): AdminAuthContextValue {
       expiresAt: Date.now() + 60_000,
     },
     sessionToken: "test-session",
+    authError: null,
     isAuthenticated: true,
     isLoading: false,
     sessionReady: true,
@@ -186,6 +187,54 @@ describe.each(["reviewer", "admin"] as const)(
       await search("Example University");
       await select(0, "accepted");
       expect(names()).toEqual(["Alex Chen"]);
+    });
+
+    it("shows final decision badges beside review links only when decided", async () => {
+      await renderPage();
+
+      const cardFor = (name: string) =>
+        Array.from(container.querySelectorAll("article")).find((article) =>
+          article.querySelector("h3")?.textContent?.includes(name),
+        )!;
+
+      for (const [name, label] of [
+        ["Alex Chen", "Accepted"],
+        ["Morgan Patel", "Waitlisted"],
+        ["Casey Jones", "Rejected"],
+      ]) {
+        const card = cardFor(name);
+        expect(card.querySelector('a[href*="/admin/applications/"]')?.textContent).toBe(
+          "Review Application",
+        );
+        expect(card.querySelector(`[aria-label="Decision: ${label}"]`)?.textContent).toBe(
+          label,
+        );
+      }
+
+      for (const name of ["Taylor Student", "Sam Lee"]) {
+        const card = cardFor(name);
+        expect(card.querySelector('a[href*="/admin/applications/"]')?.textContent).toBe(
+          "Review Application",
+        );
+        expect(card.querySelector('[aria-label^="Decision:"]')).toBeNull();
+      }
+    });
+
+    it("updates the badge when the current review status changes", async () => {
+      await renderPage();
+      const updatedApplications = fixtures().map((application) =>
+        application.applicantName === "Alex Chen"
+          ? { ...application, reviewStatus: "rejected" as const }
+          : application,
+      );
+      mocks.query.mockReturnValue(updatedApplications);
+      await search("Alex Chen");
+
+      const card = container.querySelector("article")!;
+      expect(card.querySelector('[aria-label="Decision: Rejected"]')?.textContent).toBe(
+        "Rejected",
+      );
+      expect(card.querySelector('[aria-label="Decision: Accepted"]')).toBeNull();
     });
 
     it("sorts newest first by default and supports oldest first", async () => {

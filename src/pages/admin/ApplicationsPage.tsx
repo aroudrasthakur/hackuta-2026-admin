@@ -15,6 +15,43 @@ import {
 } from "../../lib/applicationDisplay";
 import { ADMIN_ROUTES } from "../../types/routes";
 
+const decisionPresentations = {
+  accepted: {
+    label: "Accepted",
+    className: "border-green-200 bg-green-50 text-green-800",
+  },
+  rejected: {
+    label: "Rejected",
+    className: "border-red-200 bg-red-50 text-red-800",
+  },
+  waitlisted: {
+    label: "Waitlisted",
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+} as const;
+
+function ApplicationDecisionBadge({
+  status,
+}: {
+  status: SubmittedApplicationSummary["reviewStatus"];
+}) {
+  const decision =
+    status === "accepted" || status === "rejected" || status === "waitlisted"
+      ? decisionPresentations[status]
+      : null;
+
+  if (!decision) return null;
+
+  return (
+    <span
+      aria-label={`Decision: ${decision.label}`}
+      className={`inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-semibold ${decision.className}`}
+    >
+      {decision.label}
+    </span>
+  );
+}
+
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const applications = useQuery(listSubmittedApplicationsRef, { sessionToken });
   const [search, setSearch] = useState("");
@@ -159,12 +196,15 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
                 </dl>
 
                 <div className="mt-auto pt-5">
-                  <Link
-                    className="inline-flex w-full items-center justify-center rounded-md border border-ocean bg-ocean px-4 py-2 text-sm font-medium text-light transition hover:bg-ink"
-                    to={ADMIN_ROUTES.applicationReview(application.applicationId)}
-                  >
-                    Review Application
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      className="inline-flex flex-1 items-center justify-center rounded-md border border-ocean bg-ocean px-4 py-2 text-sm font-medium text-light transition hover:bg-ink"
+                      to={ADMIN_ROUTES.applicationReview(application.applicationId)}
+                    >
+                      Review Application
+                    </Link>
+                    <ApplicationDecisionBadge status={application.reviewStatus} />
+                  </div>
                 </div>
               </article>
             </li>
