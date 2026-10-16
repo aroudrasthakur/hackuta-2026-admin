@@ -49,7 +49,7 @@ function adminAuthApiMiddleware(config: AdminAuthApiConfig) {
         const response = await routeAdminAuthRequest(request, config);
         await writeNodeResponse(res, response);
       } catch (error) {
-        console.error("Organizer auth API request failed", error);
+        console.error("Organizer auth API request failed", { route: req.url }, error);
         res.statusCode = 500;
         res.end("Internal Server Error");
       }

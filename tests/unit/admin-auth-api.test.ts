@@ -5,6 +5,7 @@ import signOutRoute from "../../api/admin/sign-out";
 import { ADMIN_SESSION_COOKIE, isSecureRequest, readAdminSessionCookie, serializeAdminSessionCookie } from "../../server/adminAuthCookie";
 import { routeAdminAuthRequest } from "../../server/adminAuthHandlers";
 import { viteAdminAuthApiPlugin } from "../../server/viteAdminAuthApiPlugin";
+import { E2E_REVIEWER } from "../../shared/admin/e2e/credentials";
 import { ADMIN_ERROR_MESSAGES, SIGN_IN_FAILED_MESSAGE } from "../../shared/admin/errors";
 
 const convex = vi.hoisted(() => ({ mutation: vi.fn(), urls: [] as string[] }));
@@ -107,7 +108,44 @@ describe("sign-in API", () => {
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: SIGN_IN_FAILED_MESSAGE });
-    expect(consoleError).toHaveBeenCalledWith("Organizer sign-in failed", "boom");
+    expect(consoleError).toHaveBeenCalledWith(
+      "Organizer sign-in failed",
+      { route: "/api/admin/sign-in", convexFunction: "admin/auth:signIn", convexRequestId: null },
+      "boom",
+    );
+  });
+
+  it("logs the Convex request ID without the sign-in details", async () => {
+    convex.mutation.mockRejectedValue(
+      new Error("[CONVEX M(admin/auth:signIn)] [Request ID: 8f2c1d] Server Error"),
+    );
+    const response = await signInRoute(
+      post("/api/admin/sign-in", { email: "secret@hackuta.org", password: "hunter22" }),
+    );
+    expect(await response.json()).toEqual({ error: SIGN_IN_FAILED_MESSAGE });
+    expect(consoleError).toHaveBeenCalledWith(
+      "Organizer sign-in failed",
+      { route: "/api/admin/sign-in", convexFunction: "admin/auth:signIn", convexRequestId: "8f2c1d" },
+      expect.any(Error),
+    );
+    const logged = JSON.stringify(consoleError.mock.calls.map((call) => call.slice(0, 2)));
+    expect(logged).not.toContain("secret@hackuta.org");
+    expect(logged).not.toContain("hunter22");
+  });
+
+  it("returns the same failure shape from the E2E mock as from Convex", async () => {
+    vi.stubEnv("VITE_E2E_MOCK", "true");
+    const mocked = await signInRoute(post("/api/admin/sign-in", { email: E2E_REVIEWER.email, password: "wrong" }));
+    vi.stubEnv("VITE_E2E_MOCK", "false");
+    convex.mutation.mockResolvedValue({
+      ok: false,
+      code: "INVALID_CREDENTIALS",
+      error: ADMIN_ERROR_MESSAGES.INVALID_CREDENTIALS,
+    });
+    const real = await signInRoute(post("/api/admin/sign-in", { email: E2E_REVIEWER.email, password: "wrong" }));
+
+    expect(mocked.status).toBe(real.status);
+    expect(await mocked.json()).toEqual(await real.json());
   });
 
   it("rejects a body that is not JSON", async () => {
@@ -125,6 +163,7 @@ describe("sign-in API", () => {
     expect(await response.json()).toEqual({ error: SIGN_IN_FAILED_MESSAGE });
     expect(consoleError).toHaveBeenCalledWith(
       "Organizer sign-in failed",
+      expect.objectContaining({ convexRequestId: null }),
       expect.objectContaining({ message: expect.stringMatching(/Missing VITE_CONVEX_URL/) }),
     );
     expect(convex.mutation).not.toHaveBeenCalled();

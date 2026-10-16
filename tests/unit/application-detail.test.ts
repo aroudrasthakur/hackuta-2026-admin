@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { hashSessionToken } from "../../convex/admin/staffAuth";
 import { getApplicationRef, logApplicationReviewActionRef } from "../../src/convex/adminApi";
 import { createConvexTest } from "../helpers/convexTestContext";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 const sessionToken = "a".repeat(64);
 
@@ -88,9 +89,9 @@ describe("read-only submitted application detail", () => {
       })).rejects.toThrow();
     }
     await t.run((ctx) => ctx.db.delete(applicationId));
-    await expect(t.mutation(logApplicationReviewActionRef, {
+    await expectAdminErrorCode(t.mutation(logApplicationReviewActionRef, {
       sessionToken, applicationId, action: "viewed",
-    })).rejects.toThrow(/APPLICATION_NOT_FOUND/);
+    }), "APPLICATION_NOT_FOUND");
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
   });
 
@@ -164,7 +165,7 @@ describe("read-only submitted application detail", () => {
         if (condition === "inactive") await ctx.db.patch(adminId, { active: false });
       });
       const token = condition === "missing" ? "" : condition === "fake" ? "b".repeat(64) : sessionToken;
-      await expect(t.query(getApplicationRef, { sessionToken: token, applicationId })).rejects.toThrow(/NOT_AUTHENTICATED/);
+      await expectAdminErrorCode(t.query(getApplicationRef, { sessionToken: token, applicationId }), "NOT_AUTHENTICATED");
     },
   );
 
@@ -172,7 +173,7 @@ describe("read-only submitted application detail", () => {
     const { t, adminId, userId, applicationId } = fixture;
     await t.run((ctx) => ctx.db.patch(adminId, { role: "admin", email: "applicant@example.com" }));
     const applicant = t.withIdentity({ subject: userId, email: "applicant@example.com" });
-    await expect(applicant.query(getApplicationRef, { sessionToken: "", applicationId })).rejects.toThrow(/NOT_AUTHENTICATED/);
+    await expectAdminErrorCode(applicant.query(getApplicationRef, { sessionToken: "", applicationId }), "NOT_AUTHENTICATED");
   });
 
   it("resolves an attached resume and distinguishes a deleted file", async () => {

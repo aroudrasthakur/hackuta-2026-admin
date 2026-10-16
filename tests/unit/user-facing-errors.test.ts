@@ -13,6 +13,7 @@ import {
   UserFacingError,
   userFacingErrorMessage,
 } from "../../src/lib/userFacingError";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -67,5 +68,19 @@ describe("userFacingErrorMessage", () => {
     const original = new Error("db exploded");
     expect(reportUserFacingError("Saving failed", original, "Try again.")).toBe("Try again.");
     expect(consoleError).toHaveBeenCalledWith("Saving failed", original);
+  });
+});
+
+describe("expectAdminErrorCode", () => {
+  it("passes on the matching code", async () => {
+    await expectAdminErrorCode(Promise.reject(adminError("REVIEW_CLAIMED")), "REVIEW_CLAIMED");
+  });
+
+  it.each([
+    ["no error", () => Promise.resolve("ok")],
+    ["a different code", () => Promise.reject(adminError("ADMIN_ONLY"))],
+    ["a plain Error that only mentions the code", () => Promise.reject(new Error("REVIEW_CLAIMED"))],
+  ])("fails on %s", async (_label, run) => {
+    await expect(expectAdminErrorCode(run, "REVIEW_CLAIMED")).rejects.toThrow();
   });
 });

@@ -68,6 +68,12 @@ async function readJsonBody<T>(request: Request): Promise<T> {
   return (await request.json()) as T;
 }
 
+/** Convex puts its request ID in the error message; it links this log to the Convex dashboard. */
+function convexRequestId(error: unknown) {
+  const match = error instanceof Error ? /\[Request ID: ([^\]]+)\]/.exec(error.message) : null;
+  return match?.[1] ?? null;
+}
+
 function signInErrorStatus(code: AdminSignInFailureCode) {
   if (code === "ACCOUNT_INACTIVE") {
     return 403;
@@ -98,7 +104,10 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
     if (isE2eMockAuthEnabled()) {
       const result = e2eMockSignIn(email, password);
       if (!result.ok) {
-        return jsonResponse({ code: result.code, error: result.error }, { status: 401 });
+        return jsonResponse(
+          { code: result.code, error: result.error },
+          { status: signInErrorStatus(result.code) },
+        );
       }
       const headers = new Headers();
       headers.append(
@@ -124,8 +133,16 @@ export async function handleAdminSignIn(request: Request, configuredUrl?: string
     );
     return jsonResponse({ ok: true, expiresAt: result.expiresAt }, { headers });
   } catch (error) {
-    // Keep config and Convex details in server logs only.
-    console.error("Organizer sign-in failed", error);
+    // Keep config and Convex details in server logs only. Never log the email, password, or IP.
+    console.error(
+      "Organizer sign-in failed",
+      {
+        route: "/api/admin/sign-in",
+        convexFunction: "admin/auth:signIn",
+        convexRequestId: convexRequestId(error),
+      },
+      error,
+    );
     return jsonResponse({ error: SIGN_IN_FAILED_MESSAGE }, { status: 500 });
   }
 }
