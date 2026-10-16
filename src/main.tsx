@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { AdminBrowserRouter } from "./lib/adminBrowserRouter";
 import App from "./App";
 import { AdminAuthProvider } from "./contexts/AdminAuthProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -19,10 +19,9 @@ if (!root) {
 const app = (
   <React.StrictMode>
     <ErrorBoundary>
-      {/* Queue inputs use URL state and need each change committed before the next input event. */}
-      <BrowserRouter useTransitions={false}>
+      <AdminBrowserRouter>
         <App />
-      </BrowserRouter>
+      </AdminBrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>
 );

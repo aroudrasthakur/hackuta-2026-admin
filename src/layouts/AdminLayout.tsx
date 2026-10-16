@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { AdminNav } from "../components/AdminNav";
 import { useAdminAuth } from "../hooks/useAdminAuth";
+import { logAdminError } from "../../shared/admin/logAdminError";
 import { reviewSecondaryButtonClass } from "../lib/reviewButtonClasses";
 import { ADMIN_ROUTES } from "../types/routes";
 
@@ -17,7 +18,11 @@ export function AdminLayout() {
     try {
       await signOut();
       navigate(ADMIN_ROUTES.login, { replace: true });
-    } catch {
+    } catch (error) {
+      logAdminError("Organizer sign-out failed", error, {
+        source: "AdminLayout.handleSignOut",
+        route: "/api/admin/sign-out",
+      });
       setSignOutError("Unable to sign out. Please try again.");
       setIsSigningOut(false);
     }

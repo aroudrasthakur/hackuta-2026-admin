@@ -125,7 +125,7 @@ describe.each(["reviewer", "admin"] as const)(
     async function renderPage(path = "/admin/applications") {
       await act(async () => {
         root.render(
-          <MemoryRouter initialEntries={[path]} useTransitions={false}>
+          <MemoryRouter initialEntries={[path]}>
             <AdminAuthContext.Provider value={staffContext(role)}>
               <ApplicationsPage />
             </AdminAuthContext.Provider>

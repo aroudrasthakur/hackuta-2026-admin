@@ -13,6 +13,7 @@ import { getApplicationRef, logApplicationReviewActionRef } from "../../convex/a
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { ADMIN_ROUTES } from "../../types/routes";
 import { useNow } from "../../hooks/useNow";
+import { resolveReviewIsStale } from "../../../shared/admin/reviewActivityStale";
 
 export function ApplicationReviewContent({
   applicationId,
@@ -29,14 +30,15 @@ export function ApplicationReviewContent({
 }) {
   const loadedDetail = useQuery(getApplicationRef, { sessionToken, applicationId });
   const now = useNow();
-  const detail = loadedDetail ? {
-    ...loadedDetail,
-    reviewActivity: {
-      ...loadedDetail.reviewActivity,
-      isStale: loadedDetail.reviewActivity.expiresAt !== undefined
-        ? now > loadedDetail.reviewActivity.expiresAt : loadedDetail.reviewActivity.isStale,
-    },
-  } : loadedDetail;
+  const detail = loadedDetail
+    ? {
+        ...loadedDetail,
+        reviewActivity: {
+          ...loadedDetail.reviewActivity,
+          isStale: resolveReviewIsStale(loadedDetail.reviewActivity, now),
+        },
+      }
+    : loadedDetail;
   const recordView = useMutation(logApplicationReviewActionRef);
   const viewRequest = useRef<{
     applicationId: string;
