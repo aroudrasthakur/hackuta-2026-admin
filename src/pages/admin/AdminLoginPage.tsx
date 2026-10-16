@@ -18,9 +18,9 @@ export function AdminLoginPage() {
   if (isLoading) {
     return (
       <StormPageFrame>
-        <div className="flex min-h-screen items-center justify-center px-4">
+        <main id="admin-content" tabIndex={-1} className="flex min-h-screen items-center justify-center px-4">
           <LoadingState message="Checking session…" />
-        </div>
+        </main>
       </StormPageFrame>
     );
   }
@@ -47,7 +47,7 @@ export function AdminLoginPage() {
 
   return (
     <StormPageFrame>
-      <div className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
+      <main id="admin-content" tabIndex={-1} className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
         <div className="sign-in-card w-full">
           <div className="sign-in-card__heading">
             <p className="text-xs uppercase tracking-wide text-mist">HackUTA 2026</p>
@@ -96,7 +96,7 @@ export function AdminLoginPage() {
             </button>
           </form>
         </div>
-      </div>
+      </main>
     </StormPageFrame>
   );
 }

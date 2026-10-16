@@ -597,7 +597,7 @@ describe("application review state", () => {
       applicationId,
       action: "started_review",
     });
-    const originalStartedAt = (await getReview(t, applicationId))?.startedAt;
+    const originalStartedAt = Date.now() - 31 * 60 * 1000;
 
     await t.run(async (ctx) => {
       const review = await ctx.db
@@ -606,7 +606,8 @@ describe("application review state", () => {
         .unique();
       if (!review) throw new Error("missing review");
       await ctx.db.patch(review._id, {
-        lastActiveAt: Date.now() - 31 * 60 * 1000,
+        startedAt: originalStartedAt,
+        lastActiveAt: originalStartedAt,
       });
     });
 
@@ -618,7 +619,7 @@ describe("application review state", () => {
 
     const review = await getReview(t, applicationId);
     expect(review?.reviewedBy).toBe(second.adminId);
-    expect(review?.startedAt).toBeGreaterThan(originalStartedAt!);
+    expect(review?.startedAt).toBeGreaterThan(originalStartedAt);
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toHaveLength(2);
   });
 

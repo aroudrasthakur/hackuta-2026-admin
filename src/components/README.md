@@ -4,6 +4,8 @@
 | --- | --- |
 | [`AdminNav.tsx`](AdminNav.tsx) | Applications nav |
 | [`ApplicationDetail.tsx`](ApplicationDetail.tsx) | Read-only applicant fields |
+| [`ApplicationsList.tsx`](ApplicationsList.tsx) | Desktop queue table and mobile cards |
+| [`ApplicationStatusBadge.tsx`](ApplicationStatusBadge.tsx) | Consistent queue status labels |
 | [`ApplicationReviewControls.tsx`](ApplicationReviewControls.tsx) | Review claim |
 | [`ApplicationDecisionControls.tsx`](ApplicationDecisionControls.tsx) | Two-step decisions |
 | [`ApplicationReviewHistory.tsx`](ApplicationReviewHistory.tsx) | Admin audit timeline |

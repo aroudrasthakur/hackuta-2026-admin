@@ -5,25 +5,40 @@ import { ApplicationDetail } from "../../components/ApplicationDetail";
 import { ApplicationDecisionControls } from "../../components/ApplicationDecisionControls";
 import { ApplicationReviewControls } from "../../components/ApplicationReviewControls";
 import { ApplicationReviewHistory } from "../../components/ApplicationReviewHistory";
+import { NextApplicationLink } from "../../components/NextApplicationLink";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
 import { getApplicationRef, logApplicationReviewActionRef } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { ADMIN_ROUTES } from "../../types/routes";
+import { useNow } from "../../hooks/useNow";
+import { resolveReviewIsStale } from "../../../shared/admin/reviewActivityStale";
 
 export function ApplicationReviewContent({
   applicationId,
   sessionToken,
   staffAdminId,
   isAdmin,
+  applicationsSearch = "",
 }: {
   applicationId: string;
   sessionToken: string;
   staffAdminId: string;
   isAdmin: boolean;
+  applicationsSearch?: string;
 }) {
-  const detail = useQuery(getApplicationRef, { sessionToken, applicationId });
+  const loadedDetail = useQuery(getApplicationRef, { sessionToken, applicationId });
+  const now = useNow();
+  const detail = loadedDetail
+    ? {
+        ...loadedDetail,
+        reviewActivity: {
+          ...loadedDetail.reviewActivity,
+          isStale: resolveReviewIsStale(loadedDetail.reviewActivity, now),
+        },
+      }
+    : loadedDetail;
   const recordView = useMutation(logApplicationReviewActionRef);
   const viewRequest = useRef<{
     applicationId: string;
@@ -71,17 +86,21 @@ export function ApplicationReviewContent({
           We couldn’t record this application view. Please reopen the application to try again.
         </p>
       )}
-      <ApplicationReviewControls
-        detail={detail}
-        sessionToken={sessionToken}
-        staffAdminId={staffAdminId}
-      />
-      <ApplicationDecisionControls
-        detail={detail}
-        sessionToken={sessionToken}
-        blockedByOther={blockedByOther}
-      />
-      <ApplicationDetail detail={detail} />
+      <ApplicationDetail detail={detail}>
+        <ApplicationReviewControls
+          detail={detail}
+          sessionToken={sessionToken}
+          staffAdminId={staffAdminId}
+        />
+        <ApplicationDecisionControls
+          detail={detail}
+          sessionToken={sessionToken}
+          blockedByOther={blockedByOther}
+        />
+        <ErrorBoundary fallback={<p className="text-sm text-ocean">Next application is unavailable. Return to Applications to continue.</p>}>
+          <NextApplicationLink applicationId={applicationId} sessionToken={sessionToken} staffAdminId={staffAdminId} applicationsSearch={applicationsSearch} />
+        </ErrorBoundary>
+      </ApplicationDetail>
       {isAdmin && (
         <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />
       )}
@@ -93,10 +112,12 @@ export function ApplicationReviewPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
   const location = useLocation();
   const { sessionToken, staff } = useAdminAuth();
+  const applicationsSearch = typeof location.state?.applicationsSearch === "string"
+    ? location.state.applicationsSearch : "";
 
   return (
     <div className="space-y-5">
-      <Link className="inline-block text-sm underline" to={ADMIN_ROUTES.applications}>Back to Applications</Link>
+      <Link className="inline-flex min-h-11 items-center rounded-md text-sm font-medium text-ocean underline underline-offset-4" to={`${ADMIN_ROUTES.applications}${applicationsSearch ? `?${applicationsSearch}` : ""}`}>Back to Applications</Link>
       {sessionToken && applicationId && staff ? (
         <ErrorBoundary
           key={`${location.key}:${applicationId}:${staff.adminId}`}
@@ -112,6 +133,7 @@ export function ApplicationReviewPage() {
             sessionToken={sessionToken}
             staffAdminId={staff.adminId}
             isAdmin={staff.role === "admin"}
+            applicationsSearch={applicationsSearch}
           />
         </ErrorBoundary>
       ) : <LoadingState message="Verifying organizer session…" />}

@@ -116,7 +116,16 @@ describe("ApplicationDecisionControls", () => {
     await act(async () => button(confirm)!.click());
     expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ decision }));
     expect(container.textContent).toContain(message);
-    expect(container.textContent).toContain("will receive an email shortly");
+    expect(container.textContent).toContain("email scheduled.");
+  });
+
+  it.each([undefined, "   "])("does not claim an email was scheduled for a missing address (%s)", async (email) => {
+    await renderControls({ detail: detail({ application: { ...detail().application, email } }) });
+    await act(async () => button("Reject")!.click());
+    await act(async () => button("Confirm rejection")!.click());
+    expect(container.querySelector('[role="status"]')?.textContent).toBe(
+      "Application rejected. No email scheduled: applicant email is missing.",
+    );
   });
 
   it("sends only one request while finalization is pending", async () => {
@@ -188,5 +197,36 @@ describe("ApplicationDecisionControls", () => {
       }),
     });
     expect(container.querySelector('section[aria-label="Application decision"]')).toBeNull();
+  });
+
+  it("offers only confirmed acceptance for a waitlisted applicant", async () => {
+    await renderControls({ detail: detail({ reviewStatus: "waitlisted", reviewActivity: { ...detail().reviewActivity, isFinal: true } }) });
+    expect(button("Reject")).toBeUndefined();
+    expect(button("Waitlist")).toBeUndefined();
+    await act(async () => button("Accept from waitlist")!.click());
+    expect(mocks.finalize).not.toHaveBeenCalled();
+    await act(async () => button("Confirm acceptance")!.click());
+    expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ decision: "accepted" }));
+  });
+
+  it("focuses confirmation, restores the selected choice on cancel, and identifies the applicant", async () => {
+    await renderControls();
+    button("Reject")!.focus();
+    await act(async () => button("Reject")!.click());
+    expect(document.activeElement).toBe(button("Confirm rejection"));
+    expect(container.textContent).toContain("taylor@example.com");
+    await act(async () => button("Cancel")!.click());
+    expect(document.activeElement).toBe(button("Reject"));
+  });
+
+  it("retains and focuses completion after the live query reports a final decision", async () => {
+    await renderControls();
+    await act(async () => button("Accept")!.click());
+    await act(async () => button("Confirm acceptance")!.click());
+    await renderControls({ detail: detail({ reviewStatus: "accepted", reviewActivity: { ...detail().reviewActivity, isFinal: true } }) });
+    const notice = container.querySelector('[role="status"]');
+    expect(notice?.textContent).toContain("Application accepted");
+    expect(document.activeElement).toBe(notice);
+    expect(button("Accept")).toBeUndefined();
   });
 });

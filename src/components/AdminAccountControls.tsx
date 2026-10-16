@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { logAdminError } from "../../shared/admin/logAdminError";
 import { useAdminAuth } from "../hooks/useAdminAuth";
 import { subscribeMediaQuery } from "../lib/matchMediaSubscribe";
 import { ADMIN_ROUTES } from "../types/routes";
@@ -16,6 +17,8 @@ export function AdminAccountControls() {
   const { staff, signOut } = useAdminAuth();
   const [compact, setCompact] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const signOutMenuItemRef = useRef<HTMLButtonElement>(null);
@@ -58,8 +61,19 @@ export function AdminAccountControls() {
 
   async function handleSignOut() {
     setMenuOpen(false);
-    await signOut();
-    navigate(ADMIN_ROUTES.login, { replace: true });
+    setIsSigningOut(true);
+    setSignOutError(null);
+    try {
+      await signOut();
+      navigate(ADMIN_ROUTES.login, { replace: true });
+    } catch (error) {
+      logAdminError("Organizer sign-out failed", error, {
+        source: "AdminAccountControls.handleSignOut",
+        route: "/api/admin/sign-out",
+      });
+      setSignOutError("Unable to sign out. Please try again.");
+      setIsSigningOut(false);
+    }
   }
 
   function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -71,6 +85,7 @@ export function AdminAccountControls() {
   }
 
   const roleLabel = staff?.role ? formatRole(staff.role) : null;
+  const signOutLabel = isSigningOut ? "Signing out…" : "Sign out";
 
   return (
     <div className="admin-topbar__account">
@@ -98,6 +113,7 @@ export function AdminAccountControls() {
             aria-controls={menuId}
             aria-haspopup="menu"
             aria-label={`Account menu for ${staff.name}`}
+            disabled={isSigningOut}
             onClick={() => setMenuOpen((open) => !open)}
           >
             <span className="admin-topbar__chip-label">{staff.name}</span>
@@ -120,9 +136,10 @@ export function AdminAccountControls() {
                 type="button"
                 role="menuitem"
                 className="admin-topbar__menu-item"
+                disabled={isSigningOut}
                 onClick={() => void handleSignOut()}
               >
-                Sign out
+                {signOutLabel}
               </button>
             </div>
           ) : null}
@@ -130,9 +147,20 @@ export function AdminAccountControls() {
       ) : null}
 
       {staff && !compact ? (
-        <button type="button" className="admin-topbar__sign-out" onClick={() => void handleSignOut()}>
-          Sign out
+        <button
+          type="button"
+          className="admin-topbar__sign-out"
+          disabled={isSigningOut}
+          onClick={() => void handleSignOut()}
+        >
+          {signOutLabel}
         </button>
+      ) : null}
+
+      {signOutError ? (
+        <p role="alert" className="admin-topbar__sign-out-error">
+          {signOutError}
+        </p>
       ) : null}
     </div>
   );

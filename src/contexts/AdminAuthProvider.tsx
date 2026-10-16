@@ -90,8 +90,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     try {
       await signOutAdminCookie();
-    } catch {
-      // Clear in-memory session even if the API call fails.
+    } catch (error) {
+      logAdminError("Organizer sign-out API failed", error, {
+        source: "AdminAuthProvider.signOut",
+        route: "/api/admin/sign-out",
+      });
+      throw error;
     }
     hadStaff.current = false;
     setSessionToken(null);

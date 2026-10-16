@@ -52,9 +52,9 @@ export function AdminLayout() {
           </div>
         </header>
         <div style={{ height: headerOffset }} aria-hidden="true" />
-        <div className="mx-auto max-w-6xl px-4 py-8">
+        <main id="admin-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-8">
           <Outlet />
-        </div>
+        </main>
       </div>
     </StormPageFrame>
   );

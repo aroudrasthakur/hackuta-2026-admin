@@ -94,4 +94,14 @@ describe("submitted applications dashboard query", () => {
     await t.query(listSubmittedApplicationsRef, { sessionToken });
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
   });
+
+  it("includes claim expiration while distinguishing new unassigned submissions", async () => {
+    const { t, submittedId, reviewedId, adminId } = fixture;
+    await t.run((ctx) => ctx.db.insert("applicationReviews", {
+      applicationId: submittedId, status: "under_review", createdAt: Date.now(), updatedAt: Date.now(),
+    }));
+    const list = await t.query(listSubmittedApplicationsRef, { sessionToken });
+    expect(list.find((item) => item.applicationId === submittedId)?.reviewClaim).toBeUndefined();
+    expect(list.find((item) => item.applicationId === reviewedId)?.reviewClaim).toEqual({ reviewedBy: adminId, expiresAt: 1 + 30 * 60_000 });
+  });
 });
