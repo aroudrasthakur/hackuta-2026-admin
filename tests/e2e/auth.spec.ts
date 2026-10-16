@@ -25,7 +25,7 @@ test.describe("organizer authentication", () => {
 
   test("signs in and signs out", async ({ page }) => {
     await signInOrganizer(page, E2E_REVIEWER);
-    await expect(page.getByText(/Signed in as/)).toContainText(E2E_REVIEWER.name);
+    await expect(page.getByText(E2E_REVIEWER.name)).toBeVisible();
     await signOutOrganizer(page);
     await page.goto("/admin/applications");
     await expect(page).toHaveURL(/\/admin\/login$/);

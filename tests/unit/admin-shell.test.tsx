@@ -140,8 +140,10 @@ describe("app routes", () => {
   it.each(["/", "/admin", "/unknown"])("sends %s to the applications page", async (path) => {
     await renderApp(path, authContext());
     expect(currentPath()).toBe("/admin/applications");
-    expect(container.textContent).toContain("Signed in as Jordan Reviewer (reviewer)");
+    expect(container.textContent).toContain("Jordan Reviewer");
+    expect(container.textContent).toContain("Reviewer");
     expect(container.querySelector('nav[aria-label="Admin"] a')?.textContent).toBe("Applications");
+    expect(container.textContent).toMatch(/Jordan Reviewer\s*·\s*Reviewer/);
   });
 
   it("sends signed-out visitors to sign-in", async () => {
