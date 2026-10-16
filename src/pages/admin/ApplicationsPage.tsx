@@ -30,22 +30,33 @@ const decisionPresentations = {
   },
 } as const;
 
+type FinalDecisionStatus = keyof typeof decisionPresentations;
+
+const DECISION_BADGE_BASE_CLASS =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-4 py-2 text-sm font-semibold";
+
+function decisionPresentationForStatus(
+  status: SubmittedApplicationSummary["reviewStatus"],
+) {
+  if (status === null || status === undefined || !(status in decisionPresentations)) {
+    return null;
+  }
+  return decisionPresentations[status as FinalDecisionStatus];
+}
+
 function ApplicationDecisionBadge({
   status,
 }: {
   status: SubmittedApplicationSummary["reviewStatus"];
 }) {
-  const decision =
-    status === "accepted" || status === "rejected" || status === "waitlisted"
-      ? decisionPresentations[status]
-      : null;
+  const decision = decisionPresentationForStatus(status);
 
   if (!decision) return null;
 
   return (
     <span
       aria-label={`Decision: ${decision.label}`}
-      className={`inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-semibold ${decision.className}`}
+      className={`${DECISION_BADGE_BASE_CLASS} ${decision.className}`}
     >
       {decision.label}
     </span>
@@ -196,9 +207,9 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
                 </dl>
 
                 <div className="mt-auto pt-5">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-stretch gap-2">
                     <Link
-                      className="inline-flex flex-1 items-center justify-center rounded-md border border-ocean bg-ocean px-4 py-2 text-sm font-medium text-light transition hover:bg-ink"
+                      className="inline-flex min-w-[8.5rem] flex-1 items-center justify-center rounded-md border border-ocean bg-ocean px-4 py-2 text-sm font-medium text-light transition hover:bg-ink"
                       to={ADMIN_ROUTES.applicationReview(application.applicationId)}
                     >
                       Review Application

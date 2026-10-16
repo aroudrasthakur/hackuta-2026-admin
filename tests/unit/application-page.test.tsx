@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { getByLabelText, queryByLabelText, within } from "@testing-library/dom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
@@ -132,6 +133,18 @@ describe.each(["reviewer", "admin"] as const)(
       );
     }
 
+    function articleForApplicant(name: string) {
+      for (const article of container.querySelectorAll("article")) {
+        try {
+          within(article).getByRole("heading", { level: 3, name });
+          return article;
+        } catch {
+          // try next card
+        }
+      }
+      throw new Error(`Missing application card for ${name}`);
+    }
+
     async function search(value: string) {
       const input = container.querySelector<HTMLInputElement>(
         'input[type="search"]',
@@ -192,31 +205,22 @@ describe.each(["reviewer", "admin"] as const)(
     it("shows final decision badges beside review links only when decided", async () => {
       await renderPage();
 
-      const cardFor = (name: string) =>
-        Array.from(container.querySelectorAll("article")).find((article) =>
-          article.querySelector("h3")?.textContent?.includes(name),
-        )!;
-
       for (const [name, label] of [
         ["Alex Chen", "Accepted"],
         ["Morgan Patel", "Waitlisted"],
         ["Casey Jones", "Rejected"],
-      ]) {
-        const card = cardFor(name);
-        expect(card.querySelector('a[href*="/admin/applications/"]')?.textContent).toBe(
-          "Review Application",
-        );
-        expect(card.querySelector(`[aria-label="Decision: ${label}"]`)?.textContent).toBe(
-          label,
-        );
+      ] as const) {
+        const card = articleForApplicant(name);
+        expect(
+          within(card).getByRole("link", { name: "Review Application" }).getAttribute("href"),
+        ).toContain("/admin/applications/");
+        expect(getByLabelText(card, `Decision: ${label}`).textContent).toBe(label);
       }
 
       for (const name of ["Taylor Student", "Sam Lee"]) {
-        const card = cardFor(name);
-        expect(card.querySelector('a[href*="/admin/applications/"]')?.textContent).toBe(
-          "Review Application",
-        );
-        expect(card.querySelector('[aria-label^="Decision:"]')).toBeNull();
+        const card = articleForApplicant(name);
+        within(card).getByRole("link", { name: "Review Application" });
+        expect(queryByLabelText(card, /^Decision:/)).toBeNull();
       }
     });
 
@@ -230,11 +234,9 @@ describe.each(["reviewer", "admin"] as const)(
       mocks.query.mockReturnValue(updatedApplications);
       await search("Alex Chen");
 
-      const card = container.querySelector("article")!;
-      expect(card.querySelector('[aria-label="Decision: Rejected"]')?.textContent).toBe(
-        "Rejected",
-      );
-      expect(card.querySelector('[aria-label="Decision: Accepted"]')).toBeNull();
+      const card = articleForApplicant("Alex Chen");
+      expect(getByLabelText(card, "Decision: Rejected").textContent).toBe("Rejected");
+      expect(queryByLabelText(card, "Decision: Accepted")).toBeNull();
     });
 
     it("sorts newest first by default and supports oldest first", async () => {
