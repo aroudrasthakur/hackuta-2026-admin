@@ -38,8 +38,9 @@ test.describe("applications queue", () => {
     for (let attempt = 0; attempt < 8; attempt += 1) {
       await page.getByLabel("Search applications").fill("taylor");
       await page.getByLabel("Search applications").fill("");
-      await page.getByLabel("Review status").selectOption("accepted");
       await expect(page.getByLabel("Search applications")).toHaveValue("");
+      await page.getByLabel("Review status").selectOption("accepted");
+      await expect(page.getByRole("status")).toContainText("1 of 4 applications");
       await expect(page.getByRole("link", { name: "Review application for Alex Accepted" })).toBeVisible();
       await page.getByLabel("Review status").selectOption("needs_review");
     }
@@ -94,7 +95,9 @@ test.describe("applications queue", () => {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.getByRole("table")).toHaveCount(width >= 1024 ? 1 : 0);
       await expect(page.getByRole("article")).toHaveCount(width >= 1024 ? 0 : 3);
-      await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Sign out" }).or(page.getByRole("button", { name: /Account menu for/i })),
+      ).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       if (width === 1440 || width === 375) {
         await page.screenshot({ path: testInfo.outputPath(`applications-${width}.png`), fullPage: true });

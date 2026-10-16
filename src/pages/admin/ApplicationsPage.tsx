@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { ApplicationsList } from "../../components/ApplicationsList";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
@@ -12,29 +13,78 @@ import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { needsApplicationReview } from "../../../shared/admin/reviewQueue";
 import { useNow } from "../../hooks/useNow";
 
-const controlClass = "mt-1.5 min-h-11 w-full rounded-md border border-ocean/70 bg-white px-3 py-2 text-sm text-night placeholder:text-ocean";
+const controlClass =
+  "mt-1.5 min-h-11 w-full rounded-md border border-ocean/70 bg-white px-3 py-2 text-sm text-night placeholder:text-ocean focus:outline focus:outline-2 focus:outline-solid focus:outline-ocean";
 
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const now = useNow();
   const { staff } = useAdminAuth();
   const applications = useQuery(listSubmittedApplicationsRef, { sessionToken });
   const [searchParams, setSearchParams] = useSearchParams();
-  const { search, status, sortOrder, reviewer } = queueControls(searchParams);
-  const searchText = search.trim().toLowerCase();
+  const { status, sortOrder, reviewer } = queueControls(searchParams);
+  const initialSearch = searchParams.get("search") ?? queueDefaults.search;
+  const latestSearchRef = useRef(initialSearch);
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const searchText = searchInput.trim().toLowerCase();
+  const skipUrlSearchSync = useRef(false);
 
-  function updateControl(key: keyof typeof queueDefaults, value: string) {
-    setSearchParams((previous) => {
-      const next = new URLSearchParams(previous);
-      if (value === "" || value === queueDefaults[key]) {
-        next.delete(key);
-      } else {
-        next.set(key, value);
-      }
-      return next;
-    }, { replace: true });
+  useEffect(() => {
+    if (skipUrlSearchSync.current) {
+      skipUrlSearchSync.current = false;
+      return;
+    }
+    const urlSearch = searchParams.get("search") ?? queueDefaults.search;
+    latestSearchRef.current = urlSearch;
+    setSearchInput(urlSearch);
+  }, [searchParams]);
+
+  function updateSearch(value: string) {
+    latestSearchRef.current = value;
+    skipUrlSearchSync.current = true;
+    flushSync(() => {
+      setSearchInput(value);
+      setSearchParams((previous) => {
+        const term = latestSearchRef.current;
+        const next = new URLSearchParams(previous);
+        if (term === "" || term === queueDefaults.search) {
+          next.delete("search");
+        } else {
+          next.set("search", term);
+        }
+        return next;
+      }, { replace: true });
+    });
   }
 
-  const visibleApplications = applicationsInQueue(applications ?? [], searchParams, staff?.adminId ?? "", now);
+  function updateControl(key: keyof typeof queueDefaults, value: string) {
+    if (key === "search") {
+      updateSearch(value);
+      return;
+    }
+    flushSync(() => {
+      setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        if (value === "" || value === queueDefaults[key]) {
+          next.delete(key);
+        } else {
+          next.set(key, value);
+        }
+        return next;
+      }, { replace: true });
+    });
+  }
+
+  const queueParams = useMemo(() => {
+    const next = new URLSearchParams(searchParams);
+    if (searchInput === "" || searchInput === queueDefaults.search) {
+      next.delete("search");
+    } else {
+      next.set("search", searchInput);
+    }
+    return next;
+  }, [searchParams, searchInput]);
+
+  const visibleApplications = applicationsInQueue(applications ?? [], queueParams, staff?.adminId ?? "", now);
 
   if (applications === undefined) {
     return (
@@ -52,7 +102,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   }
 
   const hasCustomControls =
-    search !== queueDefaults.search || status !== queueDefaults.status ||
+    searchInput !== queueDefaults.search || status !== queueDefaults.status ||
     sortOrder !== queueDefaults.sort || reviewer !== queueDefaults.reviewer;
   const queueIsClear =
     status === queueDefaults.status && searchText === "" &&
@@ -72,8 +122,8 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
           Search applications
           <input
             type="search"
-            value={search}
-            onChange={(event) => updateControl("search", event.target.value)}
+            value={searchInput}
+            onChange={(event) => updateSearch(event.target.value)}
             placeholder="Name, email, or school"
             className={controlClass}
           />
