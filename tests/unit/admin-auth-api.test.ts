@@ -108,11 +108,12 @@ describe("sign-in API", () => {
     const response = await signInRoute(post("/api/admin/sign-in", { email: "a", password: "b" }));
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: SIGN_IN_FAILED_MESSAGE });
-    expect(consoleError).toHaveBeenCalledWith(
-      "Organizer sign-in failed",
-      { route: "/api/admin/sign-in", convexFunction: "admin/auth:signIn", convexRequestId: null },
-      "boom",
-    );
+    expect(consoleError).toHaveBeenCalledWith("Organizer sign-in failed", {
+      route: "/api/admin/sign-in",
+      convexFunction: "admin/auth:signIn",
+      convexRequestId: null,
+      errorType: "string",
+    });
   });
 
   it("logs the Convex request ID without the sign-in details", async () => {
@@ -123,12 +124,14 @@ describe("sign-in API", () => {
       post("/api/admin/sign-in", { email: "secret@hackuta.org", password: "hunter22" }),
     );
     expect(await response.json()).toEqual({ error: SIGN_IN_FAILED_MESSAGE });
-    expect(consoleError).toHaveBeenCalledWith(
-      "Organizer sign-in failed",
-      { route: "/api/admin/sign-in", convexFunction: "admin/auth:signIn", convexRequestId: "8f2c1d" },
-      expect.any(Error),
-    );
-    const logged = JSON.stringify(consoleError.mock.calls.map((call) => call.slice(0, 2)));
+    expect(consoleError).toHaveBeenCalledWith("Organizer sign-in failed", {
+      route: "/api/admin/sign-in",
+      convexFunction: "admin/auth:signIn",
+      convexRequestId: "8f2c1d",
+      errorName: "Error",
+      errorMessage: expect.stringContaining("Request ID: 8f2c1d"),
+    });
+    const logged = JSON.stringify(consoleError.mock.calls);
     expect(logged).not.toContain("secret@hackuta.org");
     expect(logged).not.toContain("hunter22");
   });
@@ -163,8 +166,10 @@ describe("sign-in API", () => {
     expect(await response.json()).toEqual({ error: SIGN_IN_FAILED_MESSAGE });
     expect(consoleError).toHaveBeenCalledWith(
       "Organizer sign-in failed",
-      expect.objectContaining({ convexRequestId: null }),
-      expect.objectContaining({ message: expect.stringMatching(/Missing VITE_CONVEX_URL/) }),
+      expect.objectContaining({
+        convexRequestId: null,
+        errorMessage: expect.stringMatching(/Missing VITE_CONVEX_URL/),
+      }),
     );
     expect(convex.mutation).not.toHaveBeenCalled();
   });

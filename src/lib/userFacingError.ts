@@ -3,6 +3,7 @@ import {
   adminErrorCode,
   GENERIC_ERROR_MESSAGE,
 } from "../../shared/admin/errors";
+import { logAdminError, type AdminLogMeta } from "../../shared/admin/logAdminError";
 
 /** An error whose message was written for organizers and is safe to display as-is. */
 export class UserFacingError extends Error {
@@ -22,8 +23,13 @@ export function userFacingErrorMessage(caught: unknown, fallback = GENERIC_ERROR
   return code ? ADMIN_ERROR_MESSAGES[code] : fallback;
 }
 
-/** Logs the original error for debugging, then returns the message to show. */
-export function reportUserFacingError(context: string, caught: unknown, fallback?: string) {
-  console.error(context, caught);
+/** Logs structured metadata for debugging, then returns the message to show. */
+export function reportUserFacingError(
+  context: string,
+  caught: unknown,
+  fallback?: string,
+  meta?: AdminLogMeta,
+) {
+  logAdminError(context, caught, meta);
   return userFacingErrorMessage(caught, fallback);
 }

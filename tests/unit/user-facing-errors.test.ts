@@ -31,6 +31,18 @@ describe("admin error catalog", () => {
     },
   );
 
+  it("accepts a bare AdminErrorCode string on ConvexError.data", () => {
+    const error = new ConvexError("REVIEW_CLAIMED");
+    expect(adminErrorCode(error)).toBe("REVIEW_CLAIMED");
+    expect(userFacingErrorMessage(error)).toBe(ADMIN_ERROR_MESSAGES.REVIEW_CLAIMED);
+  });
+
+  it("accepts data objects without a message field", () => {
+    const error = new ConvexError({ code: "ADMIN_ONLY" } as never);
+    expect(adminErrorCode(error)).toBe("ADMIN_ONLY");
+    expect(userFacingErrorMessage(error)).toBe(ADMIN_ERROR_MESSAGES.ADMIN_ONLY);
+  });
+
   it.each([
     ["null", null],
     ["a string", "Not authorized"],
@@ -63,11 +75,18 @@ describe("userFacingErrorMessage", () => {
     expect(userFacingErrorMessage(error, "Try again.")).toBe("Try again.");
   });
 
-  it("logs the original error before returning the message", () => {
+  it("logs structured metadata before returning the message", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const original = new Error("db exploded");
-    expect(reportUserFacingError("Saving failed", original, "Try again.")).toBe("Try again.");
-    expect(consoleError).toHaveBeenCalledWith("Saving failed", original);
+    expect(
+      reportUserFacingError("Saving failed", original, "Try again.", { source: "test" }),
+    ).toBe("Try again.");
+    expect(consoleError).toHaveBeenCalledWith("Saving failed", {
+      source: "test",
+      convexRequestId: null,
+      errorName: "Error",
+      errorMessage: "db exploded",
+    });
   });
 });
 

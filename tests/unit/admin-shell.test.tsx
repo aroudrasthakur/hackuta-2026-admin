@@ -436,10 +436,12 @@ describe("AdminAuthProvider", () => {
     await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
     expect(authErrorText()).toBe("We couldn't check your sign-in status. Refresh the page to try again.");
     expect(state().ready).toBe(true);
-    expect(consoleError).toHaveBeenCalledWith(
-      "Unable to initialize organizer authentication",
-      expect.any(TypeError),
-    );
+    expect(consoleError).toHaveBeenCalledWith("Unable to initialize organizer authentication", {
+      source: "AdminAuthProvider.bootstrap",
+      convexRequestId: null,
+      errorName: "TypeError",
+      errorMessage: "Failed to fetch",
+    });
   });
 
   it("keeps the local dev sign-in hint for developers", async () => {

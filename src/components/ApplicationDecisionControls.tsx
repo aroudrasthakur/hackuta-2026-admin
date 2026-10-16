@@ -86,6 +86,7 @@ export function ApplicationDecisionControls({
           "Unable to finalize decision",
           caught,
           "We couldn't save this decision. Please try again.",
+          { source: "ApplicationDecisionControls.handleConfirm" },
         ),
       );
     } finally {

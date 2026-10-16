@@ -1,9 +1,14 @@
 import { ConvexError } from "convex/values";
 
 /**
- * Organizer-facing errors. Convex functions throw these as `ConvexError({ code, message })`
- * so the code survives production redaction; the UI shows the message for the code and
- * never the raw server text.
+ * Organizer-facing errors. Convex functions throw these as `ConvexError({ code, message })`.
+ *
+ * **ConvexError contract (admin):**
+ * - Preferred payload: `{ code: AdminErrorCode, message: string }` on `error.data`.
+ * - Also accepted: `error.data` is a bare `AdminErrorCode` string (message resolved from catalog).
+ * - String-only `ConvexError("…")` and plain `Error` are not treated as admin codes (returns null).
+ * - In production, Convex may redact the message shown in the browser; structured `data.code` still
+ *   reaches the client for known `adminError()` throws.
  */
 export const ADMIN_ERROR_MESSAGES = {
   NOT_AUTHENTICATED: "Your session has expired. Please sign in again.",
@@ -46,11 +51,36 @@ export function adminError(code: AdminErrorCode) {
   return new ConvexError<AdminErrorData>({ code, message: ADMIN_ERROR_MESSAGES[code] });
 }
 
+function normalizeAdminErrorData(data: unknown): AdminErrorData | null {
+  if (isAdminErrorCode(data)) {
+    return { code: data, message: ADMIN_ERROR_MESSAGES[data] };
+  }
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  const code = (data as { code?: unknown }).code;
+  if (!isAdminErrorCode(code)) {
+    return null;
+  }
+  const message = (data as { message?: unknown }).message;
+  return {
+    code,
+    message: typeof message === "string" ? message : ADMIN_ERROR_MESSAGES[code],
+  };
+}
+
 /** Reads the code from a thrown `adminError`, or null for anything else. */
 export function adminErrorCode(error: unknown): AdminErrorCode | null {
-  if (!error || typeof error !== "object") return null;
+  if (!error || typeof error !== "object") {
+    return null;
+  }
   const data = (error as { data?: unknown }).data;
-  if (!data || typeof data !== "object") return null;
-  const code = (data as { code?: unknown }).code;
-  return isAdminErrorCode(code) ? code : null;
+  return normalizeAdminErrorData(data)?.code ?? null;
+}
+
+export function adminErrorData(error: unknown): AdminErrorData | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+  return normalizeAdminErrorData((error as { data?: unknown }).data);
 }

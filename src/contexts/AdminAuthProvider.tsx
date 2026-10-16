@@ -8,6 +8,7 @@ import {
   signOutAdminCookie,
   startLocalDevAdminSession,
 } from "../lib/adminSessionClient";
+import { logAdminError } from "../../shared/admin/logAdminError";
 import { UserFacingError } from "../lib/userFacingError";
 import { AdminAuthContext, type AdminAuthContextValue } from "./adminAuthContext";
 
@@ -39,7 +40,9 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
           setSessionToken(token);
         }
       } catch (error) {
-        console.error("Unable to initialize organizer authentication", error);
+        logAdminError("Unable to initialize organizer authentication", error, {
+          source: "AdminAuthProvider.bootstrap",
+        });
         if (!cancelled) {
           setAuthError(
             (current) =>

@@ -4,12 +4,19 @@ Admin-only shared code (not register-locked).
 
 | Path | Role |
 | --- | --- |
-| [`errors.ts`](errors.ts) | Error codes and the messages organizers see |
+| [`errors.ts`](errors.ts) | Error codes, `adminError()` throws, and `adminErrorCode()` parsing |
+| [`logAdminError.ts`](logAdminError.ts) | Structured `console.error` helper (no PII) |
 | [`e2e/`](e2e/) | Mock store and credentials for E2E tests |
 
 ## Errors
 
-- Backend: `throw adminError("REVIEW_CLAIMED")`. It throws a `ConvexError` with a `code`, so the code still reaches the browser in production.
-- Frontend: `userFacingErrorMessage(error, fallback)` shows the message for the code. Anything else shows the fallback.
-- The original error is logged with `console.error`. In production, Convex shows the browser only a request ID; search the Convex dashboard logs for it.
-- Internal checks that organizers should never hit can keep using `throw new Error(...)`.
+- Backend: `throw adminError("REVIEW_CLAIMED")` → `ConvexError({ code, message })` on `error.data`.
+- `adminErrorCode(error)` reads `data.code` (object or bare code string). String-only `ConvexError` payloads are ignored.
+- Frontend: `userFacingErrorMessage(error, fallback)` shows the catalog message for known codes.
+- Logging: `logAdminError(context, caught, meta?)` or `reportUserFacingError(..., meta?)` — always structured meta, never email/password/IP.
+
+## Sign-in API migration
+
+Failed `POST /api/admin/sign-in` responses include **`code` + `error`**. See [docs/CHANGES.md](../../docs/CHANGES.md).
+
+Internal checks organizers should never see can keep using `throw new Error(...)`.
