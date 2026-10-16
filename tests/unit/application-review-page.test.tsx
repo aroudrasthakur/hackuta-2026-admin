@@ -239,14 +239,15 @@ describe("read-only application review page", () => {
     expect(answer("Race / ethnicity")).toBe("Not provided");
   });
 
-  it("opens the resume in another tab and uses a fallback filename", async () => {
+  it("offers an in-page preview with a fallback filename and no PDF link", async () => {
     const detail = applicationDetail();
     detail.resume.filename = null;
     await renderDetail(detail);
-    const resume = container.querySelector('a[href="https://files.example.com/resume.pdf"]');
-    expect(resume?.textContent).toBe("Open resume (PDF)");
-    expect(resume?.getAttribute("target")).toBe("_blank");
-    expect(resume?.getAttribute("rel")).toBe("noreferrer");
+    const section = container.querySelector('section[aria-label="Resume"]');
+    expect(section?.textContent).toContain("Applicant resume");
+    expect(section?.querySelector("button")?.textContent).toBe("Preview Resume");
+    expect(section?.querySelector("a")).toBeNull();
+    expect(section?.querySelector("dialog")?.hasAttribute("open")).toBe(false);
   });
 
   it("explains an unavailable attached resume without a broken link", async () => {

@@ -1,3 +1,4 @@
+import { ResumePreview } from "./ResumePreview";
 import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
 import type { ApplicationDetail as ApplicationDetailData } from "../convex/adminApi";
 import { applicationLink, formatApplicationAnswer, formatApplicationDate } from "../lib/applicationDisplay";
@@ -99,18 +100,7 @@ export function ApplicationDetail({ detail }: { detail: ApplicationDetailData })
           </dl>
         </section>
       ))}
-      <section aria-label="Resume" className="rounded-lg border border-sand bg-white/40 p-5">
-        <h3 className="font-display text-lg text-night">Resume</h3>
-        {resume.status === "available" && resume.url ? (
-          <a className="mt-3 inline-block break-all underline" href={resume.url} target="_blank" rel="noreferrer">
-            {resume.filename || "Open resume (PDF)"}
-          </a>
-        ) : (
-          <p className="mt-3 text-sm text-ocean">
-            {resume.status === "missing" ? "The attached resume is no longer available." : "No resume was attached."}
-          </p>
-        )}
-      </section>
+      <ResumePreview key={application._id} resume={resume} />
     </article>
   );
 }

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "prebuild": "node scripts/ensure-convex-server-stub.mjs && node scripts/verify-production-env.mjs",
+    "prebuild": "node scripts/prepare-pdf-assets.mjs && node scripts/ensure-convex-server-stub.mjs && node scripts/verify-production-env.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "pretypecheck": "node scripts/ensure-convex-server-stub.mjs",
@@ -23,25 +23,27 @@
     "convex:dev": "convex dev",
     "convex:push-dev": "convex dev --once --env-file .env.example",
     "convex:codegen": "convex codegen",
-    "convex:deploy": "convex deploy"
+    "convex:deploy": "convex deploy",
+    "predev": "node scripts/prepare-pdf-assets.mjs"
   },
   "dependencies": {
-    "@paper-design/shaders-react": "^0.0.80",
     "@convex-dev/auth": "^0.0.96",
+    "@paper-design/shaders-react": "^0.0.80",
     "convex": "^1.45.0",
     "libphonenumber-js": "^1.13.14",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-pdf": "^10.5.0",
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.4.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "@playwright/test": "^1.63.0",
     "@vitest/coverage-istanbul": "^5.0.3",
     "convex-test": "^0.0.58",
     "eslint": "^10.10.0",
