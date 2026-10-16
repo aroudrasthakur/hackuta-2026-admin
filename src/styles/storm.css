@@ -592,6 +592,38 @@
     color: rgb(48 88 115 / 0.72);
   }
 
+  .admin-topbar__menu-header {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgb(48 88 115 / 0.12);
+  }
+
+  .admin-topbar__menu-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: flex-start;
+    border: 0;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.55rem;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgb(48 88 115 / 0.85);
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .admin-topbar__menu-item:hover,
+  .admin-topbar__menu-item:focus-visible {
+    color: var(--color-ink);
+    background: rgb(48 88 115 / 0.08);
+    outline: none;
+  }
+
   @media (min-width: 640px) {
     .admin-topbar {
       top: 1rem;

@@ -1,9 +1,13 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "../hooks/useAdminAuth";
+import { subscribeMediaQuery } from "../lib/matchMediaSubscribe";
 import { ADMIN_ROUTES } from "../types/routes";
 
-function formatRole(role: string) {
+function formatRole(role: string | null | undefined) {
+  if (!role) {
+    return "";
+  }
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
@@ -13,21 +17,24 @@ export function AdminAccountControls() {
   const [compact, setCompact] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const signOutMenuItemRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 639px)");
-    const sync = () => {
-      setCompact(media.matches);
-      if (!media.matches) setMenuOpen(false);
-    };
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
+    return subscribeMediaQuery("(max-width: 639px)", (matches) => {
+      setCompact(matches);
+      if (!matches) {
+        setMenuOpen(false);
+      }
+    });
   }, []);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen) {
+      return;
+    }
+    signOutMenuItemRef.current?.focus();
 
     const onPointerDown = (event: PointerEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) {
@@ -35,7 +42,10 @@ export function AdminAccountControls() {
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
     };
 
     addEventListener("pointerdown", onPointerDown);
@@ -52,7 +62,15 @@ export function AdminAccountControls() {
     navigate(ADMIN_ROUTES.login, { replace: true });
   }
 
-  const roleLabel = staff ? formatRole(staff.role) : null;
+  function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") {
+      return;
+    }
+    event.preventDefault();
+    signOutMenuItemRef.current?.focus();
+  }
+
+  const roleLabel = staff?.role ? formatRole(staff.role) : null;
 
   return (
     <div className="admin-topbar__account">
@@ -60,7 +78,9 @@ export function AdminAccountControls() {
         <>
           <p className="admin-topbar__identity">
             <span className="admin-topbar__identity-name">{staff.name}</span>
-            <span className="admin-topbar__identity-role"> · {roleLabel}</span>
+            {roleLabel ? (
+              <span className="admin-topbar__identity-role"> · {roleLabel}</span>
+            ) : null}
           </p>
           <span className="admin-topbar__divider" aria-hidden="true">
             |
@@ -71,6 +91,7 @@ export function AdminAccountControls() {
       {staff && compact ? (
         <div className="relative" ref={menuRef}>
           <button
+            ref={menuButtonRef}
             type="button"
             className="admin-topbar__chip"
             aria-expanded={menuOpen}
@@ -83,17 +104,36 @@ export function AdminAccountControls() {
             <span aria-hidden="true">{menuOpen ? "▴" : "▾"}</span>
           </button>
           {menuOpen ? (
-            <div id={menuId} role="menu" className="admin-topbar__menu">
-              <p className="admin-topbar__menu-name">{staff.name}</p>
-              <p className="admin-topbar__menu-role">{roleLabel}</p>
+            <div
+              id={menuId}
+              role="menu"
+              className="admin-topbar__menu"
+              aria-label="Account"
+              onKeyDown={handleMenuKeyDown}
+            >
+              <div role="presentation" className="admin-topbar__menu-header">
+                <p className="admin-topbar__menu-name">{staff.name}</p>
+                {roleLabel ? <p className="admin-topbar__menu-role">{roleLabel}</p> : null}
+              </div>
+              <button
+                ref={signOutMenuItemRef}
+                type="button"
+                role="menuitem"
+                className="admin-topbar__menu-item"
+                onClick={() => void handleSignOut()}
+              >
+                Sign out
+              </button>
             </div>
           ) : null}
         </div>
       ) : null}
 
-      <button type="button" className="admin-topbar__sign-out" onClick={() => void handleSignOut()}>
-        Sign out
-      </button>
+      {staff && !compact ? (
+        <button type="button" className="admin-topbar__sign-out" onClick={() => void handleSignOut()}>
+          Sign out
+        </button>
+      ) : null}
     </div>
   );
 }

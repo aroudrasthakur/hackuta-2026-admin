@@ -18,11 +18,14 @@ export function AdminLayout() {
     };
     syncOffset();
 
-    const observer = new ResizeObserver(syncOffset);
-    observer.observe(header);
+    let observer: ResizeObserver | undefined;
+    if (typeof window.ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(syncOffset);
+      observer.observe(header);
+    }
     addEventListener("resize", syncOffset);
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       removeEventListener("resize", syncOffset);
     };
   }, []);
