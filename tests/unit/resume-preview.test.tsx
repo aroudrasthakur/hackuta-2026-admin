@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ResumePreview } from "../../src/components/ResumePreview";
 
-vi.mock("../../src/components/ResumePdf", () => ({ default: ({ url }: { url: string }) => <div data-pdf-url={url}>PDF viewer</div> }));
+vi.mock("../../src/components/ResumePdf", () => ({ default: ({ url, onClose }: { url: string; onClose: () => void }) => <div data-pdf-url={url}>PDF viewer<button onClick={onClose}>Close</button></div> }));
 describe("resume preview modal", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -35,4 +35,11 @@ describe("resume preview modal", () => {
     expect(container.querySelector("[data-pdf-url]")).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
+  it("explains unsupported files without offering a broken PDF preview", async () => {
+    await act(async () => root.render(<ResumePreview resume={{ status: "available", url: "https://example.com/resume.docx", filename: "Resume.docx" }} />));
+    expect(container.textContent).toContain("This file format is not supported.");
+    expect(container.querySelector("button")).toBeNull();
+    expect(container.querySelector("a")).toBeNull();
+  });
+
 });

@@ -30,7 +30,7 @@ describe("resume PDF controls and recovery", () => {
       disconnect = disconnect;
     });
     container = document.createElement("div"); document.body.append(container); root = createRoot(container);
-    await act(async () => root.render(<ResumePdf url="https://example.com/resume.pdf" />));
+    await act(async () => root.render(<ResumePdf url="https://example.com/resume.pdf" onClose={vi.fn()} />));
   });
   afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
   const click = async (name: string) => {
@@ -58,6 +58,8 @@ describe("resume PDF controls and recovery", () => {
     expect(mocks.page.width).toBe(568);
     await click("Zoom in"); expect(mocks.page.width).toBe(710);
     await click("Zoom out"); expect(mocks.page.width).toBe(568);
+    await click("Zoom out"); expect(mocks.page.width).toBe(426);
+    await click("Fit width");
     for (let i = 0; i < 4; i++) await click("Zoom in");
     expect(container.textContent).toContain("200%");
     await click("Fit width"); expect(mocks.page.width).toBe(568);
