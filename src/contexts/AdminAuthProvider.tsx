@@ -95,7 +95,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         source: "AdminAuthProvider.signOut",
         route: "/api/admin/sign-out",
       });
-      // Clear in-memory session even if the API call fails.
+      throw error;
     }
     hadStaff.current = false;
     setSessionToken(null);
