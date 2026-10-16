@@ -1,18 +1,13 @@
 import { usePaginatedQuery } from "../convex/reactBindings";
 import type { GenericId } from "convex/values";
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../convex/adminApi";
+import { reviewHistoryDateFormatter } from "../lib/dateFormat";
 import { reviewActionLabels } from "../lib/reviewActionLabels";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { EmptyState } from "./states/EmptyState";
 import { LoadingState } from "./states/LoadingState";
 
 const PAGE_SIZE = 50;
-const reviewHistoryDateFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
 
 type ReviewHistoryProps = {
   applicationId: GenericId<"applications">;
@@ -89,7 +84,7 @@ function Marker({ action }: { action: Action }) {
   return (
     <span
       aria-hidden
-      className={`relative z-10 mt-1 size-2.5 shrink-0 rounded-full border-2 border-white ${actionStyles[action].marker}`}
+      className={`relative z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-white ${actionStyles[action].marker}`}
     />
   );
 }
@@ -129,7 +124,6 @@ function ViewsGroup({ events }: { events: EventGroup }) {
       <details className="group -mt-1 min-w-0 flex-1 py-0.5">
         <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
           <p className="font-medium text-night">
-            <span aria-hidden className="mr-2 inline-block text-[0.625rem] text-mist transition-transform group-open:rotate-90">▶</span>
             {reviewActionLabels.viewed} ×{events.length}
           </p>
           <p className="mt-1 text-xs text-mist">
@@ -138,7 +132,7 @@ function ViewsGroup({ events }: { events: EventGroup }) {
             <span className="sr-only">View individual events</span>
           </p>
         </summary>
-        <ol className="mt-2 space-y-2 border-l border-sand pl-4">
+        <ol aria-label="Individual view events" className="mt-2 space-y-2 border-l border-sand pl-4">
           {events.map((event) => <li key={event._id}><EventRow event={event} /></li>)}
         </ol>
       </details>
@@ -159,7 +153,7 @@ function ReviewHistoryEvents({ applicationId, sessionToken }: ReviewHistoryProps
   }
   return (
     <>
-      <ol className="relative space-y-1 before:absolute before:bottom-2 before:left-[4px] before:top-3 before:w-px before:bg-sand">
+      <ol aria-label="Review activity" className="relative space-y-1 before:absolute before:bottom-2 before:left-[4px] before:top-3 before:w-px before:bg-sand">
         {groupConsecutiveViews(prioritizeDecisionEvents(results)).map((group) => (
           <li key={group[0]._id} className="py-1.5 text-sm">
             {group.length === 1 ? <EventRow event={group[0]} /> : <ViewsGroup events={group} />}

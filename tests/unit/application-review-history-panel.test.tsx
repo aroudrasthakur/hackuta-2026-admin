@@ -5,6 +5,7 @@ import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApplicationReviewHistory } from "../../src/components/ApplicationReviewHistory";
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../../src/convex/adminApi";
+import { reviewHistoryDateFormatter } from "../../src/lib/dateFormat";
 
 const mocks = vi.hoisted(() => ({ paginatedQuery: vi.fn(), loadMore: vi.fn() }));
 vi.mock("../../src/convex/reactBindings", () => ({
@@ -21,8 +22,7 @@ function event(id: string, actorName: string, action: ReviewHistoryEvent["action
 }
 
 function historyTime(value: number) {
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-    .format(value);
+  return reviewHistoryDateFormatter.format(value);
 }
 
 describe("application review history panel", () => {
@@ -85,6 +85,7 @@ describe("application review history panel", () => {
     ];
     await render({ results: events, status: "Exhausted" });
     const rows = Array.from(container.querySelectorAll("li"));
+    expect(container.querySelector("section > ol")?.getAttribute("aria-label")).toBe("Review activity");
     expect(rows.map((row) => row.querySelector("p")?.textContent)).toEqual([
       "Waitlisted applicant",
       "Rejected applicant",
@@ -155,6 +156,7 @@ describe("application review history panel", () => {
     expect(group?.open).toBe(false);
     expect(group?.querySelector("summary")?.textContent).toContain("Viewed application ×3");
     expect(group?.querySelector("summary")?.textContent).toContain("Latest: Avery Admin ·");
+    expect(group?.querySelector("ol")?.getAttribute("aria-label")).toBe("Individual view events");
     expect(group?.querySelector("summary time")?.textContent).toBe(historyTime(1_700_000_500_000));
     expect(Array.from(group!.querySelectorAll("li")).map((row) => row.querySelector("p")?.textContent)).toEqual([
       "Viewed application",
