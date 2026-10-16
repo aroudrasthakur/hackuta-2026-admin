@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ACTIVE_REVIEW_STALE_MS, REVIEW_ALREADY_CLAIMED, REVIEW_FINALIZED } from "../../convex/admin/reviewClaim";
+import { ACTIVE_REVIEW_STALE_MS } from "../../convex/admin/reviewClaim";
 import {
   getApplicationRef,
   listApplicationReviewLogsRef,
@@ -17,6 +17,7 @@ import {
   snapshotApplicant,
   snapshotReviewState,
 } from "../helpers/reviewTestKit";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 type Action = "viewed" | "started_review" | "review_ended";
 
@@ -79,9 +80,10 @@ describe("view logging", () => {
     const staff = await seedStaff(t);
     const { applicationId } = await seedApplicant(t, { submitted: false });
     const before = await snapshotReviewState(t);
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(logApplicationReviewActionRef, { sessionToken: staff.sessionToken, applicationId, action }),
-    ).rejects.toThrow(/application not found/i);
+      "APPLICATION_NOT_FOUND",
+    );
     expect(await snapshotReviewState(t)).toEqual(before);
   });
 
@@ -90,7 +92,7 @@ describe("view logging", () => {
     async (action) => {
       const { t, first, applicant, act } = await setup();
       await t.run((ctx) => ctx.db.delete(applicant.applicationId));
-      await expect(act(first, action)).rejects.toThrow(/application not found/i);
+      await expectAdminErrorCode(act(first, action), "APPLICATION_NOT_FOUND");
       expect(await countRows(t, "applicationReviewLogs")).toBe(0);
     },
   );
@@ -131,7 +133,7 @@ describe("starting a review", () => {
     vi.advanceTimersByTime(ACTIVE_REVIEW_STALE_MS - 1_000);
     const before = await snapshotReviewState(t);
 
-    await expect(act(second, "started_review")).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+    await expectAdminErrorCode(act(second, "started_review"), "REVIEW_CLAIMED");
     expect(await snapshotReviewState(t)).toEqual(before);
     expect((await getReview(t, applicant.applicationId))?.reviewedBy).toBe(first.adminId);
   });
@@ -141,13 +143,14 @@ describe("starting a review", () => {
     await act(first, "started_review");
     vi.advanceTimersByTime(ACTIVE_REVIEW_STALE_MS - 1_000);
 
-    await expect(
+    await expectAdminErrorCode(
       t.mutation(setApplicationDecisionRef, {
         sessionToken: second.sessionToken,
         applicationId: applicant.applicationId,
         decision: "waitlisted",
       }),
-    ).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+      "REVIEW_CLAIMED",
+    );
   });
 
   it("keeps ownership and start time when the same reviewer reopens", async () => {
@@ -190,7 +193,7 @@ describe("starting a review", () => {
     await act(first, "review_ended");
     vi.advanceTimersByTime(ACTIVE_REVIEW_STALE_MS - 1_000);
 
-    await expect(act(second, "started_review")).rejects.toThrow(REVIEW_ALREADY_CLAIMED);
+    await expectAdminErrorCode(act(second, "started_review"), "REVIEW_CLAIMED");
     expect(await countRows(t, "applicationReviewLogs")).toBe(2);
   });
 
@@ -219,13 +222,14 @@ describe("starting a review", () => {
       });
       const before = await snapshotReviewState(t);
 
-      await expect(
+      await expectAdminErrorCode(
         t.mutation(logApplicationReviewActionRef, {
           sessionToken: staff.sessionToken,
           applicationId,
           action: "started_review",
         }),
-      ).rejects.toThrow(REVIEW_FINALIZED);
+        "REVIEW_FINALIZED",
+      );
       expect(await snapshotReviewState(t)).toEqual(before);
     },
   );
@@ -328,12 +332,13 @@ describe("audit log", () => {
   it("is not readable by the reviewer who wrote it", async () => {
     const { t, first, applicant } = await setup();
     await runFullReview(t, first.sessionToken, applicant.applicationId);
-    await expect(
+    await expectAdminErrorCode(
       t.query(listApplicationReviewLogsRef, {
         sessionToken: first.sessionToken,
         applicationId: applicant.applicationId,
         paginationOpts: { numItems: 10, cursor: null },
       }),
-    ).rejects.toThrow(/not authorized/i);
+      "ADMIN_ONLY",
+    );
   });
 });

@@ -6,6 +6,10 @@ export type AdminLogMeta = {
   source?: string;
 };
 
+/**
+ * Convex HTTP/client failures embed a dashboard correlation id in the message:
+ * `[Request ID: abc123]`. Format is stable across Convex SDK versions we target.
+ */
 export function convexRequestIdFromError(error: unknown): string | null {
   if (!(error instanceof Error)) {
     return null;
@@ -24,6 +28,7 @@ function errorSummary(caught: unknown): Record<string, string> {
   return { errorType: typeof caught };
 }
 
+/** One-line context string plus a small JSON-safe meta object (no PII). */
 export function logAdminError(context: string, caught: unknown, meta: AdminLogMeta = {}) {
   console.error(context, {
     ...meta,

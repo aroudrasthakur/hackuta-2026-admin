@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { SubmittedApplicationSummary } from "../convex/adminApi";
 import { formatApplicationDate } from "../lib/applicationDisplay";
 import { ADMIN_ROUTES } from "../types/routes";
+import { ApplicationDecisionBadge } from "./ApplicationDecisionBadge";
 import { ApplicationStatusBadge } from "./ApplicationStatusBadge";
 import { queueReviewStatus } from "../../shared/admin/reviewQueue";
 
@@ -89,7 +90,10 @@ export function ApplicationsList({
                 <dt className="text-ocean">Reviewer</dt>
                 <dd className="break-words">{reviewer(application)}</dd>
               </dl>
-              <div className="mt-3 border-t border-sand/70 pt-1">{reviewLink(application)}</div>
+              <div className="mt-3 flex min-w-0 flex-wrap items-stretch gap-2 border-t border-sand/70 pt-3">
+                {reviewLink(application)}
+                <ApplicationDecisionBadge status={application.reviewStatus} />
+              </div>
             </article>
           </li>
         ))}

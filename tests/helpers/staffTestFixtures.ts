@@ -12,7 +12,11 @@ export const ORGANIZER_TEST_PASSWORD = "SecurePass1";
 
 export type OrganizerSignInResult =
   | { ok: true; sessionToken: string; expiresAt: number }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      code: "INVALID_CREDENTIALS" | "ACCOUNT_INACTIVE" | "SIGN_IN_RATE_LIMITED";
+      error: string;
+    };
 
 const organizerSignInRef = makeFunctionReference<
   "mutation",

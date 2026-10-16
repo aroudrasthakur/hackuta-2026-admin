@@ -3,6 +3,7 @@ import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
 import { buildDecisionEmailContent } from "../../convex/admin/decisionEmailTemplates";
 import { createQrCodeToken } from "../../convex/admin/participantCreation";
+import { ADMIN_ERROR_MESSAGES } from "../../shared/admin/errors";
 import { createConvexTest } from "../helpers/convexTestContext";
 import {
   mutateOrganizerSignIn,
@@ -45,7 +46,7 @@ describe("organizer sign-in edge cases", () => {
     const t = createConvexTest();
     await seedAdminAccount(t, { email: "admin@hackuta.org", role: "admin", active: true });
     const result = await mutateOrganizerSignIn(t, { email, password });
-    expect(result).toEqual({ ok: false, error: "Invalid email or password." });
+    expect(result).toEqual({ ok: false, code: "INVALID_CREDENTIALS", error: ADMIN_ERROR_MESSAGES.INVALID_CREDENTIALS });
   });
 
   it("rejects an account that has no password set", async () => {
@@ -64,7 +65,11 @@ describe("organizer sign-in edge cases", () => {
       email: "nopass@hackuta.org",
       password: ORGANIZER_TEST_PASSWORD,
     });
-    expect(noPassword).toEqual({ ok: false, error: "Invalid email or password." });
+    expect(noPassword).toEqual({
+      ok: false,
+      code: "INVALID_CREDENTIALS",
+      error: ADMIN_ERROR_MESSAGES.INVALID_CREDENTIALS,
+    });
   });
 
   it("signing out an unknown session still succeeds", async () => {

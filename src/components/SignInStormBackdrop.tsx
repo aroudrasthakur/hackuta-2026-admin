@@ -1,5 +1,6 @@
 import { lazy, Suspense, useSyncExternalStore, type CSSProperties } from "react";
 import { SIGN_IN_AMBIENT_STORM, SIGN_IN_RAIN_DROPS } from "../constants/signInWeather";
+import { subscribeMediaQuery } from "../lib/matchMediaSubscribe";
 
 const SignInAtmosphere = lazy(() =>
   import("./SignInAtmosphere").then((module) => ({
@@ -8,9 +9,9 @@ const SignInAtmosphere = lazy(() =>
 );
 
 function subscribeToMotionPreference(onStoreChange: () => void) {
-  const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-  media.addEventListener("change", onStoreChange);
-  return () => media.removeEventListener("change", onStoreChange);
+  return subscribeMediaQuery("(prefers-reduced-motion: reduce)", () => {
+    onStoreChange();
+  });
 }
 
 function getMotionPreference() {

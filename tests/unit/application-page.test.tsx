@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { getByLabelText, queryByLabelText, within } from "@testing-library/dom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
@@ -92,6 +93,7 @@ function staffContext(role: "reviewer" | "admin"): AdminAuthContextValue {
       expiresAt: Date.now() + 60_000,
     },
     sessionToken: "test-session",
+    authError: null,
     isAuthenticated: true,
     isLoading: false,
     sessionReady: true,
@@ -138,6 +140,18 @@ describe.each(["reviewer", "admin"] as const)(
       return Array.from(container.querySelectorAll('tbody th[scope="row"] > span:first-child')).map(
         (element) => element.textContent,
       );
+    }
+
+    function articleForApplicant(name: string) {
+      for (const article of container.querySelectorAll("article")) {
+        try {
+          within(article).getByRole("heading", { level: 3, name });
+          return article;
+        } catch {
+          // try next card
+        }
+      }
+      throw new Error(`Missing application card for ${name}`);
     }
 
     async function search(value: string) {
@@ -204,6 +218,49 @@ describe.each(["reviewer", "admin"] as const)(
       expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
       expect(container.textContent).toContain("2 need review");
       expect(container.textContent).toContain("6 total applications");
+    });
+
+    it("shows final decision badges beside review links only when decided", async () => {
+      await renderPage();
+      await select(0, "all");
+
+      for (const [name, label] of [
+        ["Alex Chen", "Accepted"],
+        ["Morgan Patel", "Waitlisted"],
+        ["Casey Jones", "Rejected"],
+      ] as const) {
+        const card = articleForApplicant(name);
+        expect(
+          within(card)
+            .getByRole("link", { name: new RegExp(`Review application for ${name}`, "i") })
+            .getAttribute("href"),
+        ).toContain("/admin/applications/");
+        expect(getByLabelText(card, `Decision: ${label}`).textContent).toBe(label);
+      }
+
+      for (const name of ["Taylor Student", "Sam Lee"]) {
+        const card = articleForApplicant(name);
+        within(card).getByRole("link", {
+          name: new RegExp(`Review application for ${name}`, "i"),
+        });
+        expect(queryByLabelText(card, /^Decision:/)).toBeNull();
+      }
+    });
+
+    it("updates the badge when the current review status changes", async () => {
+      await renderPage();
+      await select(0, "all");
+      const updatedApplications = fixtures().map((application) =>
+        application.applicantName === "Alex Chen"
+          ? { ...application, reviewStatus: "rejected" as const }
+          : application,
+      );
+      mocks.query.mockReturnValue(updatedApplications);
+      await search("Alex Chen");
+
+      const card = articleForApplicant("Alex Chen");
+      expect(getByLabelText(card, "Decision: Rejected").textContent).toBe("Rejected");
+      expect(queryByLabelText(card, "Decision: Accepted")).toBeNull();
     });
 
     it("sorts all applications oldest first and supports newest first", async () => {

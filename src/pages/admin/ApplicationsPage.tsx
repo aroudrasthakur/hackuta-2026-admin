@@ -13,6 +13,7 @@ import { needsApplicationReview } from "../../../shared/admin/reviewQueue";
 import { useNow } from "../../hooks/useNow";
 
 const controlClass = "mt-1.5 min-h-11 w-full rounded-md border border-ocean/70 bg-white px-3 py-2 text-sm text-night placeholder:text-ocean";
+
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const now = useNow();
   const { staff } = useAdminAuth();

@@ -2,7 +2,7 @@ import { useMutation } from "../convex/reactBindings";
 import { useEffect, useRef, useState } from "react";
 import type { GenericId } from "convex/values";
 import { setApplicationDecisionRef, type ApplicationDetail } from "../convex/adminApi";
-import { formatMutationError } from "../lib/formatMutationError";
+import { reportUserFacingError } from "../lib/userFacingError";
 import { reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../lib/reviewButtonClasses";
 import { ReviewPanelSection } from "./ReviewPanelSection";
 
@@ -96,7 +96,14 @@ export function ApplicationDecisionControls({
         : `Application ${pendingDecision}. No email scheduled: applicant email is missing.`);
       setPendingDecision(null);
     } catch (caught) {
-      setError(formatMutationError(caught, "Unable to finalize decision."));
+      setError(
+        reportUserFacingError(
+          "Unable to finalize decision",
+          caught,
+          "We couldn't save this decision. Please try again.",
+          { source: "ApplicationDecisionControls.handleConfirm" },
+        ),
+      );
     } finally {
       setConfirming(false);
     }

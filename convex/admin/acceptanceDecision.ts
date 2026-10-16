@@ -1,5 +1,6 @@
 import type { DocumentByName } from "convex/server";
 import type { ApplicationDoc, DataModel, MutationCtx } from "../lib/dataModel";
+import { adminError } from "../../shared/admin/errors";
 import {
   assertParticipantAcceptanceAllowed,
   ensureParticipantForAcceptance,
@@ -23,7 +24,7 @@ export async function applyAcceptedApplicationDecision(
 ) {
   const applicantUser = await ctx.db.get(args.application.authUserId);
   if (!applicantUser) {
-    throw new Error("Applicant user account not found.");
+    throw adminError("APPLICANT_ACCOUNT_MISSING");
   }
 
   await assertParticipantAcceptanceAllowed(ctx, {

@@ -10,6 +10,7 @@ import {
 import type { ApplicationDoc } from "../lib/dataModel";
 import { ACTIVE_REVIEW_STALE_MS, isFinalReviewStatus, isReviewStale, reviewClaimExpiresAt } from "./reviewClaim";
 import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
+import { adminError } from "../../shared/admin/errors";
 
 function formatApplicantSchool(application: Pick<ApplicationDoc, "school" | "otherSchool">) {
   const school = application.school?.trim();
@@ -158,7 +159,7 @@ export const createSampleApplication = mutation({
 
     const existingApplication = await getApplicationByUser(ctx, authUserId);
     if (existingApplication && applicationFormWasSubmitted(existingApplication)) {
-      throw new Error("Applicant already has a submitted application.");
+      throw adminError("APPLICANT_ALREADY_SUBMITTED");
     }
 
     const applicationId = await ctx.db.insert("applications", {

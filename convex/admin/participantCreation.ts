@@ -1,6 +1,7 @@
 import type { DocumentByName } from "convex/server";
 import type { GenericId } from "convex/values";
 import type { DataModel, MutationCtx } from "../lib/dataModel";
+import { adminError } from "../../shared/admin/errors";
 
 type ParticipantDoc = DocumentByName<DataModel, "participants">;
 
@@ -61,7 +62,7 @@ function assertParticipantMatchesApplication(
     throw new Error("Participant authUserId does not match application.");
   }
   if (participant.applicationId !== args.applicationId) {
-    throw new Error("This user already has a participant record for a different application.");
+    throw adminError("PARTICIPANT_CONFLICT");
   }
 }
 

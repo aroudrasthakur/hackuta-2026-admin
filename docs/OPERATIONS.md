@@ -70,7 +70,8 @@ Use this when shipping organizer sign-in, session, or review authorization chang
 3. **Optional gate:** `npm run test:smoke` against shared dev after the Convex push and before promoting the frontend.
 4. **Shared dev smoke:** sign in via `/admin/login`, open one application, log a view, sign out.
 5. **Staging / preview:** confirm `VITE_DEV_AUTH_BYPASS` and `VITE_E2E_MOCK` are unset; production build must pass `scripts/verify-production-env.mjs`.
-6. **Production:** repeat smoke test; verify failed sign-in returns 401/429 (not 500) and cookies use `HttpOnly` + `Cache-Control: no-store`.
+6. **Production:** repeat smoke test; verify failed sign-in returns 401/429 (not 500) with `{ code, error }` JSON and cookies use `HttpOnly` + `Cache-Control: no-store`.
+7. **Integrations:** if anything calls `/api/admin/sign-in`, confirm it reads `code` — see [CHANGES.md](CHANGES.md).
 
 Organizer authorization is enforced **in Convex** (`sessionToken` → `resolveAdminSession` / `requireAdminRole` on every admin mutation and query). The Vite auth plugin and browser UI are not security boundaries.
 

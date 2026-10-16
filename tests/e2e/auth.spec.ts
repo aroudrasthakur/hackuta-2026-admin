@@ -19,13 +19,13 @@ test.describe("organizer authentication", () => {
     await page.getByLabel("Email").fill(E2E_REVIEWER.email);
     await page.getByLabel("Password").fill("WrongPassword1!");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText(/invalid email or password/i)).toBeVisible();
+    await expect(page.getByText(/incorrect email or password/i)).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/login$/);
   });
 
   test("signs in and signs out", async ({ page }) => {
     await signInOrganizer(page, E2E_REVIEWER);
-    await expect(page.getByText(/Signed in as/)).toContainText(E2E_REVIEWER.name);
+    await expect(page.locator(".admin-topbar__identity-name")).toHaveText(E2E_REVIEWER.name);
     await signOutOrganizer(page);
     await page.goto("/admin/applications");
     await expect(page).toHaveURL(/\/admin\/login$/);

@@ -5,6 +5,7 @@ import {
   createStaffAuthorizationFixture,
   seedSubmittedApplication,
 } from "../helpers/staffTestFixtures";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 async function fixture(role: "reviewer" | "admin" = "reviewer") {
   const t = createConvexTest();
@@ -158,11 +159,9 @@ describe("confirmed acceptance participant creation (#17)", () => {
       });
       const before = await snapshot(t);
 
-      await expect(t.mutation(setDecision, {
-        sessionToken, applicationId, decision: "accepted",
-      })).rejects.toThrow(failure === "missing user"
-        ? /applicant user account not found/i
-        : /authUserId does not match application/i);
+      const accept = () => t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
+      if (failure === "missing user") await expectAdminErrorCode(accept, "APPLICANT_ACCOUNT_MISSING");
+      else await expect(accept()).rejects.toThrow(/authUserId does not match application/i);
 
       expect(await snapshot(t)).toEqual(before);
     },
