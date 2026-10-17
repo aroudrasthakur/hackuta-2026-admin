@@ -1,4 +1,5 @@
 import { ADMIN_ERROR_MESSAGES, adminError } from "../errors";
+import { sampleResumeUrl } from "./resumeFixture.ts";
 import { E2E_ADMIN, E2E_APPLICATION_IDS, E2E_REVIEWER } from "./credentials.ts";
 
 const ACTIVE_REVIEW_STALE_MS = 30 * 60 * 1000;
@@ -355,7 +356,9 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
         application,
         reviewStatus: review?.status ?? null,
         reviewActivity: reviewActivity(review, now),
-        resume: { status: "none" as const, url: null, filename: null },
+        resume: applicationId === E2E_APPLICATION_IDS.unreviewed
+          ? { status: "available" as const, url: sampleResumeUrl(), filename: "sample-resume.pdf" }
+          : { status: "none" as const, url: null, filename: null },
       };
     }
     case "admin/applicationReviewLogs:listApplicationReviewLogs": {

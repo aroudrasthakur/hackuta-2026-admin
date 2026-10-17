@@ -1,3 +1,4 @@
+import { ResumePreview } from "./ResumePreview";
 import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { ApplicationDetail as ApplicationDetailData } from "../convex/adminApi";
@@ -112,18 +113,7 @@ export function ApplicationDetail({ detail, children }: { detail: ApplicationDet
       <div className={`grid items-start gap-6 ${children ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}>
         <div className="min-w-0 space-y-5">
           {primaryTitles.map((title) => renderSection(sections.find((section) => section.title === title)!))}
-          <section aria-label="Resume" className="rounded-lg border border-sand bg-white/40 p-5">
-            <h3 className="font-display text-lg text-night">Resume</h3>
-            {resume.status === "available" && resume.url ? (
-              <a className="mt-3 inline-block break-all underline" href={resume.url} target="_blank" rel="noreferrer">
-                {resume.filename || "Open resume (PDF)"}
-              </a>
-            ) : (
-              <p className="mt-3 text-sm text-ocean">
-                {resume.status === "missing" ? "The attached resume is no longer available." : "No resume was attached."}
-              </p>
-            )}
-          </section>
+          <ResumePreview key={application._id} resume={resume} />
         </div>
         {children && <aside aria-label="Review actions" className="min-w-0 space-y-5 lg:sticky lg:top-6">{children}</aside>}
         <details className="min-w-0 rounded-lg border border-sand bg-white/40 p-5 lg:col-span-full">
