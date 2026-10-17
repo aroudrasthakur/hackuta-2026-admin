@@ -2,16 +2,13 @@ import type { GenericId } from "convex/values";
 import type { DocumentByName } from "convex/server";
 import type { DataModel, MutationCtx } from "../lib/dataModel";
 import { applicationFormWasSubmitted, getApplicationReview } from "../lib/applications";
+import { adminError } from "../../shared/admin/errors";
 
 type ApplicationReviewDoc = DocumentByName<DataModel, "applicationReviews">;
 type AdminDoc = DocumentByName<DataModel, "admins">;
 
 /** Shared inactivity window before another organizer may claim an active review. */
 export const ACTIVE_REVIEW_STALE_MS = 30 * 60 * 1000;
-
-export const REVIEW_ALREADY_CLAIMED =
-  "Application is already being reviewed by another organizer.";
-export const REVIEW_FINALIZED = "This application already has a final decision.";
 
 export function isFinalReviewStatus(status: ApplicationReviewDoc["status"]) {
   return (
@@ -22,15 +19,15 @@ export function isFinalReviewStatus(status: ApplicationReviewDoc["status"]) {
   );
 }
 
-function reviewActivityAt(review: ApplicationReviewDoc) {
-  return review.lastActiveAt ?? review.startedAt ?? review.updatedAt;
+export function reviewClaimExpiresAt(review: ApplicationReviewDoc) {
+  return (review.lastActiveAt ?? review.startedAt ?? review.updatedAt) + ACTIVE_REVIEW_STALE_MS;
 }
 
 export function isReviewStale(review: ApplicationReviewDoc, now: number) {
   if (!review.reviewedBy || review.status !== "under_review") {
     return false;
   }
-  return now - reviewActivityAt(review) > ACTIVE_REVIEW_STALE_MS;
+  return now > reviewClaimExpiresAt(review);
 }
 
 function isActiveReviewClaim(review: ApplicationReviewDoc, now: number) {
@@ -72,12 +69,12 @@ export async function startReviewClaim(
 ): Promise<StartReviewClaimResult> {
   const application = await ctx.db.get(args.applicationId);
   if (!application || !applicationFormWasSubmitted(application)) {
-    throw new Error("Application not found");
+    throw adminError("APPLICATION_NOT_FOUND");
   }
 
   const review = await getApplicationReview(ctx, args.applicationId);
   if (review && isFinalReviewStatus(review.status)) {
-    throw new Error(REVIEW_FINALIZED);
+    throw adminError("REVIEW_FINALIZED");
   }
 
   if (review && isActiveReviewClaim(review, args.now)) {
@@ -88,7 +85,7 @@ export async function startReviewClaim(
       });
       return { outcome: "refreshed" };
     }
-    throw new Error(REVIEW_ALREADY_CLAIMED);
+    throw adminError("REVIEW_CLAIMED");
   }
 
   const stale = review ? isReviewStale(review, args.now) : false;

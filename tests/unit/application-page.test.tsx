@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { getByLabelText, queryByLabelText, within } from "@testing-library/dom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
@@ -70,6 +71,15 @@ function fixtures(): SubmittedApplicationSummary[] {
       reviewStatus: "rejected",
       currentReviewerName: null,
     },
+    {
+      applicationId: "application-f" as SubmittedApplicationSummary["applicationId"],
+      applicantName: "Riley Withdrawn",
+      email: "riley@example.com",
+      school: "State University",
+      submittedAt: 600,
+      reviewStatus: "withdrawn",
+      currentReviewerName: null,
+    },
   ];
 }
 
@@ -83,6 +93,7 @@ function staffContext(role: "reviewer" | "admin"): AdminAuthContextValue {
       expiresAt: Date.now() + 60_000,
     },
     sessionToken: "test-session",
+    authError: null,
     isAuthenticated: true,
     isLoading: false,
     sessionReady: true,
@@ -113,10 +124,10 @@ describe.each(["reviewer", "admin"] as const)(
       container.remove();
     });
 
-    async function renderPage() {
+    async function renderPage(path = "/admin/applications") {
       await act(async () => {
         root.render(
-          <MemoryRouter>
+          <MemoryRouter initialEntries={[path]}>
             <AdminAuthContext.Provider value={staffContext(role)}>
               <ApplicationsPage />
             </AdminAuthContext.Provider>
@@ -126,9 +137,21 @@ describe.each(["reviewer", "admin"] as const)(
     }
 
     function names() {
-      return Array.from(container.querySelectorAll("article h3")).map(
+      return Array.from(container.querySelectorAll('tbody th[scope="row"] > span:first-child')).map(
         (element) => element.textContent,
       );
+    }
+
+    function articleForApplicant(name: string) {
+      for (const article of container.querySelectorAll("article")) {
+        try {
+          within(article).getByRole("heading", { level: 3, name });
+          return article;
+        } catch {
+          // try next card
+        }
+      }
+      throw new Error(`Missing application card for ${name}`);
     }
 
     async function search(value: string) {
@@ -159,9 +182,10 @@ describe.each(["reviewer", "admin"] as const)(
       ["  TAYLOR  ", ["Taylor Student"]],
       ["lee", ["Sam Lee"]],
       ["alex@example.com", ["Alex Chen"]],
-      ["EXAMPLE UNIVERSITY", ["Alex Chen", "Taylor Student"]],
+      ["EXAMPLE UNIVERSITY", ["Taylor Student", "Alex Chen"]],
     ])("searches for %s", async (term, expected) => {
       await renderPage();
+      await select(0, "all");
       await search(term);
       expect(names()).toEqual(expected);
     });
@@ -172,13 +196,14 @@ describe.each(["reviewer", "admin"] as const)(
       ["accepted", "Alex Chen"],
       ["waitlisted", "Morgan Patel"],
       ["rejected", "Casey Jones"],
+      ["withdrawn", "Riley Withdrawn"],
     ])("filters status %s", async (status, expected) => {
       await renderPage();
       await select(0, status);
       expect(names()).toEqual([expected]);
 
       await select(0, "all");
-      expect(names()).toHaveLength(5);
+      expect(names()).toHaveLength(6);
     });
 
     it("combines search and status filtering", async () => {
@@ -188,25 +213,77 @@ describe.each(["reviewer", "admin"] as const)(
       expect(names()).toEqual(["Alex Chen"]);
     });
 
-    it("sorts newest first by default and supports oldest first", async () => {
+    it("defaults to applications needing review, oldest first", async () => {
       await renderPage();
+      expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
+      expect(container.textContent).toContain("2 need review");
+      expect(container.textContent).toContain("6 total applications");
+    });
 
+    it("shows final decision badges beside review links only when decided", async () => {
+      await renderPage();
+      await select(0, "all");
+
+      for (const [name, label] of [
+        ["Alex Chen", "Accepted"],
+        ["Morgan Patel", "Waitlisted"],
+        ["Casey Jones", "Rejected"],
+      ] as const) {
+        const card = articleForApplicant(name);
+        expect(
+          within(card)
+            .getByRole("link", { name: new RegExp(`Review application for ${name}`, "i") })
+            .getAttribute("href"),
+        ).toContain("/admin/applications/");
+        expect(getByLabelText(card, `Decision: ${label}`).textContent).toBe(label);
+      }
+
+      for (const name of ["Taylor Student", "Sam Lee"]) {
+        const card = articleForApplicant(name);
+        within(card).getByRole("link", {
+          name: new RegExp(`Review application for ${name}`, "i"),
+        });
+        expect(queryByLabelText(card, /^Decision:/)).toBeNull();
+      }
+    });
+
+    it("updates the badge when the current review status changes", async () => {
+      await renderPage();
+      await select(0, "all");
+      const updatedApplications = fixtures().map((application) =>
+        application.applicantName === "Alex Chen"
+          ? { ...application, reviewStatus: "rejected" as const }
+          : application,
+      );
+      mocks.query.mockReturnValue(updatedApplications);
+      await search("Alex Chen");
+
+      const card = articleForApplicant("Alex Chen");
+      expect(getByLabelText(card, "Decision: Rejected").textContent).toBe("Rejected");
+      expect(queryByLabelText(card, "Decision: Accepted")).toBeNull();
+    });
+
+    it("sorts all applications oldest first and supports newest first", async () => {
+      await renderPage();
+      await select(0, "all");
       expect(names()).toEqual([
-        "Casey Jones",
-        "Morgan Patel",
-        "Alex Chen",
-        "Sam Lee",
         "Taylor Student",
+        "Sam Lee",
+        "Alex Chen",
+        "Morgan Patel",
+        "Casey Jones",
+        "Riley Withdrawn",
       ]);
 
-      await select(1, "oldest");
+      await select(1, "newest");
 
       expect(names()).toEqual([
-        "Taylor Student",
-        "Sam Lee",
-        "Alex Chen",
-        "Morgan Patel",
+        "Riley Withdrawn",
         "Casey Jones",
+        "Morgan Patel",
+        "Alex Chen",
+        "Sam Lee",
+        "Taylor Student",
       ]);
     });
 
@@ -214,11 +291,11 @@ describe.each(["reviewer", "admin"] as const)(
       await renderPage();
       await search("no-such-applicant");
       await select(0, "accepted");
-      await select(1, "oldest");
+      await select(1, "newest");
 
       expect(names()).toEqual([]);
       expect(container.textContent).toContain("No matching applications");
-      expect(container.textContent).toContain("Showing 0 of 5 applications");
+      expect(container.textContent).toContain("Showing 0 of 6 applications");
 
       const reset = Array.from(container.querySelectorAll("button")).find(
         (button) => button.textContent === "Reset controls",
@@ -229,10 +306,63 @@ describe.each(["reviewer", "admin"] as const)(
       expect(
         container.querySelector<HTMLInputElement>('input[type="search"]')!.value,
       ).toBe("");
+      expect(container.querySelectorAll("select")[0].value).toBe("needs_review");
+      expect(container.querySelectorAll("select")[1].value).toBe("oldest");
+      expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
+    });
+
+    it("can expand a search to include completed decisions", async () => {
+      await renderPage();
+      await search("alex@example.com");
+      expect(names()).toEqual([]);
+      const expand = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Search all applications",
+      )!;
+      await act(async () => expand.click());
+      expect(names()).toEqual(["Alex Chen"]);
+      expect(container.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe("alex@example.com");
+    });
+
+    it("distinguishes a cleared queue from an empty submission list", async () => {
+      mocks.query.mockReturnValue(fixtures().filter((application) =>
+        ["accepted", "waitlisted", "rejected", "withdrawn"].includes(application.reviewStatus ?? ""),
+      ));
+      await renderPage();
+      expect(container.textContent).toContain("No applications need review");
+      const expand = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "View all applications",
+      )!;
+      await act(async () => expand.click());
+      expect(names()).toHaveLength(4);
+    });
+
+    it("restores controls from a queue URL", async () => {
+      await renderPage("/admin/applications?search=example&status=all&sort=newest");
+      expect(names()).toEqual(["Riley Withdrawn", "Casey Jones", "Morgan Patel", "Alex Chen", "Sam Lee", "Taylor Student"]);
       expect(container.querySelectorAll("select")[0].value).toBe("all");
       expect(container.querySelectorAll("select")[1].value).toBe("newest");
-      expect(names()).toHaveLength(5);
-      expect(names()[0]).toBe("Casey Jones");
+    });
+
+    it("falls back to queue defaults for invalid URL controls", async () => {
+      await renderPage("/admin/applications?status=invalid&sort=invalid");
+      expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
+      expect(container.querySelectorAll("select")[0].value).toBe("needs_review");
+      expect(container.querySelectorAll("select")[1].value).toBe("oldest");
+    });
+
+    it("recovers from a query failure using Try again", async () => {
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        mocks.query.mockImplementation(() => { throw new Error("offline"); });
+        await renderPage();
+        expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to load applications");
+        mocks.query.mockReturnValue(fixtures());
+        const retry = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Try again")!;
+        await act(async () => retry.click());
+        expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
+      } finally {
+        errorLog.mockRestore();
+      }
     });
 
     it("shows the loading state", async () => {

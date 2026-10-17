@@ -1,3 +1,4 @@
+import { ADMIN_ERROR_MESSAGES, adminError } from "../errors";
 import { sampleResumeUrl } from "./resumeFixture.ts";
 import { E2E_ADMIN, E2E_APPLICATION_IDS, E2E_REVIEWER } from "./credentials.ts";
 
@@ -117,7 +118,7 @@ function resetStore() {
     role: E2E_ADMIN.role,
   });
 
-  const now = 1_700_000_000_000;
+  const now = Date.now();
   seedApplication(E2E_APPLICATION_IDS.unreviewed, {
     authUserId: "e2e-user-1",
     email: "taylor.unreviewed@example.com",
@@ -126,7 +127,7 @@ function resetStore() {
     school: "Example University",
     createdAt: now - 3_000,
     submittedAt: now - 2_000,
-  });
+  }, { status: "under_review", createdAt: now, updatedAt: now });
 
   seedApplication(
     E2E_APPLICATION_IDS.underReview,
@@ -224,7 +225,7 @@ function adminFromSessionToken(sessionToken: string) {
 function requireSession(sessionToken: string) {
   const admin = adminFromSessionToken(sessionToken);
   if (!admin) {
-    throw new Error("Not authenticated");
+    throw adminError("NOT_AUTHENTICATED");
   }
   return admin;
 }
@@ -236,7 +237,7 @@ function requireReviewer(sessionToken: string) {
 function requireAdmin(sessionToken: string) {
   const admin = requireSession(sessionToken);
   if (admin.role !== "admin") {
-    throw new Error("Not authorized");
+    throw adminError("ADMIN_ONLY");
   }
   return admin;
 }
@@ -270,6 +271,7 @@ function reviewActivity(review: ReviewRecord | undefined, now: number) {
     lastActiveAt,
     isFinal: isFinalStatus(review.status),
     isStale,
+    ...(review.status === "under_review" && review.reviewedBy ? { expiresAt: (review.lastActiveAt ?? review.startedAt ?? review.updatedAt) + ACTIVE_REVIEW_STALE_MS } : {}),
     activeReviewStaleMs: ACTIVE_REVIEW_STALE_MS,
   };
 }
@@ -281,7 +283,11 @@ export function e2eMockSignIn(email: string, password: string) {
     (normalized === E2E_REVIEWER.email && password === E2E_REVIEWER.password) ||
     (normalized === E2E_ADMIN.email && password === E2E_ADMIN.password);
   if (!staff || !valid) {
-    return { ok: false as const, error: "Invalid email or password." };
+    return {
+      ok: false as const,
+      code: "INVALID_CREDENTIALS" as const,
+      error: ADMIN_ERROR_MESSAGES.INVALID_CREDENTIALS,
+    };
   }
   const sessionToken = `e2e-session-${staff.adminId}-${Date.now()}`;
   sessions.set(sessionToken, {
@@ -332,6 +338,9 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
             submittedAt: application.submittedAt,
             reviewStatus: review?.status ?? null,
             currentReviewerName: reviewer?.name ?? null,
+            ...(review?.status === "under_review" && review.reviewedBy ? {
+              reviewClaim: { reviewedBy: review.reviewedBy, expiresAt: (review.lastActiveAt ?? review.startedAt ?? review.updatedAt) + ACTIVE_REVIEW_STALE_MS },
+            } : {}),
           };
         })
         .sort((left, right) => (right.submittedAt ?? 0) - (left.submittedAt ?? 0));
@@ -355,7 +364,7 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
     case "admin/applicationReviewLogs:listApplicationReviewLogs": {
       requireAdmin(sessionToken);
       const applicationId = String(args.applicationId ?? "");
-      if (!applications.has(applicationId)) throw new Error("Application not found");
+      if (!applications.has(applicationId)) throw adminError("APPLICATION_NOT_FOUND");
       const paginationOpts = args.paginationOpts as { numItems: number; cursor: string | null };
       const filtered = logs
         .filter((log) => log.applicationId === applicationId)
@@ -387,7 +396,7 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       const admin = requireReviewer(sessionToken);
       const applicationId = String(args.applicationId ?? "");
       const action = String(args.action ?? "");
-      if (!applications.has(applicationId)) throw new Error("Application not found");
+      if (!applications.has(applicationId)) throw adminError("APPLICATION_NOT_FOUND");
 
       if (action === "started_review") {
         let review = reviews.get(applicationId);
@@ -417,7 +426,7 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
           review.lastActiveAt = now;
           review.updatedAt = now;
         } else {
-          throw new Error("Another organizer is actively reviewing this application.");
+          throw adminError("REVIEW_CLAIMED");
         }
       }
 
@@ -436,11 +445,12 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       const admin = requireReviewer(sessionToken);
       const applicationId = String(args.applicationId ?? "");
       const decision = String(args.decision ?? "") as "accepted" | "rejected" | "waitlisted";
-      if (!applications.has(applicationId)) throw new Error("Application not found");
+      if (!applications.has(applicationId)) throw adminError("APPLICATION_NOT_FOUND");
       const review = reviews.get(applicationId);
       if (!review) throw new Error("Application review not found");
-      if (isFinalStatus(review.status)) {
-        throw new Error("This application already has a final decision.");
+      const promotingWaitlist = review.status === "waitlisted" && decision === "accepted";
+      if (isFinalStatus(review.status) && !promotingWaitlist) {
+        throw adminError("REVIEW_FINALIZED");
       }
       if (
         review.status === "under_review" &&
@@ -449,7 +459,7 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
         review.lastActiveAt !== undefined &&
         now - review.lastActiveAt <= ACTIVE_REVIEW_STALE_MS
       ) {
-        throw new Error("Application is already being reviewed by another organizer.");
+        throw adminError("REVIEW_CLAIMED");
       }
       review.status = decision;
       review.reviewedBy = admin.adminId;

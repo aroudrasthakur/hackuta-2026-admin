@@ -55,6 +55,10 @@ After detail loads, the page calls `logApplicationReviewAction` with `action: "v
 
 Registration reads/writes for applicants remain in register-locked modules ([applications.ts](../applications.ts), [registrations.ts](../registrations.ts), etc.).
 
+## Waitlist decisions
+
+Waitlisted applicants can be accepted through the same confirmed decision mutation. This appends an acceptance event, creates the participant atomically, and schedules an acceptance email. The earlier waitlist event remains in history. Accepted, rejected, and withdrawn decisions cannot be changed through this workflow; repeated confirmation of the same recorded decision is idempotent.
+
 ## Related
 
 | Location | Role |

@@ -2,7 +2,7 @@ import { useMutation } from "../convex/reactBindings";
 import { useState } from "react";
 import type { GenericId } from "convex/values";
 import { logApplicationReviewActionRef, type ApplicationDetail } from "../convex/adminApi";
-import { formatMutationError } from "../lib/formatMutationError";
+import { reportUserFacingError } from "../lib/userFacingError";
 import { reviewPrimaryButtonClass } from "../lib/reviewButtonClasses";
 import { ReviewPanelSection } from "./ReviewPanelSection";
 
@@ -46,7 +46,14 @@ export function ApplicationReviewControls({
       await startReview({ sessionToken, applicationId, action: "started_review" });
       setConfirmed(true);
     } catch (caught) {
-      setError(formatMutationError(caught, "Unable to start review."));
+      setError(
+        reportUserFacingError(
+          "Unable to start review",
+          caught,
+          "We couldn't start the review. Please try again.",
+          { source: "ApplicationReviewControls.handleStartReview" },
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -54,8 +61,10 @@ export function ApplicationReviewControls({
 
   if (activity.isFinal) {
     return (
-      <p className="rounded-lg border border-sand bg-white/60 p-4 text-sm text-mist">
-        This application has a final decision and cannot be returned to active review.
+      <p className="rounded-lg border border-sand bg-white/60 p-4 text-sm text-ocean">
+        {detail.reviewStatus === "waitlisted"
+          ? "This applicant is on the waitlist and can be accepted when a spot opens."
+          : "This application has a final decision and cannot be returned to active review."}
       </p>
     );
   }

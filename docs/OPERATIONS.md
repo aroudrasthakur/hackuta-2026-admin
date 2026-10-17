@@ -35,15 +35,43 @@ push command continues to target `standing-manatee-425`.
 3. **Vercel:** push to `main` or promote deployment; set `VITE_CONVEX_URL`
 4. **Smoke test:** sign in, open `/admin/applications`, open one application review
 
+### Repeatable live-backend smoke test
+
+`npm run test:smoke` serves the current frontend at `http://127.0.0.1:5377` and
+connects to `standing-manatee-425` with mock mode and development auth bypass
+disabled. It does not deploy code. Provide a dedicated reviewer account in the
+**local-only** `.env.smoke.local` file (ignored by `.gitignore` via `.env.*` — never commit it):
+
+```dotenv
+ADMIN_SMOKE_EMAIL=<test-organizer-email>
+ADMIN_SMOKE_PASSWORD=<test-organizer-password>
+ADMIN_SMOKE_CONVEX_URL=https://standing-manatee-425.convex.cloud
+```
+
+The check exercises unauthenticated redirects, real sign-in, an HttpOnly cookie,
+noncached session retrieval, queue loading and refresh, opening an application,
+preserved filters, failed sign-out recovery, and successful sign-out. It verifies
+the old session is invalid in Convex and cannot reopen the queue. At least one
+submitted application must exist. Opening it appends the normal `viewed` audit
+event; the check does not claim reviews, make decisions, or send emails.
+
+The command closes its own browser and Vite server, reports only check results,
+and exits nonzero on failure. It does not save screenshots, traces, passwords,
+tokens, or applicant data. Use a dedicated account because normal sign-in clears
+that organizer's earlier sessions. A Vercel deployment still needs its own smoke
+check for HTTPS cookies and hosted API routing.
+
 ### Auth hardening deploy checklist
 
 Use this when shipping organizer sign-in, session, or review authorization changes:
 
-1. **Backend first:** `npm run convex:push-dev` (shared dev) or `npm run convex:deploy` (prod).
-2. **Frontend:** deploy the admin app only after Convex functions are live on that deployment.
-3. **Shared dev smoke:** sign in via `/admin/login`, open one application, log a view, sign out.
-4. **Staging / preview:** confirm `VITE_DEV_AUTH_BYPASS` and `VITE_E2E_MOCK` are unset; production build must pass `scripts/verify-production-env.mjs`.
-5. **Production:** repeat smoke test; verify failed sign-in returns 401/429 (not 500) and cookies use `HttpOnly` + `Cache-Control: no-store`.
+1. **Backend first:** `npm run convex:push-dev` (shared dev) or `npm run convex:deploy` (prod). Review-queue and detail views expect Convex to return `reviewClaim.expiresAt` and `reviewActivity.expiresAt` when a claim is active.
+2. **Frontend:** deploy the admin app only after Convex functions are live on that deployment. If the frontend ships first, the UI falls back to legacy `isStale` / conservative “still under review” behavior until the backend is updated.
+3. **Optional gate:** `npm run test:smoke` against shared dev after the Convex push and before promoting the frontend.
+4. **Shared dev smoke:** sign in via `/admin/login`, open one application, log a view, sign out.
+5. **Staging / preview:** confirm `VITE_DEV_AUTH_BYPASS` and `VITE_E2E_MOCK` are unset; production build must pass `scripts/verify-production-env.mjs`.
+6. **Production:** repeat smoke test; verify failed sign-in returns 401/429 (not 500) with `{ code, error }` JSON and cookies use `HttpOnly` + `Cache-Control: no-store`.
+7. **Integrations:** if anything calls `/api/admin/sign-in`, confirm it reads `code` — see [CHANGES.md](CHANGES.md).
 
 Organizer authorization is enforced **in Convex** (`sessionToken` → `resolveAdminSession` / `requireAdminRole` on every admin mutation and query). The Vite auth plugin and browser UI are not security boundaries.
 

@@ -48,3 +48,19 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
 @media (max-width: 640px) {
   .resume-dialog { width: 100vw; height: 100dvh; border-radius: 0; }
 }
+
+@layer components {
+  .admin-workspace :where(a, button, input, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-ocean);
+    outline-offset: 3px;
+  }
+
+  .admin-workspace :where(input, select, button) {
+    min-height: 2.75rem;
+  }
+
+  .admin-workspace :where(p, h3) {
+    overflow-wrap: anywhere;
+  }
+
+}

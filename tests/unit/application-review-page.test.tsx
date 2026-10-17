@@ -34,6 +34,7 @@ vi.mock("../../src/convex/reactBindings", () => ({
   useQuery: mocks.query,
   usePaginatedQuery: mocks.paginatedQuery,
   useMutation: mocks.mutationHook,
+  useAction: () => vi.fn(),
 }));
 
 function applicationDetail(): ApplicationDetail {
@@ -175,7 +176,7 @@ describe("read-only application review page", () => {
     expect(answer("Allergy details")).toBe("Peanuts");
     expect(answer("Accessibility needs")).toBe("Step-free access");
     expect(answer("Contact name")).toBe("Jordan Student");
-    expect(container.textContent).toContain("Review status: Under Review");
+    expect(container.textContent).toContain("Review status: Awaiting review");
     expect(container.querySelectorAll("input, textarea, select")).toHaveLength(0);
     expect(container.textContent).toContain("Start review");
     expect(container.textContent).toContain("Accept");
@@ -221,7 +222,7 @@ describe("read-only application review page", () => {
     detail.reviewStatus = null;
     detail.resume = { status: "none", url: null, filename: null };
     await renderDetail(detail);
-    expect(container.textContent).toContain("Review status: Unreviewed");
+    expect(container.textContent).toContain("Review status: Awaiting review");
     expect(container.textContent).toContain("Submitted: Not recorded");
     expect(answer("First name")).toBe("Not provided");
     expect(answer("Dietary restrictions")).toBe("Not provided");

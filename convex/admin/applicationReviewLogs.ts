@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { mutation, query } from "../_generated/server";
+import { adminError } from "../../shared/admin/errors";
 import { applicationFormWasSubmitted } from "../lib/applications";
 import { finalizeApplicationDecision } from "./decisionFinalize";
 import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./staffAuth";
@@ -30,7 +31,7 @@ export const logApplicationReviewAction = mutation({
       ((action === "viewed" || action === "started_review") &&
         !applicationFormWasSubmitted(application))
     ) {
-      throw new Error("Application not found");
+      throw adminError("APPLICATION_NOT_FOUND");
     }
 
     const now = Date.now();
@@ -82,8 +83,8 @@ export const setApplicationDecision = mutation({
   handler: async (ctx, { sessionToken, applicationId, decision }) => {
     const admin = await requireReviewerAccess(ctx, sessionToken);
     const application = await ctx.db.get(applicationId);
-    if (!application) throw new Error("Application not found");
-    if (!applicationFormWasSubmitted(application)) throw new Error("Application has not been submitted.");
+    if (!application) throw adminError("APPLICATION_NOT_FOUND");
+    if (!applicationFormWasSubmitted(application)) throw adminError("APPLICATION_NOT_SUBMITTED");
 
     const review = await ctx.db
       .query("applicationReviews")
@@ -109,7 +110,7 @@ export const listApplicationReviewLogs = query({
   },
   handler: async (ctx, { sessionToken, applicationId, paginationOpts }) => {
     await requireAdminRole(ctx, sessionToken);
-    if (!(await ctx.db.get(applicationId))) throw new Error("Application not found");
+    if (!(await ctx.db.get(applicationId))) throw adminError("APPLICATION_NOT_FOUND");
 
     const result = await ctx.db
       .query("applicationReviewLogs")

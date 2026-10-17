@@ -5,6 +5,7 @@ import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApplicationDecisionControls } from "../../src/components/ApplicationDecisionControls";
 import { setApplicationDecisionRef, type ApplicationDetail } from "../../src/convex/adminApi";
+import { ADMIN_ERROR_MESSAGES, adminError } from "../../shared/admin/errors";
 
 const mocks = vi.hoisted(() => ({ mutationHook: vi.fn(), finalize: vi.fn() }));
 vi.mock("../../src/convex/reactBindings", () => ({
@@ -115,7 +116,16 @@ describe("ApplicationDecisionControls", () => {
     await act(async () => button(confirm)!.click());
     expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ decision }));
     expect(container.textContent).toContain(message);
-    expect(container.textContent).toContain("will receive an email shortly");
+    expect(container.textContent).toContain("email scheduled.");
+  });
+
+  it.each([undefined, "   "])("does not claim an email was scheduled for a missing address (%s)", async (email) => {
+    await renderControls({ detail: detail({ application: { ...detail().application, email } }) });
+    await act(async () => button("Reject")!.click());
+    await act(async () => button("Confirm rejection")!.click());
+    expect(container.querySelector('[role="status"]')?.textContent).toBe(
+      "Application rejected. No email scheduled: applicant email is missing.",
+    );
   });
 
   it("sends only one request while finalization is pending", async () => {
@@ -146,23 +156,28 @@ describe("ApplicationDecisionControls", () => {
   });
 
   it("shows the server error and keeps the confirmation open", async () => {
-    mocks.finalize.mockRejectedValue(new Error("This application already has a final decision."));
+    mocks.finalize.mockRejectedValue(adminError("REVIEW_FINALIZED"));
     await renderControls();
     await act(async () => button("Reject")!.click());
     await act(async () => button("Confirm rejection")!.click());
 
     expect(container.querySelector('[role="alert"]')?.textContent).toBe(
-      "This application already has a final decision.",
+      ADMIN_ERROR_MESSAGES.REVIEW_FINALIZED,
     );
     expect(button("Confirm rejection")).toBeDefined();
   });
 
-  it("shows a fallback message for a non-Error failure", async () => {
-    mocks.finalize.mockRejectedValue("boom");
+  it.each([
+    ["a non-Error failure", "boom"],
+    ["a redacted Convex server error", new Error("[CONVEX M(admin/x)] [Request ID: abc123] Server Error")],
+  ])("shows a fallback message for %s", async (_label, failure) => {
+    mocks.finalize.mockRejectedValue(failure);
     await renderControls();
     await act(async () => button("Accept")!.click());
     await act(async () => button("Confirm acceptance")!.click());
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Unable to finalize decision.");
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      "We couldn't save this decision. Please try again.",
+    );
   });
 
   it("hides decision actions when another organizer holds the active claim", async () => {
@@ -182,5 +197,36 @@ describe("ApplicationDecisionControls", () => {
       }),
     });
     expect(container.querySelector('section[aria-label="Application decision"]')).toBeNull();
+  });
+
+  it("offers only confirmed acceptance for a waitlisted applicant", async () => {
+    await renderControls({ detail: detail({ reviewStatus: "waitlisted", reviewActivity: { ...detail().reviewActivity, isFinal: true } }) });
+    expect(button("Reject")).toBeUndefined();
+    expect(button("Waitlist")).toBeUndefined();
+    await act(async () => button("Accept from waitlist")!.click());
+    expect(mocks.finalize).not.toHaveBeenCalled();
+    await act(async () => button("Confirm acceptance")!.click());
+    expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ decision: "accepted" }));
+  });
+
+  it("focuses confirmation, restores the selected choice on cancel, and identifies the applicant", async () => {
+    await renderControls();
+    button("Reject")!.focus();
+    await act(async () => button("Reject")!.click());
+    expect(document.activeElement).toBe(button("Confirm rejection"));
+    expect(container.textContent).toContain("taylor@example.com");
+    await act(async () => button("Cancel")!.click());
+    expect(document.activeElement).toBe(button("Reject"));
+  });
+
+  it("retains and focuses completion after the live query reports a final decision", async () => {
+    await renderControls();
+    await act(async () => button("Accept")!.click());
+    await act(async () => button("Confirm acceptance")!.click());
+    await renderControls({ detail: detail({ reviewStatus: "accepted", reviewActivity: { ...detail().reviewActivity, isFinal: true } }) });
+    const notice = container.querySelector('[role="status"]');
+    expect(notice?.textContent).toContain("Application accepted");
+    expect(document.activeElement).toBe(notice);
+    expect(button("Accept")).toBeUndefined();
   });
 });

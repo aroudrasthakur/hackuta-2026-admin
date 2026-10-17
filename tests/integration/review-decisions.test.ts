@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { logApplicationReviewActionRef, setApplicationDecisionRef } from "../../src/convex/adminApi";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+// Load the action before fake-timer pumps can race its asynchronous module transform.
+import "../../convex/admin/sendDecisionEmails";
 import {
   countRows,
   EMAIL_SERVICE_URL,
@@ -14,6 +16,8 @@ import {
   stubEmailService,
   type Decision,
 } from "../helpers/reviewTestKit";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
+import type { AdminErrorCode } from "../../shared/admin/errors";
 
 const decisions: Array<{ decision: Decision; note: string; subject: RegExp }> = [
   { decision: "accepted", note: "application_accepted", subject: /accepted/i },
@@ -138,8 +142,11 @@ describe.each(decisions)("$decision decision", ({ decision, note, subject }) => 
     await flushScheduled(t);
     const before = await snapshotReviewState(t);
 
-    const other = decisions.find((entry) => entry.decision !== decision)!.decision;
-    await expect(decide(other)).rejects.toThrow(/already has a final decision/i);
+    const other =
+      decision === "waitlisted"
+        ? "rejected"
+        : decisions.find((entry) => entry.decision !== decision)!.decision;
+    await expectAdminErrorCode(decide(other), "REVIEW_FINALIZED");
     expect(await snapshotReviewState(t)).toEqual(before);
     expect(email.fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -164,6 +171,23 @@ describe.each(decisions)("$decision decision", ({ decision, note, subject }) => 
 });
 
 describe("acceptance", () => {
+  it("promotes a waitlisted applicant once, preserving both decisions in history", async () => {
+    const { t, applicant, decide } = await setup();
+    await decide("waitlisted");
+    await flushScheduled(t);
+    expect(await countRows(t, "participants")).toBe(0);
+    const accepted = await decide("accepted");
+    await flushScheduled(t);
+    expect((await getReview(t, applicant.applicationId))?.status).toBe("accepted");
+    expect((await getLogs(t, applicant.applicationId)).map((log) => log.action)).toEqual(["waitlisted", "accepted"]);
+    expect(await countRows(t, "participants")).toBe(1);
+    expect(email.sentEmails().map((sent) => sent.body.note)).toEqual(["application_waitlisted", "application_accepted"]);
+    expect(await decide("accepted")).toEqual({ logId: accepted.logId, duplicate: true });
+    await flushScheduled(t);
+    expect(await countRows(t, "participants")).toBe(1);
+    expect(email.fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("creates exactly one participant linked to the applicant", async () => {
     const { t, staff, applicant, decide } = await setup();
     await decide("accepted");
@@ -190,7 +214,7 @@ describe("acceptance", () => {
     await t.run((ctx) => ctx.db.delete(applicant.userId));
     const before = await snapshotReviewState(t);
 
-    await expect(decide("accepted")).rejects.toThrow(/user account not found/i);
+    await expectAdminErrorCode(decide("accepted"), "APPLICANT_ACCOUNT_MISSING");
     expect(await snapshotReviewState(t)).toEqual(before);
   });
 
@@ -214,7 +238,7 @@ describe("acceptance", () => {
     });
     const before = await snapshotReviewState(t);
 
-    await expect(decide("accepted")).rejects.toThrow(/different application/i);
+    await expectAdminErrorCode(decide("accepted"), "PARTICIPANT_CONFLICT");
     expect(await snapshotReviewState(t)).toEqual(before);
   });
 });
@@ -262,10 +286,11 @@ describe("invalid application requests", () => {
   async function expectNoWrites(
     t: ConvexTestInstance,
     run: () => Promise<unknown>,
-    message: RegExp,
+    expected: AdminErrorCode | RegExp,
   ) {
     const before = await snapshotReviewState(t);
-    await expect(run()).rejects.toThrow(message);
+    if (typeof expected === "string") await expectAdminErrorCode(run, expected);
+    else await expect(run()).rejects.toThrow(expected);
     expect(await snapshotReviewState(t)).toEqual(before);
     expect(email.fetchMock).not.toHaveBeenCalled();
   }
@@ -273,7 +298,7 @@ describe("invalid application requests", () => {
   it.each(decisions.map((entry) => entry.decision))("rejects %s on a deleted application", async (decision) => {
     const { t, applicant, decide } = await setup();
     await t.run((ctx) => ctx.db.delete(applicant.applicationId));
-    await expectNoWrites(t, () => decide(decision), /application not found/i);
+    await expectNoWrites(t, () => decide(decision), "APPLICATION_NOT_FOUND");
   });
 
   it.each(decisions.map((entry) => entry.decision))("rejects %s on a draft application", async (decision) => {
@@ -283,7 +308,7 @@ describe("invalid application requests", () => {
     await expectNoWrites(
       t,
       () => t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision }),
-      /not been submitted/i,
+      "APPLICATION_NOT_SUBMITTED",
     );
   });
 
@@ -336,7 +361,7 @@ describe("invalid application requests", () => {
     await expectNoWrites(
       t,
       () => t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "accepted" }),
-      /already has a final decision/i,
+      "REVIEW_FINALIZED",
     );
   });
 
@@ -347,7 +372,7 @@ describe("invalid application requests", () => {
     await expectNoWrites(
       t,
       () => t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "rejected" }),
-      /already has a final decision/i,
+      "REVIEW_FINALIZED",
     );
   });
 });

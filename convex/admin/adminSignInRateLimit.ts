@@ -7,9 +7,6 @@ export const ADMIN_SIGN_IN_MAX_FAILURES = 5;
 export const ADMIN_SIGN_IN_WINDOW_MS = 15 * 60 * 1000;
 export const ADMIN_SIGN_IN_CLIENT_IP_MAX_LENGTH = 64;
 
-export const ADMIN_SIGN_IN_RATE_LIMIT_MESSAGE =
-  "Too many failed sign-in attempts. Please try again later.";
-
 export function normalizeRateLimitClientIp(raw: string | undefined) {
   const trimmed = raw?.trim();
   if (!trimmed) {
