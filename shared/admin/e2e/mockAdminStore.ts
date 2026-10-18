@@ -1,4 +1,4 @@
-import { ADMIN_ERROR_MESSAGES, adminError } from "../errors";
+import { ADMIN_ERROR_MESSAGES, adminError } from "../errors.ts";
 import { sampleResumeUrl } from "./resumeFixture.ts";
 import { E2E_ADMIN, E2E_APPLICATION_IDS, E2E_REVIEWER } from "./credentials.ts";
 
