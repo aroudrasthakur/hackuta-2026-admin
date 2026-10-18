@@ -1,8 +1,8 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
-import { e2eMockSignIn, e2eMockSignOut } from "../shared/admin/e2e/mockAdminStore";
-import { SIGN_IN_FAILED_MESSAGE } from "../shared/admin/errors";
-import { logAdminError } from "../shared/admin/logAdminError";
+import { e2eMockSignIn, e2eMockSignOut } from "../shared/admin/e2e/mockAdminStore.ts";
+import { SIGN_IN_FAILED_MESSAGE } from "../shared/admin/errors.ts";
+import { logAdminError } from "../shared/admin/logAdminError.ts";
 import {
   clearAdminSessionCookie,
   isSecureRequest,
