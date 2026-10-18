@@ -1,6 +1,7 @@
-import { lazy, Suspense, useId, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { ErrorBoundary } from "./ErrorBoundary";
 import type { ApplicationDetail } from "../convex/adminApi";
+import { isUnsupportedNonPdfResume } from "../lib/resumeFile";
 
 const ResumePdf = lazy(() => import("./ResumePdf"));
 
@@ -10,7 +11,26 @@ export function ResumePreview({ resume }: { resume: ApplicationDetail["resume"] 
   const titleId = useId();
   const [open, setOpen] = useState(false);
 
-  const unsupported = resume.status === "available" && !!resume.filename && !resume.filename.toLowerCase().endsWith(".pdf");
+  const unsupported = resume.status === "available" && isUnsupportedNonPdfResume(resume.filename, resume.url);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialogEl = dialog.current;
+    if (!dialogEl) return;
+    let cancelled = false;
+    const focusInsideDialog = () => {
+      if (cancelled) return;
+      const focusTarget = dialogEl.querySelector<HTMLElement>("[autofocus], button:not([disabled])");
+      focusTarget?.focus({ preventScroll: true });
+    };
+    focusInsideDialog();
+    const observer = new MutationObserver(focusInsideDialog);
+    observer.observe(dialogEl, { childList: true, subtree: true });
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [open]);
 
   function close() {
     dialog.current?.close();
@@ -32,7 +52,7 @@ export function ResumePreview({ resume }: { resume: ApplicationDetail["resume"] 
           }}>Preview Resume</button>
         ) : <p className="text-sm text-ocean">{unsupported ? "Preview is only available for PDF resumes. This file format is not supported." : resume.status === "missing" ? "The attached resume is no longer available." : "No resume was attached."}</p>}
       </div>
-      <dialog ref={dialog} aria-labelledby={titleId} className="resume-dialog" onCancel={(event) => { event.preventDefault(); close(); }} onClose={() => { setOpen(false); trigger.current?.focus(); }}>
+      <dialog ref={dialog} aria-labelledby={titleId} aria-modal="true" aria-label="Resume preview" className="resume-dialog" onCancel={(event) => { event.preventDefault(); close(); }} onClose={() => { setOpen(false); trigger.current?.focus(); }}>
         <header className="border-b border-sand bg-light px-4 py-3">
           <h2 id={titleId} className="break-all text-base font-semibold text-night">{resume.filename || "Applicant resume"}</h2>
         </header>

@@ -42,4 +42,21 @@ describe("resume preview modal", () => {
     expect(container.querySelector("a")).toBeNull();
   });
 
+  it("allows uppercase PDF filenames", async () => {
+    await act(async () => root.render(<ResumePreview resume={{ status: "available", url: "https://example.com/resume.pdf", filename: "Resume.PDF" }} />));
+    expect(container.querySelector("button")?.textContent).toBe("Preview Resume");
+  });
+
+  it("exposes dialog accessibility and moves focus into the preview", async () => {
+    await render();
+    const trigger = container.querySelector("button")!;
+    await act(async () => trigger.click());
+    await act(async () => { await Promise.resolve(); });
+    const dialog = container.querySelector("dialog")!;
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("aria-label")).toBe("Resume preview");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.textContent).toBe("Close");
+  });
+
 });

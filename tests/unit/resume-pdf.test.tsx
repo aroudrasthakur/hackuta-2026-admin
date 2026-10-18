@@ -64,9 +64,13 @@ describe("resume PDF controls and recovery", () => {
     expect(container.textContent).toContain("200%");
     await click("Fit width"); expect(mocks.page.width).toBe(568);
   });
-  it.each(["onLoadError", "onSourceError", "onPassword"])("shows a recoverable error for %s", async (callback) => {
+  it.each([
+    ["onSourceError", "Resume file unavailable"],
+    ["onLoadError", "Unable to open this PDF"],
+    ["onPassword", "Unable to open this PDF"],
+  ] as const)("shows a recoverable error for %s", async (callback, heading) => {
     await act(async () => (mocks.document[callback] as () => void)());
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to load this resume");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(heading);
     await click("Try again");
     expect(container.querySelector('[role="alert"]')).toBeNull();
     await loaded(); expect(container.textContent).toContain("Page 1 of 2");
