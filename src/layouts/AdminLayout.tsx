@@ -32,7 +32,7 @@ export function AdminLayout() {
 
   return (
     <StormPageFrame>
-      <div className="min-h-screen">
+      <div className="admin-workspace min-h-screen">
         <header ref={headerRef} className="admin-topbar">
           <div className="admin-topbar__inner">
             <div className="admin-topbar__brand">

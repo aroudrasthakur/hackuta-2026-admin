@@ -3,7 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import type { GenericId } from "convex/values";
 import { setApplicationDecisionRef, type ApplicationDetail } from "../convex/adminApi";
 import { reportUserFacingError } from "../lib/userFacingError";
-import { reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../lib/reviewButtonClasses";
+import {
+  reviewDangerButtonClass,
+  reviewPrimaryButtonClass,
+  reviewSecondaryButtonClass,
+  reviewSuccessButtonClass,
+  reviewWaitlistButtonClass,
+} from "../lib/reviewButtonClasses";
 import { ReviewPanelSection } from "./ReviewPanelSection";
 
 type PendingDecision = "accepted" | "rejected" | "waitlisted";
@@ -111,7 +117,7 @@ export function ApplicationDecisionControls({
 
   const promotingWaitlist = detail.reviewStatus === "waitlisted";
   const completion = success && (
-    <p ref={completionRef} tabIndex={-1} role="status" className="rounded-md border border-sand bg-white p-4 text-sm text-ocean">{success}</p>
+    <p ref={completionRef} tabIndex={-1} role="status" className="admin-callout admin-callout--success">{success}</p>
   );
   if (isFinal && !promotingWaitlist) {
     return completion;
@@ -143,20 +149,26 @@ export function ApplicationDecisionControls({
         : "Choose accept, reject, or waitlist. Nothing is saved until you confirm on the next step."}
     >
       {error && (
-        <p role="alert" className="text-sm text-ink">
+        <p role="alert" className="admin-callout admin-callout--alert">
           {error}
         </p>
       )}
       {completion}
 
       {!pendingDecision && (
-        <div className="flex flex-wrap gap-2">
+        <div className={`grid gap-2 ${choices.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-3"}`}>
           {choices.map((decision) => (
             <button
               key={decision}
               ref={(element) => { choiceRefs.current[decision] = element; }}
               type="button"
-              className={decision === "accepted" ? reviewPrimaryButtonClass : reviewSecondaryButtonClass}
+              className={
+                decision === "accepted"
+                  ? reviewSuccessButtonClass
+                  : decision === "rejected"
+                    ? reviewDangerButtonClass
+                    : reviewWaitlistButtonClass
+              }
               onClick={() => selectDecision(decision)}
             >
               {promotingWaitlist ? "Accept from waitlist" : decisionCopy[decision].label}
@@ -166,19 +178,19 @@ export function ApplicationDecisionControls({
       )}
 
       {pendingCopy && (
-        <div className="space-y-3 rounded-md border border-sand bg-clay/20 p-4">
-          <h4 className="font-medium text-night">{pendingCopy.title}</h4>
+        <div className="space-y-3 rounded-xl border border-sand bg-clay/30 p-4">
+          <h4 className="font-semibold text-night">{pendingCopy.title}</h4>
           <p className="break-words text-sm text-night">
             Applicant: <strong>{[detail.application.firstName, detail.application.lastName].filter(Boolean).join(" ") || "Applicant"}</strong>
             {detail.application.email ? ` (${detail.application.email})` : ""}
           </p>
           <p className="text-sm text-ocean">{pendingCopy.body}</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             <button
               ref={confirmRef}
               type="button"
               disabled={confirming}
-              className={reviewPrimaryButtonClass}
+              className={pendingDecision === "accepted" ? reviewSuccessButtonClass : pendingDecision === "rejected" ? reviewDangerButtonClass : reviewPrimaryButtonClass}
               onClick={() => void confirmDecision()}
             >
               {confirming ? "Finalizing…" : pendingCopy.title}

@@ -624,6 +624,13 @@
     outline: none;
   }
 
+  .admin-topbar__sign-out-error {
+    width: 100%;
+    margin: 0;
+    font-size: 0.75rem;
+    color: #7f1d1d;
+  }
+
   @media (min-width: 640px) {
     .admin-topbar {
       top: 1rem;

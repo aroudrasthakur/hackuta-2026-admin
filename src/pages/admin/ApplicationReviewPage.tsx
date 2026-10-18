@@ -14,6 +14,7 @@ import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { ADMIN_ROUTES } from "../../types/routes";
 import { useNow } from "../../hooks/useNow";
 import { resolveReviewIsStale } from "../../../shared/admin/reviewActivityStale";
+import { reviewGhostButtonClass } from "../../lib/reviewButtonClasses";
 
 export function ApplicationReviewContent({
   applicationId,
@@ -82,7 +83,7 @@ export function ApplicationReviewContent({
   return (
     <>
       {loggingFailed && (
-        <p role="alert" className="rounded-lg border border-sand bg-clay/30 p-3 text-sm">
+        <p role="alert" className="admin-callout admin-callout--alert">
           We couldn’t record this application view. Please reopen the application to try again.
         </p>
       )}
@@ -117,12 +118,12 @@ export function ApplicationReviewPage() {
 
   return (
     <div className="space-y-5">
-      <Link className="inline-flex min-h-11 items-center rounded-md text-sm font-medium text-ocean underline underline-offset-4" to={`${ADMIN_ROUTES.applications}${applicationsSearch ? `?${applicationsSearch}` : ""}`}>Back to Applications</Link>
+      <Link className={reviewGhostButtonClass} to={`${ADMIN_ROUTES.applications}${applicationsSearch ? `?${applicationsSearch}` : ""}`}>Back to Applications</Link>
       {sessionToken && applicationId && staff ? (
         <ErrorBoundary
           key={`${location.key}:${applicationId}:${staff.adminId}`}
           fallback={
-            <div role="alert" className="rounded-lg border border-sand bg-clay/30 p-5">
+            <div role="alert" className="admin-card admin-card__body admin-callout--alert">
               <h2 className="font-display text-lg text-night">Unable to load application</h2>
               <p className="mt-2 text-sm">Return to Applications and try again.</p>
             </div>

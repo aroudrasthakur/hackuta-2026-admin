@@ -17,11 +17,11 @@ export function ReviewPanelSection({
   return (
     <section
       aria-label={ariaLabel}
-      className="rounded-lg border border-sand bg-white/60 p-4 space-y-3"
+      className="admin-card admin-card__body space-y-3"
     >
       <div className="space-y-1">
-        <h3 className="font-display text-lg text-night">{title}</h3>
-        {description ? <p className="text-sm text-ocean">{description}</p> : null}
+        <h3 className="admin-card__title">{title}</h3>
+        {description ? <p className="admin-card__hint">{description}</p> : null}
       </div>
       {children}
     </section>

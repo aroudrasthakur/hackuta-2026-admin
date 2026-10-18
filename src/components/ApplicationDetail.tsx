@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import type { ApplicationDetail as ApplicationDetailData } from "../convex/adminApi";
 import { applicationLink, formatApplicationAnswer, formatApplicationDate } from "../lib/applicationDisplay";
 import { dashboardReviewStatusLabel } from "../lib/applicationDisplay";
+import { ApplicationStatusBadge } from "./ApplicationStatusBadge";
 
 type Field = keyof ApplicationDetailData["application"];
 type Section = { title: string; fields: readonly (readonly [Field, string])[] };
@@ -75,8 +76,8 @@ export function ApplicationDetail({ detail, children }: { detail: ApplicationDet
 
   function renderSection({ title, fields }: Section) {
     return (
-      <section key={title} aria-label={title} className="rounded-lg border border-sand bg-white/40 p-5">
-        <h3 className="font-display text-lg text-night">{title}</h3>
+      <section key={title} aria-label={title} className="admin-card admin-card__body">
+        <h3 className="admin-card__title">{title}</h3>
         <dl className="mt-4 grid gap-5 sm:grid-cols-2">
           {fields.map(([field, label]) => {
             const value: unknown = application[field];
@@ -89,7 +90,7 @@ export function ApplicationDetail({ detail, children }: { detail: ApplicationDet
                 <dt className="text-sm font-semibold text-ocean">{label}</dt>
                 <dd className="mt-1 whitespace-pre-wrap break-words text-sm">
                   {href ? (
-                    <a href={href} target="_blank" rel="noreferrer" className="underline">
+                    <a href={href} target="_blank" rel="noreferrer" className="font-medium text-ocean underline underline-offset-4">
                       {answer}
                     </a>
                   ) : field.endsWith("At") ? formatApplicationDate(value) : answer}
@@ -104,21 +105,29 @@ export function ApplicationDetail({ detail, children }: { detail: ApplicationDet
 
   return (
     <article className="space-y-6">
-      <header className="space-y-2">
-        <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-night">{name || "Application review"}</h2>
-        <p className="break-words text-sm text-ocean">{application.email}</p>
-        <p className="text-sm">Submitted: {formatApplicationDate(application.submittedAt)}</p>
-        <p className="text-sm">Review status: {dashboardReviewStatusLabel(displayedStatus)}</p>
+      <header className="admin-card admin-card__body space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold tracking-tight text-night">{name || "Application review"}</h2>
+            <p className="break-words text-sm text-ocean">{application.email}</p>
+          </div>
+          <ApplicationStatusBadge status={displayedStatus} />
+        </div>
+        <p className="text-sm text-night">
+          Submitted: {formatApplicationDate(application.submittedAt)}
+          <span aria-hidden="true"> · </span>
+          Review status: {dashboardReviewStatusLabel(displayedStatus)}
+        </p>
       </header>
       <div className={`grid items-start gap-6 ${children ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}>
         <div className="min-w-0 space-y-5">
           {primaryTitles.map((title) => renderSection(sections.find((section) => section.title === title)!))}
           <ResumePreview key={application._id} resume={resume} />
         </div>
-        {children && <aside aria-label="Review actions" className="min-w-0 space-y-5 lg:sticky lg:top-6">{children}</aside>}
-        <details className="min-w-0 rounded-lg border border-sand bg-white/40 p-5 lg:col-span-full">
-          <summary className="min-h-11 cursor-pointer font-semibold text-night">Additional applicant information</summary>
-          <p className="mb-4 text-sm text-ocean">Contact details, dietary and accessibility needs, emergency contact, and consent records.</p>
+        {children && <aside aria-label="Review actions" className="min-w-0 space-y-5 lg:sticky lg:top-24">{children}</aside>}
+        <details className="admin-card admin-card__body admin-disclosure min-w-0 lg:col-span-full">
+          <summary>Additional applicant information</summary>
+          <p className="mb-4 mt-3 text-sm text-ocean">Contact details, dietary and accessibility needs, emergency contact, and consent records.</p>
           <div className="space-y-5">{sections.filter((section) => !primaryTitles.includes(section.title)).map(renderSection)}</div>
         </details>
       </div>

@@ -12,7 +12,7 @@ const statusClasses = {
 
 export function ApplicationStatusBadge({ status }: { status: keyof typeof statusClasses | null }) {
   return (
-    <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium ${statusClasses[status ?? "unreviewed"]}`}>
+    <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide ${statusClasses[status ?? "unreviewed"]}`}>
       {dashboardReviewStatusLabel(status)}
     </span>
   );

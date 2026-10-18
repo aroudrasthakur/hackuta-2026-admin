@@ -13,8 +13,7 @@ import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { needsApplicationReview } from "../../../shared/admin/reviewQueue";
 import { useNow } from "../../hooks/useNow";
 
-const controlClass =
-  "mt-1.5 min-h-11 w-full rounded-md border border-ocean/70 bg-white px-3 py-2 text-sm text-night placeholder:text-ocean focus:outline focus:outline-2 focus:outline-solid focus:outline-ocean";
+const controlClass = "admin-field__control";
 
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const now = useNow();
@@ -111,14 +110,17 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-ocean">
-        <span className="font-semibold text-night">{needsReviewCount} need review</span>
-        <span aria-hidden="true"> · </span>
-        <span>{applications.length} total applications</span>
-      </p>
+      <div className="flex flex-wrap gap-2">
+        <p className="admin-stat">
+          <strong>{needsReviewCount}</strong> need review
+        </p>
+        <p className="admin-stat">
+          <strong>{applications.length}</strong> total applications
+        </p>
+      </div>
 
-      <div className="grid gap-4 rounded-lg border border-sand bg-white p-4 min-[360px]:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_11rem_10rem_12rem]">
-        <label className="block text-sm font-medium text-night min-[360px]:col-span-2 xl:col-span-1">
+      <div className="admin-card admin-card__body grid gap-4 min-[360px]:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_11rem_10rem_12rem]">
+        <label className="admin-field min-[360px]:col-span-2 xl:col-span-1">
           Search applications
           <input
             type="search"
@@ -128,7 +130,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
             className={controlClass}
           />
         </label>
-        <label className="block text-sm font-medium text-night">
+        <label className="admin-field">
           Review status
           <select
             value={status}
@@ -140,7 +142,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
             ))}
           </select>
         </label>
-        <label className="block text-sm font-medium text-night">
+        <label className="admin-field">
           Submission time
           <select
             value={sortOrder}
@@ -151,7 +153,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
             <option value="newest">Newest first</option>
           </select>
         </label>
-        <label className="block text-sm font-medium text-night">
+        <label className="admin-field">
           Review assignment
           <select value={reviewer} onChange={(event) => updateControl("reviewer", event.target.value)} className={controlClass}>
             {Object.entries(reviewerFilters).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -176,7 +178,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
       </div>
 
       {visibleApplications.length === 0 ? (
-        <div className="rounded-lg border border-sand bg-white p-6 text-center sm:p-10">
+        <div className="admin-card admin-card__body p-6 text-center sm:p-10">
           <h3 className="text-lg font-semibold text-night">
             {queueIsClear ? "No applications need review" : "No matching applications"}
           </h3>
@@ -216,7 +218,7 @@ export function ApplicationsPage() {
         <ErrorBoundary
           key={`${sessionToken}:${retry}`}
           fallback={
-            <div role="alert" className="rounded-lg border border-red-200 bg-white p-6">
+            <div role="alert" className="admin-card admin-card__body admin-callout--alert">
               <h3 className="text-lg font-semibold text-night">Unable to load applications</h3>
               <p className="mt-2 text-sm text-ocean">Check your connection and try again.</p>
               <button

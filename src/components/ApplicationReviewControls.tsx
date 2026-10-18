@@ -61,7 +61,7 @@ export function ApplicationReviewControls({
 
   if (activity.isFinal) {
     return (
-      <p className="rounded-lg border border-sand bg-white/60 p-4 text-sm text-ocean">
+      <p className="admin-card admin-card__body admin-callout">
         {detail.reviewStatus === "waitlisted"
           ? "This applicant is on the waitlist and can be accepted when a spot opens."
           : "This application has a final decision and cannot be returned to active review."}
@@ -98,12 +98,12 @@ export function ApplicationReviewControls({
         </p>
       )}
       {error && (
-        <p role="alert" className="text-sm text-ink">
+        <p role="alert" className="admin-callout admin-callout--alert">
           {error}
         </p>
       )}
       {confirmed && !error && (
-        <p role="status" className="text-sm text-ocean">
+        <p role="status" className="admin-callout admin-callout--success">
           {ownsActiveReview ? "Review activity refreshed." : "Review started."}
         </p>
       )}
@@ -112,7 +112,7 @@ export function ApplicationReviewControls({
           type="button"
           disabled={pending}
           onClick={() => void handleStartReview()}
-          className={reviewPrimaryButtonClass}
+          className={`${reviewPrimaryButtonClass} w-full`}
         >
           {pending ? "Starting…" : ownsActiveReview ? "Refresh review activity" : "Start review"}
         </button>

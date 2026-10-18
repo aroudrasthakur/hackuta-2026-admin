@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/TextLayer.css";
+import { reviewSecondaryButtonClass } from "../lib/reviewButtonClasses";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdfjs/pdf.worker.min.mjs`;
 
@@ -35,7 +36,7 @@ export default function ResumePdf({ url, onClose }: { url: string; onClose: () =
     viewport.current?.scrollTo({ top: 0, left: 0 });
   }
 
-  const buttonClass = "rounded-md border border-sand bg-white px-3 py-2 text-sm hover:bg-clay disabled:cursor-not-allowed disabled:bg-clay disabled:text-ocean/70";
+  const buttonClass = reviewSecondaryButtonClass;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sand bg-light px-4 py-3" aria-label="PDF controls">
