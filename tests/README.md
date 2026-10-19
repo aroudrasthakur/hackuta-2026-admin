@@ -13,6 +13,7 @@ npm run test:coverage   # tests + coverage check (what CI runs)
 | --- | --- |
 | [`integration/`](integration/) | Full review flow against the real Convex functions: who can do what, view logs, review claims, Accept / Reject / Waitlist, emails, duplicates, bad requests |
 | [`unit/`](unit/) | Admin code: sign-in, pages, components, auth API |
+| [`unit/sign-in-password-input.test.tsx`](unit/sign-in-password-input.test.tsx) | Sign-in password visibility toggle |
 | [`register/`](register/) | Register-owned code (see below) |
 | [`helpers/`](helpers/) | Shared setup for admin tests |
 | [`fixtures/`](fixtures/) | Sample registration form data used by `register/` tests |

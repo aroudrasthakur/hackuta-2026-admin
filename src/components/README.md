@@ -10,4 +10,5 @@
 | [`ApplicationReviewHistory.tsx`](ApplicationReviewHistory.tsx) | Admin audit timeline |
 | [`ReviewPanelSection.tsx`](ReviewPanelSection.tsx) | Shared review panel layout |
 | [`AdminProtectedRoute.tsx`](AdminProtectedRoute.tsx) | Session gate |
+| [`SignInPasswordInput.tsx`](SignInPasswordInput.tsx) | Password field with show/hide toggle (matches register sign-in) |
 | [`states/`](states/README.md) | Loading, empty, error |

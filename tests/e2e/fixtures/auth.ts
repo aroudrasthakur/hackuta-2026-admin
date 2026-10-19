@@ -14,7 +14,7 @@ export async function signInOrganizer(
 ) {
   await page.goto("/admin/login");
   await page.getByLabel("Email").fill(account.email);
-  await page.getByLabel("Password").fill(account.password);
+  await page.getByLabel("Password", { exact: true }).fill(account.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/admin\/applications$/);
   await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();

@@ -17,10 +17,25 @@ test.describe("organizer authentication", () => {
   test("rejects invalid credentials", async ({ page }) => {
     await page.goto("/admin/login");
     await page.getByLabel("Email").fill(E2E_REVIEWER.email);
-    await page.getByLabel("Password").fill("WrongPassword1!");
+    await page.getByLabel("Password", { exact: true }).fill("WrongPassword1!");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByText(/incorrect email or password/i)).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/login$/);
+  });
+
+  test("reveals and hides the password on the sign-in form", async ({ page }) => {
+    await page.goto("/admin/login");
+    const password = page.getByLabel("Password", { exact: true });
+    await password.fill("SecurePass1");
+    await expect(password).toHaveAttribute("type", "password");
+
+    await page.getByRole("button", { name: "Show password" }).click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue("SecurePass1");
+
+    await page.getByRole("button", { name: "Hide password" }).click();
+    await expect(password).toHaveAttribute("type", "password");
+    await expect(password).toHaveValue("SecurePass1");
   });
 
   test("signs in and signs out", async ({ page }) => {

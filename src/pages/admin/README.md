@@ -2,7 +2,7 @@
 
 | File | Route |
 | --- | --- |
-| [`AdminLoginPage.tsx`](AdminLoginPage.tsx) | `/admin/login` |
+| [`AdminLoginPage.tsx`](AdminLoginPage.tsx) | `/admin/login` — email + password with the same show/hide control as register sign-in |
 | [`ApplicationsPage.tsx`](ApplicationsPage.tsx) | `/admin/applications` |
 | [`ApplicationReviewPage.tsx`](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` |
 

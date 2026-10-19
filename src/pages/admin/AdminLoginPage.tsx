@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { SignInPasswordInput } from "../../components/SignInPasswordInput";
 import { StormPageFrame } from "../../components/StormPageFrame";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { LoadingState } from "../../components/states/LoadingState";
@@ -72,10 +73,12 @@ export function AdminLoginPage() {
               />
             </label>
 
-            <label className="sign-in-field">
-              <span className="sign-in-field__label">Password</span>
-              <input
-                type="password"
+            <div className="sign-in-field">
+              <label className="sign-in-field__label" htmlFor="admin-sign-in-password">
+                Password
+              </label>
+              <SignInPasswordInput
+                id="admin-sign-in-password"
                 name="password"
                 autoComplete="current-password"
                 required
@@ -83,7 +86,7 @@ export function AdminLoginPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 className="sign-in-field__input"
               />
-            </label>
+            </div>
 
             {message ? (
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
