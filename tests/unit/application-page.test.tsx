@@ -424,6 +424,33 @@ describe.each(["reviewer", "admin"] as const)(
       expect(names()).toHaveLength(1);
       expect(names()[0]).toBe("Applicant 11");
       expect(container.textContent).toContain("Showing 11–11 of 11 applications");
+
+      const previous = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Previous")!;
+      await act(async () => previous.click());
+      expect(names()).toHaveLength(10);
+      expect(container.textContent).toContain("Showing 1–10 of 11 applications");
+    });
+
+    it("clamps an out-of-range page back to the last page", async () => {
+      const many = Array.from({ length: 11 }, (_, index) => ({
+        applicationId: `application-${index}` as SubmittedApplicationSummary["applicationId"],
+        applicantName: `Applicant ${String(index + 1).padStart(2, "0")}`,
+        email: `applicant-${index}@example.com`,
+        school: "Example University",
+        submittedAt: index + 1,
+        reviewStatus: null,
+        currentReviewerName: null,
+      }));
+      mocks.query.mockReturnValue(many);
+      await renderPage("/admin/applications?page=99");
+      expect(names()).toHaveLength(1);
+      expect(container.textContent).toContain("Page 2 of 2");
+    });
+
+    it("ignores a non-numeric page query", async () => {
+      await renderPage("/admin/applications?page=abc");
+      expect(names()).toHaveLength(6);
+      expect(container.textContent).not.toContain("Page 2 of");
     });
   },
 );

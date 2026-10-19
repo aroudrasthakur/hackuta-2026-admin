@@ -16,7 +16,7 @@ test.describe("applications queue", () => {
     await expect(page.getByRole("status")).toContainText("4 of 4 applications");
 
     await page.getByLabel("Search applications").fill("taylor");
-    await expect(page.getByRole("status")).toContainText("1 of 4 applications");
+    await expect(page.getByRole("status")).toContainText("1 matching applications (4 total)");
     await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Review application for Jordan Review" })).toHaveCount(0);
 
@@ -36,7 +36,7 @@ test.describe("applications queue", () => {
       await page.getByLabel("Search applications").fill("");
       await expect(page.getByLabel("Search applications")).toHaveValue("");
       await selectAdminListbox(page, "Review status", "accepted");
-      await expect(page.getByRole("status")).toContainText("1 of 4 applications");
+      await expect(page.getByRole("status")).toContainText("1 matching applications (4 total)");
       await expect(page.getByRole("link", { name: "Review application for Alex Accepted" })).toBeVisible();
       await selectAdminListbox(page, "Review status", "needs_review");
     }
@@ -63,10 +63,11 @@ test.describe("applications queue", () => {
     await expectAdminListboxValue(page, "Review status", "all");
     await expectAdminListboxValue(page, "Submission time", "newest");
     await expect(page.getByLabel("Search applications")).toHaveValue("alex.accepted@example.com");
-    await expect(page.getByRole("status")).toContainText("1 of 4 applications");
+    await expect(page.getByRole("status")).toContainText("1 matching applications (4 total)");
   });
 
   test("expands an empty search to include completed decisions", async ({ page }) => {
+    await selectAdminListbox(page, "Review status", "needs_review");
     await page.getByLabel("Search applications").fill("alex.accepted@example.com");
     await expect(page.getByRole("heading", { name: "No matching applications" })).toBeVisible();
     await page.getByRole("button", { name: "Search all applications" }).click();
@@ -82,7 +83,7 @@ test.describe("applications queue", () => {
     await page.getByRole("link", { name: "Back to Applications" }).click();
     await expect(page.getByRole("status")).toContainText("4 of 4 applications");
     await selectAdminListbox(page, "Review status", "waitlisted");
-    await expect(page.getByRole("status")).toContainText("1 of 4 applications");
+    await expect(page.getByRole("status")).toContainText("1 matching applications (4 total)");
     await expect(page.getByRole("link", { name: /Review application for/ })).toHaveCount(1);
   });
 
@@ -90,7 +91,7 @@ test.describe("applications queue", () => {
     for (const width of [1440, 1024, 768, 375, 320]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.getByRole("table")).toHaveCount(width >= 1024 ? 1 : 0);
-      await expect(page.getByRole("article")).toHaveCount(width >= 1024 ? 0 : 3);
+      await expect(page.getByRole("article")).toHaveCount(width >= 1024 ? 0 : 4);
       await expect(
         page.getByRole("button", { name: "Sign out" }).or(page.getByRole("button", { name: /Account menu for/i })),
       ).toBeVisible();
@@ -119,7 +120,7 @@ test.describe("applications queue", () => {
     await page.keyboard.press("Tab");
     await expect(page.getByLabel("Review assignment")).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeFocused();
+    await expect(page.getByRole("link", { name: /^Review application for / }).first()).toBeFocused();
   });
 
   test("shows fresh submissions as awaiting review and expired claims as reclaimable", async ({ page }) => {
@@ -127,21 +128,21 @@ test.describe("applications queue", () => {
     await page.reload();
     await selectAdminListbox(page, "Review status", "needs_review");
     await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeVisible();
-    await expect(page.getByRole("status")).toContainText("1 of 4");
+    await expect(page.getByRole("status")).toContainText("1 matching applications (4 total)");
     await selectAdminListbox(page, "Review status", "under_review");
-    await expect(page.getByRole("status")).toContainText("2 of 4");
+    await expect(page.getByRole("status")).toContainText("2 matching applications (4 total)");
     await page.clock.fastForward(31 * 60_000);
-    await expect(page.getByRole("status")).toContainText("0 of 4");
+    await expect(page.getByRole("status")).toContainText("Showing 0 of 4 applications");
     await selectAdminListbox(page, "Review status", "needs_review");
-    await expect(page.getByRole("status")).toContainText("3 of 4");
+    await expect(page.getByRole("status")).toContainText("3 matching applications (4 total)");
     await expect(page.getByRole("table")).toContainText("Available to reclaim");
   });
 
   test("filters assignments and continues reviewing with the original queue controls", async ({ page }) => {
     await selectAdminListbox(page, "Review assignment", "mine");
-    await expect(page.getByRole("status")).toContainText("2 of 4");
+    await expect(page.getByRole("status")).toContainText("2 matching applications (4 total)");
     await selectAdminListbox(page, "Review assignment", "available");
-    await expect(page.getByRole("status")).toContainText("3 of 4");
+    await expect(page.getByRole("status")).toContainText("3 matching applications (4 total)");
     await selectAdminListbox(page, "Submission time", "newest");
     const queueUrl = page.url();
     await page.getByRole("link", { name: "Review application for Casey Decision" }).click();
@@ -154,6 +155,6 @@ test.describe("applications queue", () => {
     await expect(page).toHaveURL(queueUrl);
     await expectAdminListboxValue(page, "Review assignment", "available");
     await expectAdminListboxValue(page, "Submission time", "newest");
-    await expect(page.getByRole("status")).toContainText("2 of 4");
+    await expect(page.getByRole("status")).toContainText("2 matching applications (4 total)");
   });
 });

@@ -4,7 +4,10 @@ import { ensureParticipantForAcceptance } from "./participantCreation";
 
 /**
  * Create the participant row for a confirmed acceptance.
- * Idempotent: returns the existing participant if the application already has one.
+ * Internal only: the public client cannot call this, so QR tokens are minted only
+ * from the staff-gated acceptance transaction (or other internal callers).
+ * Idempotent: returns the existing participant if the application already has one
+ * and does not rotate `qrCodeToken`.
  * Reuses the applicant's existing `users` account; profile data stays on `applications`.
  */
 export const createParticipantFromAcceptance = internalMutation({

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   getApplicationRef,
@@ -9,7 +10,7 @@ import {
 } from "../../src/convex/adminApi";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 import { insertStaffSession } from "../helpers/staffTestFixtures";
-import { seedApplicant, seedStaff, snapshotReviewState } from "../helpers/reviewTestKit";
+import { countRows, seedApplicant, seedStaff, snapshotReviewState } from "../helpers/reviewTestKit";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 const page = { numItems: 10, cursor: null };
@@ -191,5 +192,63 @@ describe("account changes apply to live sessions", () => {
       asApplicant.query(getApplicationRef, { sessionToken: "", applicationId }),
       "NOT_AUTHENTICATED",
     );
+  });
+});
+
+describe("participant QR credentials", () => {
+  it("keeps participant creation off the public Convex API", () => {
+    const source = readFileSync(new URL("../../convex/admin/participants.ts", import.meta.url), "utf8");
+    expect(source).toContain("internalMutation");
+    expect(source).not.toMatch(/export const \w+ = (query|mutation)\(/);
+  });
+
+  it("omits the QR token and participant id from the acceptance response and review reads", async () => {
+    const t = createConvexTest();
+    const { sessionToken } = await seedStaff(t, { role: "reviewer" });
+    const { applicationId } = await seedApplicant(t);
+    const calls = protectedCalls(t, sessionToken, applicationId);
+
+    const accepted = await calls.accept();
+    expect(Object.keys(accepted).sort()).toEqual(["duplicate", "logId"]);
+    expect(JSON.stringify(accepted)).not.toContain("qrCodeToken");
+
+    const listed = await calls.listApplications();
+    const opened = await calls.openApplication();
+    expect(JSON.stringify({ listed, opened })).not.toContain("qrCodeToken");
+
+    const participant = await t.run((ctx) => ctx.db.query("participants").unique());
+    expect(participant?.qrCodeToken).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("keeps the same QR token when acceptance is retried", async () => {
+    const t = createConvexTest();
+    const { sessionToken } = await seedStaff(t, { role: "reviewer" });
+    const { applicationId } = await seedApplicant(t);
+    const calls = protectedCalls(t, sessionToken, applicationId);
+
+    await calls.accept();
+    const first = await t.run((ctx) => ctx.db.query("participants").unique());
+    const retry = await calls.accept();
+    const second = await t.run((ctx) => ctx.db.query("participants").unique());
+
+    expect(retry).toMatchObject({ duplicate: true, logId: expect.anything() });
+    expect(second).toEqual(first);
+    expect(await countRows(t, "participants")).toBe(1);
+  });
+
+  it("does not create a participant when an applicant session tries to accept", async () => {
+    const t = createConvexTest();
+    const { applicationId, userId } = await seedApplicant(t);
+    const asApplicant = t.withIdentity({ subject: userId, email: "applicant@example.com" });
+
+    await expectAdminErrorCode(
+      asApplicant.mutation(setApplicationDecisionRef, {
+        sessionToken: "",
+        applicationId,
+        decision: "accepted",
+      }),
+      "NOT_AUTHENTICATED",
+    );
+    expect(await countRows(t, "participants")).toBe(0);
   });
 });
