@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AdminAccountControls } from "../components/AdminAccountControls";
-import { AdminNav } from "../components/AdminNav";
+import { HackUtaLogo } from "../components/HackUtaLogo";
 import { StormPageFrame } from "../components/StormPageFrame";
 
 export function AdminLayout() {
@@ -33,11 +33,10 @@ export function AdminLayout() {
   return (
     <StormPageFrame>
       <div className="admin-workspace min-h-screen">
-        <header ref={headerRef} className="admin-topbar">
-          <div className="admin-topbar__inner">
+        <header ref={headerRef} className="admin-topbar admin-topbar--compact">
+          <div className="admin-topbar__inner admin-topbar__inner--compact">
             <div className="admin-topbar__brand">
-              <p className="admin-topbar__brand-kicker">HackUTA 2026</p>
-              <h1 className="admin-topbar__brand-title">Organizer Admin</h1>
+              <HackUtaLogo className="admin-topbar__logo" />
               {import.meta.env.DEV &&
               import.meta.env.VITE_DEV_AUTH_BYPASS === "true" ? (
                 <p className="mt-1 text-xs font-medium text-red-700">
@@ -45,8 +44,6 @@ export function AdminLayout() {
                 </p>
               ) : null}
             </div>
-
-            <AdminNav />
 
             <AdminAccountControls />
           </div>

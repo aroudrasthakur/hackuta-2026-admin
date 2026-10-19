@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useSearchParams } from "react-router-dom";
+import { AdminListboxSelect } from "../../components/AdminListboxSelect";
 import { ApplicationsList } from "../../components/ApplicationsList";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
@@ -8,12 +9,28 @@ import { LoadingState } from "../../components/states/LoadingState";
 import { listSubmittedApplicationsRef } from "../../convex/adminApi";
 import { useQuery } from "../../convex/reactBindings";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
-import { applicationsInQueue, queueControls, queueDefaults, reviewStatusFilters, reviewerFilters } from "../../lib/applicationQueue";
+import { ApplicationsQueuePagination } from "../../components/ApplicationsQueuePagination";
+import {
+  applicationsInQueue,
+  paginateQueue,
+  queueControls,
+  queueDefaults,
+  queuePage,
+  queuePageRange,
+  reviewStatusFilterOptions,
+  reviewStatusFilters,
+  reviewerFilters,
+} from "../../lib/applicationQueue";
 import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { needsApplicationReview } from "../../../shared/admin/reviewQueue";
 import { useNow } from "../../hooks/useNow";
 
 const controlClass = "admin-field__control";
+const sortOptions = [
+  { value: "oldest", label: "Oldest first" },
+  { value: "newest", label: "Newest first" },
+] as const;
+const reviewerOptions = Object.entries(reviewerFilters).map(([value, label]) => ({ value, label }));
 
 function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const now = useNow();
@@ -50,6 +67,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
         } else {
           next.set("search", term);
         }
+        next.delete("page");
         return next;
       }, { replace: true });
     });
@@ -68,6 +86,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
         } else {
           next.set(key, value);
         }
+        next.delete("page");
         return next;
       }, { replace: true });
     });
@@ -84,6 +103,39 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   }, [searchParams, searchInput]);
 
   const visibleApplications = applicationsInQueue(applications ?? [], queueParams, staff?.adminId ?? "", now);
+  const filteredCount = visibleApplications.length;
+  const page = queuePage(searchParams, filteredCount);
+  const { start: rangeStart, end: rangeEnd, totalPages } = queuePageRange(page, filteredCount);
+  const pagedApplications = paginateQueue(visibleApplications, page);
+
+  useEffect(() => {
+    const requestedRaw = searchParams.get("page");
+    if (!requestedRaw) return;
+    const requested = Number.parseInt(requestedRaw, 10);
+    if (!Number.isFinite(requested) || requested < 1) return;
+    if (requested === page) return;
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (page <= 1) {
+        next.delete("page");
+      } else {
+        next.set("page", String(page));
+      }
+      return next;
+    }, { replace: true });
+  }, [page, searchParams, setSearchParams]);
+
+  function goToPage(nextPage: number) {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (nextPage <= 1) {
+        next.delete("page");
+      } else {
+        next.set("page", String(nextPage));
+      }
+      return next;
+    }, { replace: true });
+  }
 
   if (applications === undefined) {
     return (
@@ -100,11 +152,8 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
     );
   }
 
-  const hasCustomControls =
-    searchInput !== queueDefaults.search || status !== queueDefaults.status ||
-    sortOrder !== queueDefaults.sort || reviewer !== queueDefaults.reviewer;
-  const queueIsClear =
-    status === queueDefaults.status && searchText === "" &&
+  const queueNeedsReviewEmpty =
+    status === "needs_review" && searchText === "" &&
     reviewer === queueDefaults.reviewer && visibleApplications.length === 0;
   const needsReviewCount = applications.filter(needsApplicationReview).length;
 
@@ -130,61 +179,52 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
             className={controlClass}
           />
         </label>
-        <label className="admin-field">
-          Review status
-          <select
-            value={status}
-            onChange={(event) => updateControl("status", event.target.value)}
-            className={controlClass}
-          >
-            {Object.entries(reviewStatusFilters).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="admin-field">
-          Submission time
-          <select
-            value={sortOrder}
-            onChange={(event) => updateControl("sort", event.target.value)}
-            className={controlClass}
-          >
-            <option value="oldest">Oldest first</option>
-            <option value="newest">Newest first</option>
-          </select>
-        </label>
-        <label className="admin-field">
-          Review assignment
-          <select value={reviewer} onChange={(event) => updateControl("reviewer", event.target.value)} className={controlClass}>
-            {Object.entries(reviewerFilters).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </label>
+        <AdminListboxSelect
+          id="applications-review-status"
+          label="Review status"
+          value={status}
+          options={reviewStatusFilterOptions.map(([value, optionLabel]) => ({ value, label: optionLabel }))}
+          onChange={(value) => updateControl("status", value)}
+          controlClassName={controlClass}
+        />
+        <AdminListboxSelect
+          id="applications-sort-order"
+          label="Submission time"
+          value={sortOrder}
+          options={sortOptions}
+          onChange={(value) => updateControl("sort", value)}
+          controlClassName={controlClass}
+        />
+        <AdminListboxSelect
+          id="applications-reviewer-filter"
+          label="Review assignment"
+          value={reviewer}
+          options={reviewerOptions}
+          onChange={(value) => updateControl("reviewer", value)}
+          controlClassName={controlClass}
+        />
       </div>
 
       <div className="flex min-h-11 flex-wrap items-center justify-between gap-3">
         <p role="status" className="text-sm text-ocean">
-          Showing {visibleApplications.length} of {applications.length} applications
-          <span className="sr-only">. Filter: {reviewStatusFilters[status]}. Assignment: {reviewerFilters[reviewer]}</span>
+          {filteredCount === 0
+            ? `Showing 0 of ${applications.length} applications`
+            : filteredCount === applications.length
+              ? `Showing ${rangeStart}–${rangeEnd} of ${applications.length} applications`
+              : `Showing ${rangeStart}–${rangeEnd} of ${filteredCount} matching applications (${applications.length} total)`}
+          <span className="sr-only">. Filter: {reviewStatusFilters[status]}. Assignment: {reviewerFilters[reviewer]}. Page {page} of {totalPages}.</span>
         </p>
-        {hasCustomControls && (
-          <button
-            type="button"
-            className={reviewSecondaryButtonClass}
-            onClick={() => setSearchParams({}, { replace: true })}
-          >
-            Reset controls
-          </button>
-        )}
+        <ApplicationsQueuePagination page={page} totalPages={totalPages} onPageChange={goToPage} />
       </div>
 
       {visibleApplications.length === 0 ? (
         <div className="admin-card admin-card__body p-6 text-center sm:p-10">
           <h3 className="text-lg font-semibold text-night">
-            {queueIsClear ? "No applications need review" : "No matching applications"}
+            {queueNeedsReviewEmpty ? "No applications need review" : "No matching applications"}
           </h3>
           <p className="mt-2 text-sm text-ocean">
-            {queueIsClear
-              ? "You're up to date. Past decisions are available under All applications."
+            {queueNeedsReviewEmpty
+              ? "You're up to date. Switch to All applications to see completed decisions."
               : "Try another search or change the review status or assignment filter."}
           </p>
           {status !== "all" && (
@@ -198,7 +238,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
           )}
         </div>
       ) : (
-        <ApplicationsList applications={visibleApplications} applicationsSearch={searchParams.toString()} now={now} staffAdminId={staff?.adminId} />
+        <ApplicationsList applications={pagedApplications} applicationsSearch={searchParams.toString()} now={now} staffAdminId={staff?.adminId} />
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { E2E_APPLICATION_IDS, E2E_REVIEWER, signInOrganizer } from "./fixtures/auth";
+import { expectAdminListboxValue, selectAdminListbox } from "./fixtures/listbox";
 import { resetE2eMockBackend } from "./fixtures/resetMock";
 
 test.describe("applications queue", () => {
@@ -11,8 +12,8 @@ test.describe("applications queue", () => {
   test("lists seeded applications with filters and search", async ({ page }) => {
     await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Review application for Jordan Review" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Review application for Alex Accepted" })).toHaveCount(0);
-    await expect(page.getByRole("status")).toContainText("3 of 4 applications");
+    await expect(page.getByRole("link", { name: "Review application for Alex Accepted" })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("4 of 4 applications");
 
     await page.getByLabel("Search applications").fill("taylor");
     await expect(page.getByRole("status")).toContainText("1 of 4 applications");
@@ -20,18 +21,13 @@ test.describe("applications queue", () => {
     await expect(page.getByRole("link", { name: "Review application for Jordan Review" })).toHaveCount(0);
 
     await page.getByLabel("Search applications").fill("");
-    await page.getByLabel("Review status").selectOption("accepted");
+    await selectAdminListbox(page, "Review status", "accepted");
     await expect(page.getByRole("link", { name: "Review application for Alex Accepted" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toHaveCount(0);
 
-    await page.getByLabel("Review status").selectOption("all");
-    await page.getByLabel("Submission time").selectOption("newest");
+    await selectAdminListbox(page, "Review status", "all");
+    await selectAdminListbox(page, "Submission time", "newest");
     await expect(page.getByRole("status")).toContainText("4 of 4 applications");
-
-    await page.getByRole("button", { name: "Reset controls" }).click();
-    await expect(page.getByLabel("Review status")).toHaveValue("needs_review");
-    await expect(page.getByLabel("Submission time")).toHaveValue("oldest");
-    await expect(page.getByRole("status")).toContainText("3 of 4 applications");
   });
 
   test("keeps rapid search and status changes in sync", async ({ page }) => {
@@ -39,10 +35,10 @@ test.describe("applications queue", () => {
       await page.getByLabel("Search applications").fill("taylor");
       await page.getByLabel("Search applications").fill("");
       await expect(page.getByLabel("Search applications")).toHaveValue("");
-      await page.getByLabel("Review status").selectOption("accepted");
+      await selectAdminListbox(page, "Review status", "accepted");
       await expect(page.getByRole("status")).toContainText("1 of 4 applications");
       await expect(page.getByRole("link", { name: "Review application for Alex Accepted" })).toBeVisible();
-      await page.getByLabel("Review status").selectOption("needs_review");
+      await selectAdminListbox(page, "Review status", "needs_review");
     }
   });
 
@@ -55,8 +51,8 @@ test.describe("applications queue", () => {
   });
 
   test("preserves queue controls across refresh and return from review", async ({ page }) => {
-    await page.getByLabel("Review status").selectOption("all");
-    await page.getByLabel("Submission time").selectOption("newest");
+    await selectAdminListbox(page, "Review status", "all");
+    await selectAdminListbox(page, "Submission time", "newest");
     await page.getByLabel("Search applications").fill("alex.accepted@example.com");
     const queueUrl = page.url();
     await page.reload();
@@ -64,8 +60,8 @@ test.describe("applications queue", () => {
     await page.getByRole("link", { name: "Review application for Alex Accepted" }).click();
     await page.getByRole("link", { name: "Back to Applications" }).click();
     await expect(page).toHaveURL(queueUrl);
-    await expect(page.getByLabel("Review status")).toHaveValue("all");
-    await expect(page.getByLabel("Submission time")).toHaveValue("newest");
+    await expectAdminListboxValue(page, "Review status", "all");
+    await expectAdminListboxValue(page, "Submission time", "newest");
     await expect(page.getByLabel("Search applications")).toHaveValue("alex.accepted@example.com");
     await expect(page.getByRole("status")).toContainText("1 of 4 applications");
   });
@@ -82,10 +78,10 @@ test.describe("applications queue", () => {
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
     await page.getByRole("button", { name: "Waitlist" }).click();
     await page.getByRole("button", { name: "Confirm waitlist" }).click();
-    await expect(page.getByText("Review status: Waitlisted")).toBeVisible();
+    await expect(page.locator(".application-review-identity")).toContainText("Waitlisted");
     await page.getByRole("link", { name: "Back to Applications" }).click();
-    await expect(page.getByRole("status")).toContainText("2 of 4 applications");
-    await page.getByLabel("Review status").selectOption("waitlisted");
+    await expect(page.getByRole("status")).toContainText("4 of 4 applications");
+    await selectAdminListbox(page, "Review status", "waitlisted");
     await expect(page.getByRole("status")).toContainText("1 of 4 applications");
     await expect(page.getByRole("link", { name: /Review application for/ })).toHaveCount(1);
   });
@@ -129,35 +125,35 @@ test.describe("applications queue", () => {
   test("shows fresh submissions as awaiting review and expired claims as reclaimable", async ({ page }) => {
     await page.clock.install();
     await page.reload();
-    await page.getByLabel("Review status").selectOption("unreviewed");
+    await selectAdminListbox(page, "Review status", "needs_review");
     await expect(page.getByRole("link", { name: "Review application for Taylor Unreviewed" })).toBeVisible();
     await expect(page.getByRole("status")).toContainText("1 of 4");
-    await page.getByLabel("Review status").selectOption("under_review");
+    await selectAdminListbox(page, "Review status", "under_review");
     await expect(page.getByRole("status")).toContainText("2 of 4");
     await page.clock.fastForward(31 * 60_000);
     await expect(page.getByRole("status")).toContainText("0 of 4");
-    await page.getByLabel("Review status").selectOption("stale");
-    await expect(page.getByRole("status")).toContainText("2 of 4");
+    await selectAdminListbox(page, "Review status", "needs_review");
+    await expect(page.getByRole("status")).toContainText("3 of 4");
     await expect(page.getByRole("table")).toContainText("Available to reclaim");
   });
 
   test("filters assignments and continues reviewing with the original queue controls", async ({ page }) => {
-    await page.getByLabel("Review assignment").selectOption("mine");
+    await selectAdminListbox(page, "Review assignment", "mine");
     await expect(page.getByRole("status")).toContainText("2 of 4");
-    await page.getByLabel("Review assignment").selectOption("available");
+    await selectAdminListbox(page, "Review assignment", "available");
     await expect(page.getByRole("status")).toContainText("3 of 4");
-    await page.getByLabel("Submission time").selectOption("newest");
+    await selectAdminListbox(page, "Submission time", "newest");
     const queueUrl = page.url();
     await page.getByRole("link", { name: "Review application for Casey Decision" }).click();
     await page.getByRole("button", { name: "Accept", exact: true }).click();
     await page.getByRole("button", { name: "Confirm acceptance", exact: true }).click();
-    await expect(page.getByText("Review status: Accepted", { exact: true })).toBeVisible();
+    await expect(page.locator(".application-review-identity")).toContainText("Accepted");
     await page.getByRole("link", { name: "Review next application", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Jordan Review", exact: true })).toBeFocused();
     await page.getByRole("link", { name: "Back to Applications" }).click();
     await expect(page).toHaveURL(queueUrl);
-    await expect(page.getByLabel("Review assignment")).toHaveValue("available");
-    await expect(page.getByLabel("Submission time")).toHaveValue("newest");
+    await expectAdminListboxValue(page, "Review assignment", "available");
+    await expectAdminListboxValue(page, "Submission time", "newest");
     await expect(page.getByRole("status")).toContainText("2 of 4");
   });
 });

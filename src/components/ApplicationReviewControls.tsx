@@ -61,7 +61,7 @@ export function ApplicationReviewControls({
 
   if (activity.isFinal) {
     return (
-      <p className="admin-card admin-card__body admin-callout">
+      <p className="application-review-actions-panel__note admin-callout text-sm">
         {detail.reviewStatus === "waitlisted"
           ? "This applicant is on the waitlist and can be accepted when a spot opens."
           : "This application has a final decision and cannot be returned to active review."}

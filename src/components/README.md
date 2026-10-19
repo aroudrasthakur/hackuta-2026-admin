@@ -2,7 +2,6 @@
 
 | Component | Role |
 | --- | --- |
-| [`AdminNav.tsx`](AdminNav.tsx) | Applications nav |
 | [`ApplicationDetail.tsx`](ApplicationDetail.tsx) | Read-only applicant fields |
 | [`ApplicationsList.tsx`](ApplicationsList.tsx) | Desktop queue table and mobile cards |
 | [`ApplicationStatusBadge.tsx`](ApplicationStatusBadge.tsx) | Consistent queue status labels |

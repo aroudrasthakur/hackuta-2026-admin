@@ -3,8 +3,7 @@ import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { ApplicationDetail as ApplicationDetailData } from "../convex/adminApi";
 import { applicationLink, formatApplicationAnswer, formatApplicationDate } from "../lib/applicationDisplay";
-import { dashboardReviewStatusLabel } from "../lib/applicationDisplay";
-import { ApplicationStatusBadge } from "./ApplicationStatusBadge";
+import { ApplicationReviewIdentity } from "./ApplicationReviewIdentity";
 
 type Field = keyof ApplicationDetailData["application"];
 type Section = { title: string; fields: readonly (readonly [Field, string])[] };
@@ -104,32 +103,35 @@ export function ApplicationDetail({ detail, children }: { detail: ApplicationDet
   }
 
   return (
-    <article className="space-y-6">
-      <header className="admin-card admin-card__body space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold tracking-tight text-night">{name || "Application review"}</h2>
-            <p className="break-words text-sm text-ocean">{application.email}</p>
-          </div>
-          <ApplicationStatusBadge status={displayedStatus} />
-        </div>
-        <p className="text-sm text-night">
-          Submitted: {formatApplicationDate(application.submittedAt)}
-          <span aria-hidden="true"> · </span>
-          Review status: {dashboardReviewStatusLabel(displayedStatus)}
-        </p>
-      </header>
-      <div className={`grid items-start gap-6 ${children ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}>
-        <div className="min-w-0 space-y-5">
+    <article className="space-y-5">
+      <ApplicationReviewIdentity
+        detail={detail}
+        displayedStatus={displayedStatus}
+        name={name}
+        headingRef={headingRef}
+      />
+
+      <div
+        className={`grid items-start gap-5 ${children ? "application-review-body lg:grid-cols-[minmax(0,1fr)_minmax(17rem,20rem)] lg:gap-6" : ""}`}
+      >
+        {children ? (
+          <aside
+            aria-label="Review actions"
+            className="application-review-actions-rail order-1 min-w-0 lg:order-none lg:sticky lg:top-24"
+          >
+            <div className="admin-card admin-card__body application-review-actions-panel">{children}</div>
+          </aside>
+        ) : null}
+
+        <div className="order-2 min-w-0 space-y-5 lg:order-none">
           {primaryTitles.map((title) => renderSection(sections.find((section) => section.title === title)!))}
           <ResumePreview key={application._id} resume={resume} />
+          <details className="admin-card admin-card__body admin-disclosure min-w-0">
+            <summary>Additional applicant information</summary>
+            <p className="mb-4 mt-3 text-sm text-ocean">Contact details, dietary and accessibility needs, emergency contact, and consent records.</p>
+            <div className="space-y-5">{sections.filter((section) => !primaryTitles.includes(section.title)).map(renderSection)}</div>
+          </details>
         </div>
-        {children && <aside aria-label="Review actions" className="min-w-0 space-y-5 lg:sticky lg:top-24">{children}</aside>}
-        <details className="admin-card admin-card__body admin-disclosure min-w-0 lg:col-span-full">
-          <summary>Additional applicant information</summary>
-          <p className="mb-4 mt-3 text-sm text-ocean">Contact details, dietary and accessibility needs, emergency contact, and consent records.</p>
-          <div className="space-y-5">{sections.filter((section) => !primaryTitles.includes(section.title)).map(renderSection)}</div>
-        </details>
       </div>
     </article>
   );

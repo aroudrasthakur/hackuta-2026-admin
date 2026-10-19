@@ -169,12 +169,32 @@ describe.each(["reviewer", "admin"] as const)(
       });
     }
 
-    async function select(index: number, value: string) {
-      const element = container.querySelectorAll("select")[index];
+    function listboxTrigger(labelText: string) {
+      const label = Array.from(container.querySelectorAll(".admin-field label")).find((element) =>
+        element.textContent?.includes(labelText),
+      );
+      const field = label?.closest(".admin-field");
+      return field?.querySelector('[role="combobox"]') as HTMLButtonElement | undefined;
+    }
+
+    function listboxValue(labelText: string) {
+      return listboxTrigger(labelText)?.getAttribute("data-value");
+    }
+
+    async function selectFilter(labelText: string, value: string) {
+      const label = Array.from(container.querySelectorAll(".admin-field label")).find((element) =>
+        element.textContent?.includes(labelText),
+      )!;
+      const field = label.closest(".admin-field")!;
+      const trigger = field.querySelector('[role="combobox"]') as HTMLButtonElement;
 
       await act(async () => {
-        element.value = value;
-        element.dispatchEvent(new Event("change", { bubbles: true }));
+        trigger.click();
+      });
+
+      const option = field.querySelector(`[role="listbox"] [data-value="${value}"]`) as HTMLButtonElement;
+      await act(async () => {
+        option.click();
       });
     }
 
@@ -185,44 +205,50 @@ describe.each(["reviewer", "admin"] as const)(
       ["EXAMPLE UNIVERSITY", ["Taylor Student", "Alex Chen"]],
     ])("searches for %s", async (term, expected) => {
       await renderPage();
-      await select(0, "all");
+      await selectFilter("Review status", "all");
       await search(term);
       expect(names()).toEqual(expected);
     });
 
     it.each([
-      ["unreviewed", "Taylor Student"],
+      ["needs_review", "Taylor Student"],
       ["under_review", "Sam Lee"],
       ["accepted", "Alex Chen"],
       ["waitlisted", "Morgan Patel"],
       ["rejected", "Casey Jones"],
-      ["withdrawn", "Riley Withdrawn"],
     ])("filters status %s", async (status, expected) => {
       await renderPage();
-      await select(0, status);
+      await selectFilter("Review status", status);
       expect(names()).toEqual([expected]);
 
-      await select(0, "all");
+      await selectFilter("Review status", "all");
       expect(names()).toHaveLength(6);
     });
 
     it("combines search and status filtering", async () => {
       await renderPage();
       await search("Example University");
-      await select(0, "accepted");
+      await selectFilter("Review status", "accepted");
       expect(names()).toEqual(["Alex Chen"]);
     });
 
-    it("defaults to applications needing review, oldest first", async () => {
+    it("defaults to all applications, oldest first", async () => {
       await renderPage();
-      expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
+      expect(names()).toEqual([
+        "Taylor Student",
+        "Sam Lee",
+        "Alex Chen",
+        "Morgan Patel",
+        "Casey Jones",
+        "Riley Withdrawn",
+      ]);
       expect(container.textContent).toContain("2 need review");
       expect(container.textContent).toContain("6 total applications");
     });
 
     it("shows final decision badges beside review links only when decided", async () => {
       await renderPage();
-      await select(0, "all");
+      await selectFilter("Review status", "all");
 
       for (const [name, label] of [
         ["Alex Chen", "Accepted"],
@@ -249,7 +275,7 @@ describe.each(["reviewer", "admin"] as const)(
 
     it("updates the badge when the current review status changes", async () => {
       await renderPage();
-      await select(0, "all");
+      await selectFilter("Review status", "all");
       const updatedApplications = fixtures().map((application) =>
         application.applicantName === "Alex Chen"
           ? { ...application, reviewStatus: "rejected" as const }
@@ -265,7 +291,7 @@ describe.each(["reviewer", "admin"] as const)(
 
     it("sorts all applications oldest first and supports newest first", async () => {
       await renderPage();
-      await select(0, "all");
+      await selectFilter("Review status", "all");
       expect(names()).toEqual([
         "Taylor Student",
         "Sam Lee",
@@ -275,7 +301,7 @@ describe.each(["reviewer", "admin"] as const)(
         "Riley Withdrawn",
       ]);
 
-      await select(1, "newest");
+      await selectFilter("Submission time", "newest");
 
       expect(names()).toEqual([
         "Riley Withdrawn",
@@ -287,32 +313,20 @@ describe.each(["reviewer", "admin"] as const)(
       ]);
     });
 
-    it("shows an empty result and resets all controls", async () => {
+    it("shows an empty result when filters match nothing", async () => {
       await renderPage();
       await search("no-such-applicant");
-      await select(0, "accepted");
-      await select(1, "newest");
+      await selectFilter("Review status", "accepted");
+      await selectFilter("Submission time", "newest");
 
       expect(names()).toEqual([]);
       expect(container.textContent).toContain("No matching applications");
       expect(container.textContent).toContain("Showing 0 of 6 applications");
-
-      const reset = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "Reset controls",
-      )!;
-
-      await act(async () => reset.click());
-
-      expect(
-        container.querySelector<HTMLInputElement>('input[type="search"]')!.value,
-      ).toBe("");
-      expect(container.querySelectorAll("select")[0].value).toBe("needs_review");
-      expect(container.querySelectorAll("select")[1].value).toBe("oldest");
-      expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
     });
 
     it("can expand a search to include completed decisions", async () => {
       await renderPage();
+      await selectFilter("Review status", "needs_review");
       await search("alex@example.com");
       expect(names()).toEqual([]);
       const expand = Array.from(container.querySelectorAll("button")).find(
@@ -328,6 +342,7 @@ describe.each(["reviewer", "admin"] as const)(
         ["accepted", "waitlisted", "rejected", "withdrawn"].includes(application.reviewStatus ?? ""),
       ));
       await renderPage();
+      await selectFilter("Review status", "needs_review");
       expect(container.textContent).toContain("No applications need review");
       const expand = Array.from(container.querySelectorAll("button")).find(
         (button) => button.textContent === "View all applications",
@@ -339,15 +354,15 @@ describe.each(["reviewer", "admin"] as const)(
     it("restores controls from a queue URL", async () => {
       await renderPage("/admin/applications?search=example&status=all&sort=newest");
       expect(names()).toEqual(["Riley Withdrawn", "Casey Jones", "Morgan Patel", "Alex Chen", "Sam Lee", "Taylor Student"]);
-      expect(container.querySelectorAll("select")[0].value).toBe("all");
-      expect(container.querySelectorAll("select")[1].value).toBe("newest");
+      expect(listboxValue("Review status")).toBe("all");
+      expect(listboxValue("Submission time")).toBe("newest");
     });
 
     it("falls back to queue defaults for invalid URL controls", async () => {
       await renderPage("/admin/applications?status=invalid&sort=invalid");
-      expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
-      expect(container.querySelectorAll("select")[0].value).toBe("needs_review");
-      expect(container.querySelectorAll("select")[1].value).toBe("oldest");
+      expect(names()).toHaveLength(6);
+      expect(listboxValue("Review status")).toBe("all");
+      expect(listboxValue("Submission time")).toBe("oldest");
     });
 
     it("recovers from a query failure using Try again", async () => {
@@ -359,7 +374,7 @@ describe.each(["reviewer", "admin"] as const)(
         mocks.query.mockReturnValue(fixtures());
         const retry = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Try again")!;
         await act(async () => retry.click());
-        expect(names()).toEqual(["Taylor Student", "Sam Lee"]);
+        expect(names()).toHaveLength(6);
       } finally {
         errorLog.mockRestore();
       }
@@ -380,11 +395,35 @@ describe.each(["reviewer", "admin"] as const)(
     it("does not use mutation or action hooks while changing controls", async () => {
       await renderPage();
       await search("Example");
-      await select(0, "accepted");
-      await select(1, "oldest");
+      await selectFilter("Review status", "accepted");
+      await selectFilter("Submission time", "oldest");
 
       expect(mocks.mutation).not.toHaveBeenCalled();
       expect(mocks.action).not.toHaveBeenCalled();
+    });
+
+    it("shows ten applications per page with navigation", async () => {
+      const many = Array.from({ length: 11 }, (_, index) => ({
+        applicationId: `application-${index}` as SubmittedApplicationSummary["applicationId"],
+        applicantName: `Applicant ${String(index + 1).padStart(2, "0")}`,
+        email: `applicant-${index}@example.com`,
+        school: "Example University",
+        submittedAt: index + 1,
+        reviewStatus: null,
+        currentReviewerName: null,
+      }));
+      mocks.query.mockReturnValue(many);
+      await renderPage();
+
+      expect(names()).toHaveLength(10);
+      expect(container.textContent).toContain("Showing 1–10 of 11 applications");
+      expect(container.querySelector('nav[aria-label="Applications pages"]')).not.toBeNull();
+
+      const next = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Next")!;
+      await act(async () => next.click());
+      expect(names()).toHaveLength(1);
+      expect(names()[0]).toBe("Applicant 11");
+      expect(container.textContent).toContain("Showing 11–11 of 11 applications");
     });
   },
 );

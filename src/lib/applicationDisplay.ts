@@ -1,3 +1,5 @@
+import { formatApplicationDisplayDate } from "./dateFormat";
+
 /** Preserve meaningful false/zero values while presenting missing answers cleanly. */
 export function formatApplicationAnswer(value: unknown): string {
   if (value === null || value === undefined) return "Not provided";
@@ -8,7 +10,7 @@ export function formatApplicationAnswer(value: unknown): string {
 }
 
 export const dashboardReviewStatusLabels = {
-  unreviewed: "Awaiting review",
+  unreviewed: "Need review",
   under_review: "In review",
   stale: "Available to reclaim",
   accepted: "Accepted",
@@ -27,7 +29,7 @@ export function dashboardReviewStatusLabel(
 export function formatApplicationDate(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "Not recorded";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Not recorded" : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? "Not recorded" : formatApplicationDisplayDate(value);
 }
 
 /** Legacy applicant records may predate registration URL validation. */

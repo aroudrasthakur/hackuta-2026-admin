@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { applicationsInQueue, nextApplicationInQueue, queueControls } from "../../src/lib/applicationQueue";
+import {
+  APPLICATIONS_QUEUE_PAGE_SIZE,
+  applicationsInQueue,
+  nextApplicationInQueue,
+  paginateQueue,
+  queueControls,
+  queuePage,
+  queuePageRange,
+} from "../../src/lib/applicationQueue";
 import type { SubmittedApplicationSummary } from "../../src/convex/adminApi";
 
 function application(id: string, submittedAt: number, overrides: Partial<SubmittedApplicationSummary> = {}): SubmittedApplicationSummary {
@@ -16,6 +24,11 @@ const applications = [
 const ids = (items: SubmittedApplicationSummary[]) => items.map((item) => item.applicationId);
 
 describe("application queue navigation", () => {
+  it("treats need review separately from in review", () => {
+    expect(ids(applicationsInQueue(applications, new URLSearchParams("status=needs_review"), "me", 1))).toEqual(["a", "e"]);
+    expect(ids(applicationsInQueue(applications, new URLSearchParams("status=under_review"), "me", 1))).toEqual(["b", "c"]);
+  });
+
   it("filters active assignments separately from review status", () => {
     expect(ids(applicationsInQueue(applications, new URLSearchParams("reviewer=mine"), "me", 1))).toEqual(["b"]);
     expect(ids(applicationsInQueue(applications, new URLSearchParams("reviewer=available"), "me", 1))).toEqual(["a", "b", "e"]);
@@ -34,11 +47,23 @@ describe("application queue navigation", () => {
   });
   it("handles empty queues and validates query parameters", () => {
     expect(nextApplicationInQueue([], "a", new URLSearchParams(), "me", 1)).toBeNull();
-    expect(queueControls(new URLSearchParams("status=bad&reviewer=bad&sort=bad"))).toEqual({ search: "", status: "needs_review", reviewer: "all", sortOrder: "oldest" });
+    expect(queueControls(new URLSearchParams("status=bad&reviewer=bad&sort=bad"))).toEqual({ search: "", status: "all", reviewer: "all", sortOrder: "oldest" });
     expect(ids(applicationsInQueue(applications, new URLSearchParams("status=all&search=EXAMPLE.COM&sort=newest"), "me", 1))).toEqual(["e", "d", "c", "b", "a"]);
   });
   it("sorts equal and missing submission dates consistently", () => {
     const tied = [application("b", 1), application("a", 1), application("c", 2, { submittedAt: null })];
     expect(ids(applicationsInQueue(tied, new URLSearchParams(), "me", 1))).toEqual(["c", "a", "b"]);
+  });
+
+  it("pages the queue ten at a time and clamps invalid page numbers", () => {
+    const many = Array.from({ length: 23 }, (_, index) => application(`app-${index}`, index + 1));
+    expect(paginateQueue(many, 1)).toHaveLength(APPLICATIONS_QUEUE_PAGE_SIZE);
+    expect(paginateQueue(many, 2)).toHaveLength(APPLICATIONS_QUEUE_PAGE_SIZE);
+    expect(paginateQueue(many, 3)).toHaveLength(3);
+    expect(queuePage(new URLSearchParams(), many.length)).toBe(1);
+    expect(queuePage(new URLSearchParams("page=2"), many.length)).toBe(2);
+    expect(queuePage(new URLSearchParams("page=99"), many.length)).toBe(3);
+    expect(queuePage(new URLSearchParams("page=0"), many.length)).toBe(1);
+    expect(queuePageRange(2, many.length)).toEqual({ start: 11, end: 20, totalPages: 3 });
   });
 });

@@ -631,10 +631,49 @@
     color: #7f1d1d;
   }
 
+  .admin-topbar--compact {
+    top: 3.75rem;
+    left: 30%;
+    right: 30%;
+    width: auto;
+  }
+
+  .admin-topbar__inner--compact {
+    justify-content: space-between;
+    padding: 0.35rem 0.75rem 0.35rem 1rem;
+  }
+
+  .admin-topbar--compact .admin-topbar__brand {
+    padding-left: 0.35rem;
+  }
+
+  .admin-topbar--compact .admin-topbar__brand-kicker {
+    font-size: 0.58rem;
+  }
+
+  .admin-topbar--compact .admin-topbar__brand-title {
+    font-size: 0.9rem;
+  }
+
+  .admin-topbar__logo {
+    display: block;
+    height: 1.5rem;
+    width: auto;
+  }
+
   @media (min-width: 640px) {
     .admin-topbar {
       top: 1rem;
       left: 11.25rem;
+      border-radius: 999px;
+    }
+
+    .admin-topbar--compact {
+      top: 1rem;
+      left: 30%;
+      right: 30%;
+      width: auto;
+      transform: none;
       border-radius: 999px;
     }
 
@@ -644,6 +683,17 @@
       align-items: center;
       gap: 0.75rem 1rem;
       padding: 0.35rem 0.45rem 0.35rem 0.85rem;
+    }
+
+    .admin-topbar__inner--compact {
+      display: flex;
+      min-height: 2.65rem;
+      align-items: center;
+      padding: 0.3rem 1rem 0.3rem 1.35rem;
+    }
+
+    .admin-topbar--compact .admin-topbar__brand {
+      padding-left: 0.5rem;
     }
 
     .admin-topbar__brand {
@@ -659,6 +709,12 @@
     .admin-topbar__account {
       margin-left: 0;
       justify-self: end;
+    }
+
+    .admin-topbar--compact .admin-topbar__account {
+      position: static;
+      transform: none;
+      margin-left: auto;
     }
   }
 

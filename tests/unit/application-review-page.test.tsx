@@ -5,6 +5,7 @@ import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APPLICATION_QUESTIONS } from "../../shared/registration/constants";
+import { formatApplicationDisplayDate } from "../../src/lib/dateFormat";
 import { AdminProtectedRoute } from "../../src/components/AdminProtectedRoute";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
@@ -171,12 +172,12 @@ describe("read-only application review page", () => {
     expect(answer("Dietary restrictions")).toBe("Vegan");
     expect(answer("MLH code of conduct agreement")).toBe("Yes");
     expect(answer("MLH communications consent")).toBe("No");
-    expect(answer("Code of conduct agreed at")).toBe(new Date(1_700_000_000_000).toLocaleString());
+    expect(answer("Code of conduct agreed at")).toBe(formatApplicationDisplayDate(1_700_000_000_000));
     expect(answer(APPLICATION_QUESTIONS.builtOrWantToBuild)).toBe("I built a project.\nIt helps my community.");
     expect(answer("Allergy details")).toBe("Peanuts");
     expect(answer("Accessibility needs")).toBe("Step-free access");
     expect(answer("Contact name")).toBe("Jordan Student");
-    expect(container.textContent).toContain("Review status: Awaiting review");
+    expect(container.textContent).toContain("Need review");
     expect(container.querySelectorAll("input, textarea, select")).toHaveLength(0);
     expect(container.textContent).toContain("Start review");
     expect(container.textContent).toContain("Accept");
@@ -222,8 +223,8 @@ describe("read-only application review page", () => {
     detail.reviewStatus = null;
     detail.resume = { status: "none", url: null, filename: null };
     await renderDetail(detail);
-    expect(container.textContent).toContain("Review status: Awaiting review");
-    expect(container.textContent).toContain("Submitted: Not recorded");
+    expect(container.textContent).toContain("Need review");
+    expect(container.textContent).toContain("Not recorded");
     expect(answer("First name")).toBe("Not provided");
     expect(answer("Dietary restrictions")).toBe("Not provided");
     expect(answer("Code of conduct agreed at")).toBe("Not recorded");
@@ -339,7 +340,7 @@ describe("read-only application review page", () => {
     const detail = applicationDetail();
     detail.reviewStatus = "accepted";
     await renderDetail(detail);
-    expect(container.textContent).toContain("Review status: Accepted");
+    expect(container.textContent).toContain("Accepted");
     await renderPage();
     expect(mocks.recordView).toHaveBeenCalledTimes(1);
   });

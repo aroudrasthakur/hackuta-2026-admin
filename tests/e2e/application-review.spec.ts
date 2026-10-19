@@ -51,12 +51,12 @@ test.describe("application review workflow", () => {
 
     await page.getByRole("button", { name: "Waitlist" }).click();
     await page.getByRole("button", { name: "Confirm waitlist" }).click();
-    await expect(page.getByText("Review status: Waitlisted")).toBeVisible();
+    await expect(page.locator(".application-review-identity")).toContainText("Waitlisted");
     await expect(page.getByRole("button", { name: "Accept from waitlist", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reject", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Accept from waitlist", exact: true }).click();
     await page.getByRole("button", { name: "Confirm acceptance", exact: true }).click();
-    await expect(page.getByText("Review status: Accepted")).toBeVisible();
+    await expect(page.locator(".application-review-identity")).toContainText("Accepted");
     await expect(page.getByRole("region", { name: "Application decision" })).toHaveCount(0);
   });
 
@@ -92,9 +92,9 @@ test.describe("application review workflow", () => {
     await signInOrganizer(page, E2E_ADMIN);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
     await expect(page.getByRole("button", { name: "Start review", exact: true })).toHaveCount(0);
-    await expect(page.getByText("Review status: In review", { exact: true })).toBeVisible();
+    await expect(page.locator(".application-review-identity")).toContainText("In review");
     await page.clock.fastForward(31 * 60_000);
-    await expect(page.getByText("Review status: Available to reclaim", { exact: true })).toBeVisible();
+    await expect(page.locator(".application-review-identity")).toContainText("Available to reclaim");
     await page.getByRole("button", { name: "Start review", exact: true }).click();
     await expect(page.getByText("You are the current reviewer.", { exact: false })).toBeVisible();
   });

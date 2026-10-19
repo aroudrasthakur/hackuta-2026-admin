@@ -150,7 +150,7 @@ describe("app routes", () => {
     expect(currentPath()).toBe("/admin/applications");
     expect(container.textContent).toContain("Jordan Reviewer");
     expect(container.textContent).toContain("Reviewer");
-    expect(container.querySelector('nav[aria-label="Admin"] a')?.textContent).toBe("Applications");
+    expect(container.querySelector('nav[aria-label="Admin"] a')).toBeNull();
     expect(container.textContent).toMatch(/Jordan Reviewer\s*·\s*Reviewer/);
   });
 
@@ -271,7 +271,7 @@ describe("applications dashboard", () => {
     expect(mocks.query).toHaveBeenCalledWith(listSubmittedApplicationsRef, { sessionToken: "s".repeat(64) });
     expect(container.querySelectorAll("article")).toHaveLength(2);
     expect(container.textContent).toContain("In review");
-    expect(container.textContent).toContain("Awaiting review");
+    expect(container.textContent).toContain("Need review");
     expect(container.querySelector('a[href="/admin/applications/app-1"]')).not.toBeNull();
     expect(mocks.mutation).not.toHaveBeenCalled();
   });
