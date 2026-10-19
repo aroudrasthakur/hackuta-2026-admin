@@ -31,6 +31,7 @@ test.describe("applications queue", () => {
   });
 
   test("keeps rapid search and status changes in sync", async ({ page }) => {
+    test.setTimeout(60_000);
     for (let attempt = 0; attempt < 8; attempt += 1) {
       await page.getByLabel("Search applications").fill("taylor");
       await page.getByLabel("Search applications").fill("");

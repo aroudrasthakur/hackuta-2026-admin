@@ -7,6 +7,7 @@ export async function selectAdminListbox(page: Page, label: string, value: strin
   const option = listboxId
     ? page.locator(`#${listboxId} [data-value="${value}"]`)
     : page.locator(`[role="listbox"] [data-value="${value}"]`).first();
+  await expect(option).toBeVisible();
   await option.click();
 }
 
