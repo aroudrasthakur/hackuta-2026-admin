@@ -11,8 +11,46 @@ describe("decision email templates", () => {
         hackathonName: "HackUTA 2026",
       });
       expect(content.subject).toContain("HackUTA 2026");
-      expect(content.text).toContain("Taylor");
-      expect(content.text).toContain("HackUTA 2026 organizers");
+      expect(content.text).toContain("Hi Taylor,");
+      expect(content.text).toContain("The HackUTA 2026 Team");
+      expect(content.text).toContain("hello@hackuta.org");
     },
   );
+
+  it("tells accepted applicants when and where to show up, and how to release a spot", () => {
+    const { subject, text } = buildDecisionEmailContent({
+      decision: "accepted",
+      applicantName: "Taylor",
+      hackathonName: "HackUTA 2026",
+    });
+    expect(subject).toBe("You're accepted to HackUTA 2026");
+    expect(text).toContain("November 14–15, 2026");
+    expect(text).toContain("University of Texas at Arlington");
+    expect(text).toContain("https://hackuta.com");
+    expect(text).toContain("https://discord.gg/2bVsYS3SgS");
+    expect(text).toContain("offer your spot to someone on the waitlist");
+  });
+
+  it("explains a rejection as limited space and invites a future application", () => {
+    const { subject, text } = buildDecisionEmailContent({
+      decision: "rejected",
+      applicantName: "Taylor",
+      hackathonName: "HackUTA 2026",
+    });
+    expect(subject).toBe("Update on your HackUTA 2026 application");
+    expect(text).toContain("not able to offer you a spot");
+    expect(text).toContain("limited space");
+    expect(text).toContain("apply again in a future year");
+  });
+
+  it("tells waitlisted applicants they are not accepted and will be emailed if a spot opens", () => {
+    const { subject, text } = buildDecisionEmailContent({
+      decision: "waitlisted",
+      applicantName: "Taylor",
+      hackathonName: "HackUTA 2026",
+    });
+    expect(subject).toBe("You're on the HackUTA 2026 waitlist");
+    expect(text).toContain("not an acceptance");
+    expect(text).toContain("do not need to submit another application");
+  });
 });
