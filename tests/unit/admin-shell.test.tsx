@@ -250,8 +250,8 @@ describe("applications dashboard", () => {
     applicantName: "Taylor Student",
     school: "UT Arlington",
     submittedAt: 1_700_000_000_000,
-    reviewStatus: "under_review",
-    currentReviewerName: null,
+    reviewStatus: "under_review" as const,
+    currentReviewerName: "Jordan Reviewer",
   };
 
   it("shows a loading state, then an empty state", async () => {

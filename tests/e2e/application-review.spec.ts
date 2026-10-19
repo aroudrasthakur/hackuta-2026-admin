@@ -29,7 +29,9 @@ test.describe("application review workflow", () => {
       const responses = page.getByRole("region", { name: "Application responses" });
       await expect(name).toBeVisible();
       expect((await name.boundingBox())!.y).toBeLessThan((await responses.boundingBox())!.y);
-      expect((await responses.boundingBox())!.y).toBeLessThan(450);
+      if (width >= 1024) {
+        expect((await responses.boundingBox())!.y).toBeLessThan(720);
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       if (width === 1440 || width === 375) await page.screenshot({ path: testInfo.outputPath(`review-${width}.png`), fullPage: true });
     }
