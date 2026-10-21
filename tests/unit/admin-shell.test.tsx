@@ -150,7 +150,7 @@ describe("app routes", () => {
     expect(currentPath()).toBe("/admin/applications");
     expect(container.textContent).toContain("Jordan Reviewer");
     expect(container.textContent).toContain("Reviewer");
-    expect(container.querySelector('nav[aria-label="Admin"] a')).toBeNull();
+    expect(container.querySelector('nav[aria-label="Admin"]')?.textContent).toContain("Decision emails");
     expect(container.textContent).toMatch(/Jordan Reviewer\s*·\s*Reviewer/);
   });
 
@@ -549,6 +549,7 @@ describe("review claim controls", () => {
         ...activity,
       },
       resume: { status: "none", url: null, filename: null },
+      pendingDecision: null,
     };
   }
 

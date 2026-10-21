@@ -36,7 +36,7 @@ Organizer auth is separate from applicant Convex Auth. Sessions are stored in `a
 | Owner | Tables / paths |
 | --- | --- |
 | Register (immutable copy) | Auth tables, `users`, `eventConfig`, `applications`, `applicationSubmissionLogs`, `rateLimits`, `resumeUploadSessions`, `emailDeliveries`, `emailDeliveryRecordingFailures`, all locked `convex/` and `shared/` files |
-| Admin (editable) | `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, `adminAuthAccounts`, `adminSessions`, `convex/admin/`, `src/`, `shared/admin/` |
+| Admin (editable) | `applicationReviews`, `admins`, `applicationReviewLogs`, `participants`, `adminAuthAccounts`, `adminSessions`, `decisionEmailQueue`, `convex/admin/`, `src/`, `shared/admin/` |
 
 Full file list: [convex/REGISTER_SCHEMA.md](../convex/REGISTER_SCHEMA.md).
 

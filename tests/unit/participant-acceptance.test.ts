@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setApplicationDecisionRef as setDecision } from "../../src/convex/adminApi";
+import { releaseDecisionEmailsRef, setApplicationDecisionRef as setDecision } from "../../src/convex/adminApi";
+import "../../convex/admin/decisionEmailRelease";
+import "../../convex/admin/sendDecisionEmails";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 import {
   createStaffAuthorizationFixture,
   seedSubmittedApplication,
 } from "../helpers/staffTestFixtures";
-import { expectAdminErrorCode } from "../helpers/adminErrors";
+import { stubEmailService } from "../helpers/reviewTestKit";
 
-async function fixture(role: "reviewer" | "admin" = "reviewer") {
+async function fixture(role: "reviewer" | "admin" = "admin") {
   const t = createConvexTest();
   return { t, ...await createStaffAuthorizationFixture(t, role) };
 }
@@ -18,110 +20,138 @@ async function snapshot(t: ConvexTestInstance) {
     reviews: await ctx.db.query("applicationReviews").collect(),
     participants: await ctx.db.query("participants").collect(),
     logs: await ctx.db.query("applicationReviewLogs").collect(),
-    emails: await ctx.db.system.query("_scheduled_functions").collect(),
+    queue: await ctx.db.query("decisionEmailQueue").collect(),
   }));
+}
+
+async function release(t: ConvexTestInstance, sessionToken: string) {
+  return t.action(releaseDecisionEmailsRef, { sessionToken });
 }
 
 describe("confirmed acceptance participant creation (#17)", () => {
   beforeEach(() => {
-    // Inspect scheduled work without executing the real email action.
-    vi.useFakeTimers();
+    stubEmailService();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.clearAllTimers();
-    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it.each(["reviewer", "admin"] as const)(
-    "%s confirmation creates one participant, reuses the user, and records acceptance atomically",
+    "%s confirmation queues acceptance without a participant or email job",
     async (role) => {
       const { t, applicationId, adminId, sessionToken } = await fixture(role);
       const before = await snapshot(t);
-      const application = await t.run((ctx) => ctx.db.get(applicationId));
 
       const result = await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
 
       const after = await snapshot(t);
-      expect(result.duplicate).toBe(false);
+      expect(result).toEqual({ queued: true, duplicate: false });
       expect(after.users).toEqual(before.users);
-      expect(after.participants).toHaveLength(1);
-      const participant = after.participants[0];
-      const review = after.reviews[0];
-      expect(review).toMatchObject({ status: "accepted", reviewedBy: adminId });
-      expect(review.completedAt).toBeGreaterThan(1);
-      expect(participant).toMatchObject({
+      expect(after.participants).toEqual([]);
+      expect(after.reviews).toEqual(before.reviews);
+      expect(after.logs).toEqual([]);
+      expect(after.queue).toHaveLength(1);
+      expect(after.queue[0]).toMatchObject({
         applicationId,
-        authUserId: application!.authUserId,
-        acceptedBy: adminId,
-        acceptedAt: review.completedAt,
-        createdAt: review.completedAt,
-        updatedAt: review.completedAt,
-      });
-      expect(participant.qrCodeToken).toMatch(/^[a-f0-9]{64}$/);
-      expect(after.logs).toHaveLength(1);
-      expect(after.logs[0]).toMatchObject({
-        _id: result.logId, applicationId, adminId, action: "accepted", createdAt: review.completedAt,
-      });
-      expect(after.emails).toHaveLength(1);
-      expect(after.emails[0]).toMatchObject({
-        name: "admin/sendDecisionEmails:sendDecisionEmail",
-        args: [expect.objectContaining({ decision: "accepted", email: application!.email })],
+        decision: "accepted",
+        status: "queued",
+        queuedBy: adminId,
       });
     },
   );
 
-  it("repeated confirmation preserves participant, QR token, attribution, timestamps, log, and email job", async () => {
+  it("creates one participant only after the acceptance email is accepted", async () => {
+    const { t, applicationId, adminId, sessionToken } = await fixture("admin");
+    const application = await t.run((ctx) => ctx.db.get(applicationId));
+    await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
+
+    const result = await release(t, sessionToken);
+
+    const after = await snapshot(t);
+    expect(result).toEqual({ sent: 1, failed: 0, total: 1 });
+    const participant = after.participants[0];
+    const review = after.reviews[0];
+    expect(review).toMatchObject({ status: "accepted", reviewedBy: adminId });
+    expect(review?.completedAt).toBeGreaterThan(1);
+    expect(participant).toMatchObject({
+      applicationId,
+      authUserId: application!.authUserId,
+      acceptedBy: adminId,
+      acceptedAt: review?.completedAt,
+    });
+    expect(participant?.createdAt).toBeGreaterThanOrEqual(review?.completedAt ?? 0);
+    expect(participant?.updatedAt).toBe(participant?.createdAt);
+    expect(participant?.qrCodeToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(after.logs).toHaveLength(1);
+    expect(after.logs[0]).toMatchObject({
+      applicationId, adminId, action: "accepted", createdAt: review?.completedAt,
+    });
+    expect(after.queue[0]).toMatchObject({ status: "sent" });
+  });
+
+  it("repeated confirmation before release does not create a participant", async () => {
     const { t, applicationId, sessionToken } = await fixture();
     const first = await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
     const beforeRetry = await snapshot(t);
-    vi.setSystemTime(Date.now() + 1_000);
 
     const retry = await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
 
-    expect(retry).toEqual({ logId: first.logId, duplicate: true });
+    expect(first).toEqual({ queued: true, duplicate: false });
+    expect(retry).toEqual({ queued: true, duplicate: true });
     expect(await snapshot(t)).toEqual(beforeRetry);
+    expect((await snapshot(t)).participants).toEqual([]);
   });
 
-  it("different accepted applicants get different QR tokens", async () => {
+  it("different accepted applicants get different QR tokens after release", async () => {
     const { t, applicationId, sessionToken } = await fixture();
     const secondApplicationId = await seedSubmittedApplication(t, "second@example.com");
     for (const id of [applicationId, secondApplicationId]) {
       await t.mutation(setDecision, { sessionToken, applicationId: id, decision: "accepted" });
     }
+
+    await release(t, sessionToken);
+
     const { participants } = await snapshot(t);
     expect(participants).toHaveLength(2);
     expect(new Set(participants.map((participant) => participant.qrCodeToken)).size).toBe(2);
   });
 
-  it("QR generation failure rolls back the review and audit writes as well as participant creation", async () => {
+  it("leaves the review unpublished when QR generation fails during release", async () => {
     const { t, applicationId, sessionToken } = await fixture();
+    await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
     const before = await snapshot(t);
     vi.spyOn(crypto, "getRandomValues").mockImplementationOnce(() => {
       throw new Error("Random source unavailable");
     });
 
-    await expect(t.mutation(setDecision, {
-      sessionToken, applicationId, decision: "accepted",
-    })).rejects.toThrow(/random source unavailable/i);
+    await expect(release(t, sessionToken)).resolves.toEqual({ sent: 0, failed: 1, total: 1 });
 
-    expect(await snapshot(t)).toEqual(before);
+    const after = await snapshot(t);
+    expect(after.reviews).toEqual(before.reviews);
+    expect(after.participants).toEqual([]);
+    expect(after.logs).toEqual([]);
+    expect(after.queue[0]).toMatchObject({
+      status: "failed",
+      errorMessage: expect.stringMatching(/random source unavailable/i),
+    });
   });
 
-  it.each(["rejected", "waitlisted"] as const)("%s creates no participant", async (decision) => {
+  it.each(["rejected", "waitlisted"] as const)("%s release creates no participant", async (decision) => {
     const { t, applicationId, sessionToken } = await fixture();
-    const before = await snapshot(t);
-
     await t.mutation(setDecision, { sessionToken, applicationId, decision });
+
+    await release(t, sessionToken);
 
     const after = await snapshot(t);
     expect(after.participants).toEqual([]);
-    expect(after.users).toEqual(before.users);
-    expect(after.reviews[0].status).toBe(decision);
+    expect(after.reviews[0]?.status).toBe(decision);
+    expect(after.logs).toHaveLength(1);
   });
 
-  it("reuses an existing matching participant without changing its QR token or metadata", async () => {
+  it("reuses an existing matching participant without changing its QR token", async () => {
     const { t, applicationId, adminId, sessionToken } = await fixture();
     await t.run(async (ctx) => {
       const application = await ctx.db.get(applicationId);
@@ -130,21 +160,23 @@ describe("confirmed acceptance participant creation (#17)", () => {
         acceptedAt: 10, qrCodeToken: "b".repeat(64), createdAt: 10, updatedAt: 10,
       });
     });
+    await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
     const before = await snapshot(t);
 
-    await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
+    await release(t, sessionToken);
 
     const after = await snapshot(t);
     expect(after.participants).toEqual(before.participants);
-    expect(after.reviews[0].status).toBe("accepted");
+    expect(after.reviews[0]?.status).toBe("accepted");
     expect(after.logs).toHaveLength(1);
-    expect(after.emails).toHaveLength(1);
+    expect(after.queue[0]).toMatchObject({ status: "sent" });
   });
 
   it.each(["missing user", "conflicting participant"] as const)(
-    "%s aborts acceptance without partial review, audit, participant, or email changes",
+    "%s leaves the review unpublished when release cannot create the participant",
     async (failure) => {
       const { t, applicationId, adminId, sessionToken } = await fixture();
+      await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
       await t.run(async (ctx) => {
         const application = await ctx.db.get(applicationId);
         if (failure === "missing user") {
@@ -159,11 +191,13 @@ describe("confirmed acceptance participant creation (#17)", () => {
       });
       const before = await snapshot(t);
 
-      const accept = () => t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
-      if (failure === "missing user") await expectAdminErrorCode(accept, "APPLICANT_ACCOUNT_MISSING");
-      else await expect(accept()).rejects.toThrow(/authUserId does not match application/i);
+      await expect(release(t, sessionToken)).resolves.toMatchObject({ sent: 0, failed: 1, total: 1 });
 
-      expect(await snapshot(t)).toEqual(before);
+      const after = await snapshot(t);
+      expect(after.reviews).toEqual(before.reviews);
+      expect(after.logs).toEqual(before.logs);
+      expect(after.participants).toEqual(before.participants);
+      expect(after.queue[0]?.status).toBe("failed");
     },
   );
 });

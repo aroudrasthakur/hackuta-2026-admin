@@ -5,7 +5,6 @@ import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTest
 import "../../convex/admin/sendDecisionEmails";
 import {
   countRows,
-  EMAIL_SERVICE_URL,
   getLogs,
   getReview,
   scheduledJobs,
@@ -19,11 +18,7 @@ import {
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import type { AdminErrorCode } from "../../shared/admin/errors";
 
-const decisions: Array<{ decision: Decision; note: string; subject: RegExp }> = [
-  { decision: "accepted", note: "application_accepted", subject: /accepted/i },
-  { decision: "rejected", note: "application_rejected", subject: /update on your/i },
-  { decision: "waitlisted", note: "application_waitlisted", subject: /waitlist/i },
-];
+const decisions: Decision[] = ["accepted", "rejected", "waitlisted"];
 
 let email: ReturnType<typeof stubEmailService>;
 
@@ -56,7 +51,7 @@ async function setup(role: "reviewer" | "admin" = "reviewer") {
   return { t, staff, applicant, decide };
 }
 
-describe.each(decisions)("$decision decision", ({ decision, note, subject }) => {
+describe.each(decisions)("$decision decision", (decision) => {
   it("changes nothing before it is confirmed", async () => {
     const { t, staff, applicant } = await setup();
     // Opening and starting a review is everything that happens before confirming.
@@ -77,78 +72,65 @@ describe.each(decisions)("$decision decision", ({ decision, note, subject }) => 
   });
 
   it.each(["reviewer", "admin"] as const)(
-    "stores the decision, one audit event, and one email after %s confirms",
+    "queues the decision without changing review status, audit logs, participants, or email after %s confirms",
     async (role) => {
       const { t, staff, applicant, decide } = await setup(role);
+      const reviewBefore = await getReview(t, applicant.applicationId);
 
       const result = await decide(decision);
-      expect(result.duplicate).toBe(false);
+      expect(result).toEqual({ queued: true, duplicate: false });
 
-      const review = await getReview(t, applicant.applicationId);
-      expect(review).toMatchObject({ status: decision, reviewedBy: staff.adminId });
-      expect(review?.completedAt).toEqual(expect.any(Number));
-
-      const logs = await getLogs(t, applicant.applicationId);
-      expect(logs).toHaveLength(1);
-      expect(logs[0]).toMatchObject({
-        _id: result.logId,
-        action: decision,
-        adminId: staff.adminId,
-        createdAt: review?.completedAt,
-      });
-
-      const jobs = await scheduledJobs(t);
-      expect(jobs).toHaveLength(1);
-      expect(jobs[0]!.name).toContain("sendDecisionEmail");
-      expect(jobs[0]!.args[0]).toMatchObject({
+      expect(await getReview(t, applicant.applicationId)).toEqual(reviewBefore);
+      expect(await getLogs(t, applicant.applicationId)).toEqual([]);
+      expect(await countRows(t, "participants")).toBe(0);
+      expect(await scheduledJobs(t)).toHaveLength(0);
+      expect(email.fetchMock).not.toHaveBeenCalled();
+      const queued = await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique());
+      expect(queued).toMatchObject({
+        applicationId: applicant.applicationId,
         decision,
-        email: "taylor@example.com",
+        status: "queued",
+        recipientEmail: "taylor@example.com",
         applicantName: "Taylor Student",
+        queuedBy: staff.adminId,
       });
-
-      await flushScheduled(t);
-      const sent = email.sentEmails();
-      expect(sent).toHaveLength(1);
-      expect(sent[0]!.url).toBe(`${EMAIL_SERVICE_URL}/send-email`);
-      expect(sent[0]!.body).toMatchObject({ email: "taylor@example.com", note });
-      expect(sent[0]!.body.subject).toMatch(subject);
-      expect(sent[0]!.body.body).toContain("Hi Taylor Student,");
     },
   );
 
-  it("does not repeat the decision, audit event, or email when confirmed again", async () => {
+  it("does not add a second open queue row when confirmed again", async () => {
     const { t, applicant, decide } = await setup();
 
     const first = await decide(decision);
-    await flushScheduled(t);
     const reviewAfterFirst = await getReview(t, applicant.applicationId);
-    const participantsAfterFirst = await countRows(t, "participants");
 
     const second = await decide(decision);
     const third = await decide(decision);
-    await flushScheduled(t);
 
-    expect(second).toEqual({ logId: first.logId, duplicate: true });
-    expect(third).toEqual({ logId: first.logId, duplicate: true });
+    expect(first).toEqual({ queued: true, duplicate: false });
+    expect(second).toEqual({ queued: true, duplicate: true });
+    expect(third).toEqual({ queued: true, duplicate: true });
     expect(await getReview(t, applicant.applicationId)).toEqual(reviewAfterFirst);
-    expect(await getLogs(t, applicant.applicationId)).toHaveLength(1);
-    expect(await countRows(t, "participants")).toBe(participantsAfterFirst);
-    expect(email.fetchMock).toHaveBeenCalledTimes(1);
+    expect(await getLogs(t, applicant.applicationId)).toEqual([]);
+    expect(await countRows(t, "participants")).toBe(0);
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect())).toHaveLength(1);
+    expect(email.fetchMock).not.toHaveBeenCalled();
   });
 
-  it("blocks a different decision once this one is final", async () => {
+  it("replaces the queued decision when a different choice is confirmed before release", async () => {
     const { t, decide } = await setup();
     await decide(decision);
-    await flushScheduled(t);
     const before = await snapshotReviewState(t);
 
     const other =
       decision === "waitlisted"
         ? "rejected"
-        : decisions.find((entry) => entry.decision !== decision)!.decision;
-    await expectAdminErrorCode(decide(other), "REVIEW_FINALIZED");
+        : decisions.find((entry) => entry !== decision)!;
+    await decide(other);
     expect(await snapshotReviewState(t)).toEqual(before);
-    expect(email.fetchMock).toHaveBeenCalledTimes(1);
+    const queued = await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect());
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({ decision: other, status: "queued" });
+    expect(email.fetchMock).not.toHaveBeenCalled();
   });
 
   it("leaves applicant answers and account unchanged", async () => {
@@ -170,94 +152,34 @@ describe.each(decisions)("$decision decision", ({ decision, note, subject }) => 
   });
 });
 
-describe("acceptance", () => {
-  it("promotes a waitlisted applicant once, preserving both decisions in history", async () => {
-    const { t, applicant, decide } = await setup();
-    await decide("waitlisted");
-    await flushScheduled(t);
-    expect(await countRows(t, "participants")).toBe(0);
-    const accepted = await decide("accepted");
-    await flushScheduled(t);
-    expect((await getReview(t, applicant.applicationId))?.status).toBe("accepted");
-    expect((await getLogs(t, applicant.applicationId)).map((log) => log.action)).toEqual(["waitlisted", "accepted"]);
-    expect(await countRows(t, "participants")).toBe(1);
-    expect(email.sentEmails().map((sent) => sent.body.note)).toEqual(["application_waitlisted", "application_accepted"]);
-    expect(await decide("accepted")).toEqual({ logId: accepted.logId, duplicate: true });
-    await flushScheduled(t);
-    expect(await countRows(t, "participants")).toBe(1);
-    expect(email.fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it("creates exactly one participant linked to the applicant", async () => {
-    const { t, staff, applicant, decide } = await setup();
-    await decide("accepted");
-    await decide("accepted");
-
-    const participants = await t.run((ctx) => ctx.db.query("participants").collect());
-    expect(participants).toHaveLength(1);
-    expect(participants[0]).toMatchObject({
-      applicationId: applicant.applicationId,
-      authUserId: applicant.userId,
-      acceptedBy: staff.adminId,
-    });
-    expect(participants[0]!.qrCodeToken).toMatch(/^[0-9a-f]{64}$/);
-  });
-
-  it.each(["rejected", "waitlisted"] as const)("does not create a participant when %s", async (decision) => {
+describe("acceptance queue", () => {
+  it("does not create a participant when a decision is queued", async () => {
     const { t, decide } = await setup();
-    await decide(decision);
+    await decide("accepted");
+    await decide("rejected");
+    await decide("waitlisted");
     expect(await countRows(t, "participants")).toBe(0);
-  });
-
-  it("fails without writes when the applicant account is missing", async () => {
-    const { t, applicant, decide } = await setup();
-    await t.run((ctx) => ctx.db.delete(applicant.userId));
-    const before = await snapshotReviewState(t);
-
-    await expectAdminErrorCode(decide("accepted"), "APPLICANT_ACCOUNT_MISSING");
-    expect(await snapshotReviewState(t)).toEqual(before);
-  });
-
-  it("fails without writes when the applicant already has a participant for another application", async () => {
-    const { t, staff, applicant, decide } = await setup();
-    await t.run(async (ctx) => {
-      const otherApplicationId = await ctx.db.insert("applications", {
-        authUserId: applicant.userId,
-        email: "taylor@example.com",
-        createdAt: 1,
-      });
-      await ctx.db.insert("participants", {
-        applicationId: otherApplicationId,
-        authUserId: applicant.userId,
-        acceptedAt: 1,
-        acceptedBy: staff.adminId,
-        qrCodeToken: "0".repeat(64),
-        createdAt: 1,
-        updatedAt: 1,
-      });
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
+      decision: "waitlisted",
+      status: "queued",
     });
-    const before = await snapshotReviewState(t);
+  });
 
-    await expectAdminErrorCode(decide("accepted"), "PARTICIPANT_CONFLICT");
-    expect(await snapshotReviewState(t)).toEqual(before);
+  it("rejects a queued decision when the application has no email", async () => {
+    const t = createConvexTest();
+    const { sessionToken } = await seedStaff(t);
+    const { applicationId } = await seedApplicant(t, { email: "   " });
+    await expectAdminErrorCode(
+      t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "rejected" }),
+      "DECISION_EMAIL_MISSING",
+    );
+    expect(await scheduledJobs(t)).toHaveLength(0);
+    expect(email.fetchMock).not.toHaveBeenCalled();
+    expect((await getReview(t, applicationId))?.status).not.toBe("rejected");
   });
 });
 
-describe("decision email details", () => {
-  it("uses the event name from event config", async () => {
-    const { t, decide } = await setup();
-    await t.run((ctx) =>
-      ctx.db.insert("eventConfig", {
-        key: "current",
-        name: "HackUTA 8",
-        updatedAt: 1,
-      }),
-    );
-    await decide("waitlisted");
-    await flushScheduled(t);
-    expect(email.sentEmails()[0]!.body.subject).toBe("You're on the HackUTA 8 waitlist");
-  });
-
+describe("decision email queue snapshots", () => {
   it("falls back to the email address when the applicant has no name", async () => {
     const t = createConvexTest();
     const { sessionToken } = await seedStaff(t);
@@ -266,18 +188,9 @@ describe("decision email details", () => {
       fields: { firstName: undefined, lastName: undefined },
     });
     await t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "rejected" });
-    expect((await scheduledJobs(t))[0]!.args[0]).toMatchObject({ applicantName: "noname@example.com" });
-  });
-
-  it("still saves the decision but sends no email when the application has no email", async () => {
-    const t = createConvexTest();
-    const { sessionToken } = await seedStaff(t);
-    const { applicationId } = await seedApplicant(t, { email: "   " });
-    await t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "rejected" });
-    await flushScheduled(t);
-
-    expect((await getReview(t, applicationId))?.status).toBe("rejected");
-    expect(await scheduledJobs(t)).toHaveLength(0);
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
+      applicantName: "noname@example.com",
+    });
     expect(email.fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -295,13 +208,13 @@ describe("invalid application requests", () => {
     expect(email.fetchMock).not.toHaveBeenCalled();
   }
 
-  it.each(decisions.map((entry) => entry.decision))("rejects %s on a deleted application", async (decision) => {
+  it.each(decisions)("rejects %s on a deleted application", async (decision) => {
     const { t, applicant, decide } = await setup();
     await t.run((ctx) => ctx.db.delete(applicant.applicationId));
     await expectNoWrites(t, () => decide(decision), "APPLICATION_NOT_FOUND");
   });
 
-  it.each(decisions.map((entry) => entry.decision))("rejects %s on a draft application", async (decision) => {
+  it.each(decisions)("rejects %s on a draft application", async (decision) => {
     const t = createConvexTest();
     const { sessionToken } = await seedStaff(t);
     const { applicationId } = await seedApplicant(t, { submitted: false });
@@ -312,7 +225,7 @@ describe("invalid application requests", () => {
     );
   });
 
-  it.each(decisions.map((entry) => entry.decision))(
+  it.each(decisions)(
     "rejects %s when the application has no review row",
     async (decision) => {
       const t = createConvexTest();
@@ -365,14 +278,16 @@ describe("invalid application requests", () => {
     );
   });
 
-  it("rejects a matching decision that has no audit event to return", async () => {
+  it("treats a matching already-released decision as a duplicate without a new queue row", async () => {
     const t = createConvexTest();
     const { sessionToken } = await seedStaff(t);
     const { applicationId } = await seedApplicant(t, { review: { status: "rejected" } });
-    await expectNoWrites(
-      t,
-      () => t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "rejected" }),
-      "REVIEW_FINALIZED",
-    );
+    const before = await snapshotReviewState(t);
+    await expect(
+      t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "rejected" }),
+    ).resolves.toEqual({ queued: true, duplicate: true });
+    expect(await snapshotReviewState(t)).toEqual(before);
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect())).toHaveLength(0);
+    expect(email.fetchMock).not.toHaveBeenCalled();
   });
 });

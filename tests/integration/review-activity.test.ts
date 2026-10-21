@@ -301,7 +301,6 @@ describe("audit log", () => {
       "viewed",
       "started_review",
       "review_ended",
-      "accepted",
       "viewed",
     ]);
   });
@@ -320,7 +319,6 @@ describe("audit log", () => {
     });
     expect(history.page.map((event) => event.action)).toEqual([
       "viewed",
-      "accepted",
       "review_ended",
       "started_review",
       "viewed",
