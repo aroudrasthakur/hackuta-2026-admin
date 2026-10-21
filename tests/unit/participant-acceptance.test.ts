@@ -65,6 +65,9 @@ describe("confirmed acceptance participant creation (#17)", () => {
 
   it("creates one participant only after the acceptance email is accepted", async () => {
     const { t, applicationId, adminId, sessionToken } = await fixture("admin");
+    await t.run(async (ctx) => {
+      await ctx.db.patch(applicationId, { dietaryRestrictions: ["Vegetarian"] });
+    });
     const application = await t.run((ctx) => ctx.db.get(applicationId));
     await t.mutation(setDecision, { sessionToken, applicationId, decision: "accepted" });
 
@@ -81,6 +84,7 @@ describe("confirmed acceptance participant creation (#17)", () => {
       authUserId: application!.authUserId,
       acceptedBy: adminId,
       acceptedAt: review?.completedAt,
+      foodRestriction: "Vegetarian",
     });
     expect(participant?.createdAt).toBeGreaterThanOrEqual(review?.completedAt ?? 0);
     expect(participant?.updatedAt).toBe(participant?.createdAt);

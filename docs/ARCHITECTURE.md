@@ -50,7 +50,7 @@ Full file list: [convex/REGISTER_SCHEMA.md](../convex/REGISTER_SCHEMA.md).
          ↓
 convex/admin/applicationReviewLogs → applicationReviews updates + audit log
          ↓ (decision: accepted)
-convex/admin/participants → participants row (QR token, check-in identity)
+convex/admin/participants → participants row (QR token, check-in identity, `foodRestriction` from application)
 ```
 
 ### Deploy
