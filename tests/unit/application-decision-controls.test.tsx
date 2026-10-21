@@ -37,6 +37,7 @@ function detail(overrides: Partial<ApplicationDetail> = {}): ApplicationDetail {
       activeReviewStaleMs: 30 * 60 * 1000,
     },
     resume: { status: "none", url: null, filename: null },
+    pendingDecision: null,
     ...overrides,
   };
 }
@@ -77,9 +78,24 @@ describe("ApplicationDecisionControls", () => {
     return Array.from(container.querySelectorAll("button")).find((el) => el.textContent === name);
   }
 
+  async function choose(name: string) {
+    if (!button(name)) {
+      await act(async () => button("Change Decision")!.click());
+    }
+    await act(async () => button(name)!.click());
+  }
+
+  it("starts from one Change Decision button", async () => {
+    await renderControls();
+    expect(button("Change Decision")).toBeDefined();
+    expect(button("Accept")).toBeUndefined();
+    expect(button("Reject")).toBeUndefined();
+    expect(button("Waitlist")).toBeUndefined();
+  });
+
   it("does not call the backend when only selecting a decision", async () => {
     await renderControls();
-    await act(async () => button("Accept")!.click());
+    await choose("Accept");
     expect(container.textContent).toContain("Confirm acceptance");
     expect(mocks.mutationHook).toHaveBeenCalledWith(setApplicationDecisionRef);
     expect(mocks.finalize).not.toHaveBeenCalled();
@@ -88,14 +104,14 @@ describe("ApplicationDecisionControls", () => {
   it("finalizes only after confirmation and supports cancel", async () => {
     await renderControls();
     for (const decision of ["Accept", "Reject"]) {
-      await act(async () => button(decision)!.click());
+      await choose(decision);
       await act(async () => button("Cancel")!.click());
       expect(button(decision)).toBeDefined();
       expect(button("Cancel")).toBeUndefined();
       expect(mocks.finalize).not.toHaveBeenCalled();
     }
 
-    await act(async () => button("Waitlist")!.click());
+    await choose("Waitlist");
     await act(async () => button("Confirm waitlist")!.click());
     expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith({
       sessionToken: "session-token",
@@ -105,27 +121,27 @@ describe("ApplicationDecisionControls", () => {
   });
 
   it.each([
-    ["Accept", "Confirm acceptance", "accepted", "Application accepted."],
-    ["Reject", "Confirm rejection", "rejected", "Application rejected."],
-    ["Waitlist", "Confirm waitlist", "waitlisted", "Application waitlisted."],
-  ] as const)("%s sends one decision and shows the email notice", async (choice, confirm, decision, message) => {
+    ["Accept", "Confirm acceptance", "accepted", "Acceptance queued."],
+    ["Reject", "Confirm rejection", "rejected", "Rejection queued."],
+    ["Waitlist", "Confirm waitlist", "waitlisted", "Waitlist choice queued."],
+  ] as const)("%s sends one decision and shows the queue notice", async (choice, confirm, decision, message) => {
     await renderControls();
-    await act(async () => button(choice)!.click());
+    await choose(choice);
     expect(mocks.finalize).not.toHaveBeenCalled();
 
     await act(async () => button(confirm)!.click());
     expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ decision }));
     expect(container.textContent).toContain(message);
-    expect(container.textContent).toContain("email scheduled.");
+    expect(container.textContent).toContain("until an admin sends the email.");
   });
 
-  it.each([undefined, "   "])("does not claim an email was scheduled for a missing address (%s)", async (email) => {
-    await renderControls({ detail: detail({ application: { ...detail().application, email } }) });
-    await act(async () => button("Reject")!.click());
-    await act(async () => button("Confirm rejection")!.click());
-    expect(container.querySelector('[role="status"]')?.textContent).toBe(
-      "Application rejected. No email scheduled: applicant email is missing.",
-    );
+  it("shows the queued decision without treating it as released", async () => {
+    await renderControls({
+      detail: detail({
+        pendingDecision: { decision: "accepted", status: "queued", queuedAt: 1 },
+      }),
+    });
+    expect(container.textContent).toContain("Queued: Accepted — not released");
   });
 
   it("sends only one request while finalization is pending", async () => {
@@ -136,7 +152,7 @@ describe("ApplicationDecisionControls", () => {
       }),
     );
     await renderControls();
-    await act(async () => button("Accept")!.click());
+    await choose("Accept");
 
     const confirm = button("Confirm acceptance")!;
     await act(async () => confirm.click());
@@ -152,13 +168,13 @@ describe("ApplicationDecisionControls", () => {
     expect(mocks.finalize).toHaveBeenCalledTimes(1);
 
     await act(async () => resolveDecision({ logId: "accepted-log", duplicate: false }));
-    expect(container.querySelector('[role="status"]')?.textContent).toContain("Application accepted");
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Acceptance queued");
   });
 
   it("shows the server error and keeps the confirmation open", async () => {
     mocks.finalize.mockRejectedValue(adminError("REVIEW_FINALIZED"));
     await renderControls();
-    await act(async () => button("Reject")!.click());
+    await choose("Reject");
     await act(async () => button("Confirm rejection")!.click());
 
     expect(container.querySelector('[role="alert"]')?.textContent).toBe(
@@ -173,7 +189,7 @@ describe("ApplicationDecisionControls", () => {
   ])("shows a fallback message for %s", async (_label, failure) => {
     mocks.finalize.mockRejectedValue(failure);
     await renderControls();
-    await act(async () => button("Accept")!.click());
+    await choose("Accept");
     await act(async () => button("Confirm acceptance")!.click());
     expect(container.querySelector('[role="alert"]')?.textContent).toBe(
       "We couldn't save this decision. Please try again.",
@@ -182,7 +198,7 @@ describe("ApplicationDecisionControls", () => {
 
   it("hides decision actions when another organizer holds the active claim", async () => {
     await renderControls({ blockedByOther: true });
-    expect(button("Accept")).toBeUndefined();
+    expect(button("Change Decision")).toBeUndefined();
     expect(container.textContent).toContain("another organizer holds the active review claim");
   });
 
@@ -211,6 +227,7 @@ describe("ApplicationDecisionControls", () => {
 
   it("focuses confirmation, restores the selected choice on cancel, and identifies the applicant", async () => {
     await renderControls();
+    await act(async () => button("Change Decision")!.click());
     button("Reject")!.focus();
     await act(async () => button("Reject")!.click());
     expect(document.activeElement).toBe(button("Confirm rejection"));
@@ -221,11 +238,11 @@ describe("ApplicationDecisionControls", () => {
 
   it("retains and focuses completion after the live query reports a final decision", async () => {
     await renderControls();
-    await act(async () => button("Accept")!.click());
+    await choose("Accept");
     await act(async () => button("Confirm acceptance")!.click());
     await renderControls({ detail: detail({ reviewStatus: "accepted", reviewActivity: { ...detail().reviewActivity, isFinal: true } }) });
     const notice = container.querySelector('[role="status"]');
-    expect(notice?.textContent).toContain("Application accepted");
+    expect(notice?.textContent).toContain("Acceptance queued");
     expect(document.activeElement).toBe(notice);
     expect(button("Accept")).toBeUndefined();
   });

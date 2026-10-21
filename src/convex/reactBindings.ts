@@ -14,6 +14,10 @@ export const useMutation = (
   isE2eMockEnabled() ? mockConvex.useMutation : realConvex.useMutation
 ) as typeof realConvex.useMutation;
 
+export const useAction = (
+  isE2eMockEnabled() ? mockConvex.useAction : realConvex.useAction
+) as typeof realConvex.useAction;
+
 export const usePaginatedQuery = (
   isE2eMockEnabled() ? mockConvex.usePaginatedQuery : realConvex.usePaginatedQuery
 ) as typeof realConvex.usePaginatedQuery;

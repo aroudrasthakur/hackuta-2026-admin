@@ -27,20 +27,20 @@ const decisionCopy: Record<
   accepted: {
     label: "Accept",
     title: "Confirm acceptance",
-    body: "This will save the acceptance decision and schedule the acceptance email if an email address is available. This cannot be undone from this screen.",
-    success: "Application accepted. Acceptance email scheduled.",
+    body: "This saves an acceptance in the decision queue. The applicant will not see it, and no participant record is created, until an admin sends the email.",
+    success: "Acceptance queued. The applicant will not see this decision until an admin sends the email.",
   },
   rejected: {
     label: "Reject",
     title: "Confirm rejection",
-    body: "This will save the rejection decision and schedule the rejection email if an email address is available. This cannot be undone from this screen.",
-    success: "Application rejected. Rejection email scheduled.",
+    body: "This saves a rejection in the decision queue. The applicant will not see it until an admin sends the email.",
+    success: "Rejection queued. The applicant will not see this decision until an admin sends the email.",
   },
   waitlisted: {
     label: "Waitlist",
     title: "Confirm waitlist",
-    body: "This will place the applicant on the waitlist and schedule their notification email if an email address is available. You can accept them later when a spot opens.",
-    success: "Application waitlisted. Waitlist email scheduled.",
+    body: "This saves a waitlist choice in the decision queue. The applicant will not see it until an admin sends the email. You can change it to an acceptance before the email goes out.",
+    success: "Waitlist choice queued. The applicant will not see this decision until an admin sends the email.",
   },
 };
 
@@ -54,11 +54,13 @@ export function ApplicationDecisionControls({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const completionRef = useRef<HTMLParagraphElement>(null);
   const choiceRefs = useRef<Partial<Record<PendingDecision, HTMLButtonElement | null>>>({});
   const lastChoice = useRef<PendingDecision>("accepted");
   const restoreChoice = useRef(false);
+  const focusOpenedChoices = useRef(false);
 
   useEffect(() => {
     if (pendingDecision) confirmRef.current?.focus();
@@ -66,11 +68,22 @@ export function ApplicationDecisionControls({
     else if (restoreChoice.current) {
       choiceRefs.current[lastChoice.current]?.focus();
       restoreChoice.current = false;
+      focusOpenedChoices.current = false;
+    } else if (focusOpenedChoices.current) {
+      choiceRefs.current.accepted?.focus();
+      focusOpenedChoices.current = false;
     }
-  }, [pendingDecision, success, detail.reviewStatus, detail.reviewActivity.isFinal]);
+  }, [pendingDecision, success, choosing, detail.reviewStatus, detail.reviewActivity.isFinal]);
 
   const applicationId = detail.application._id as GenericId<"applications">;
   const isFinal = detail.reviewActivity.isFinal;
+
+  function openChoices() {
+    setError(null);
+    setSuccess(null);
+    focusOpenedChoices.current = true;
+    setChoosing(true);
+  }
 
   function selectDecision(decision: PendingDecision) {
     lastChoice.current = decision;
@@ -97,10 +110,9 @@ export function ApplicationDecisionControls({
         applicationId,
         decision: pendingDecision,
       });
-      setSuccess(detail.application.email?.trim()
-        ? decisionCopy[pendingDecision].success
-        : `Application ${pendingDecision}. No email scheduled: applicant email is missing.`);
+      setSuccess(decisionCopy[pendingDecision].success);
       setPendingDecision(null);
+      setChoosing(false);
     } catch (caught) {
       setError(
         reportUserFacingError(
@@ -139,6 +151,10 @@ export function ApplicationDecisionControls({
 
   const choices: PendingDecision[] = promotingWaitlist ? ["accepted"] : ["accepted", "rejected", "waitlisted"];
   const pendingCopy = pendingDecision ? decisionCopy[pendingDecision] : null;
+  const queued = detail.pendingDecision;
+  const queuedLabel = queued
+    ? `${queued.decision.charAt(0).toUpperCase()}${queued.decision.slice(1)}`
+    : null;
 
   return (
     <ReviewPanelSection
@@ -146,8 +162,14 @@ export function ApplicationDecisionControls({
       title="Decision"
       description={promotingWaitlist
         ? "A spot opened up? Accept this applicant from the waitlist. Nothing is saved until you confirm."
-        : "Choose accept, reject, or waitlist. Nothing is saved until you confirm on the next step."}
+        : "Change the queued decision. Nothing is saved until you confirm."}
     >
+      {queued && queuedLabel ? (
+        <p className="text-sm text-ocean" role="status">
+          Queued: {queuedLabel}
+          {queued.status === "held" ? " — held" : queued.status === "sending" ? " — sending" : " — not released"}
+        </p>
+      ) : null}
       {error && (
         <p role="alert" className="admin-callout admin-callout--alert">
           {error}
@@ -155,7 +177,13 @@ export function ApplicationDecisionControls({
       )}
       {completion}
 
-      {!pendingDecision && (
+      {!pendingDecision && !promotingWaitlist && !choosing && (
+        <button type="button" className={`${reviewPrimaryButtonClass} w-full`} onClick={openChoices}>
+          Change Decision
+        </button>
+      )}
+
+      {!pendingDecision && (promotingWaitlist || choosing) && (
         <div className={`grid gap-2 ${choices.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-3"}`}>
           {choices.map((decision) => (
             <button

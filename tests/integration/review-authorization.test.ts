@@ -119,7 +119,11 @@ describe("reviewer permissions", () => {
     const { sessionToken } = await seedStaff(t, { role: "reviewer" });
     const { applicationId } = await seedApplicant(t);
     await protectedCalls(t, sessionToken, applicationId)[callName]();
-    expect((await t.run((ctx) => ctx.db.query("applicationReviews").first()))?.status).toBe(status);
+    expect((await t.run((ctx) => ctx.db.query("applicationReviews").first()))?.status).not.toBe(status);
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
+      decision: status,
+      status: "queued",
+    });
   });
 
   it("blocks the full review history", async () => {
@@ -145,7 +149,6 @@ describe("admin permissions", () => {
 
     const history = await calls.viewHistory();
     expect(history.page.map((event) => event.action)).toEqual([
-      "waitlisted",
       "started_review",
       "viewed",
     ]);
@@ -209,15 +212,13 @@ describe("participant QR credentials", () => {
     const calls = protectedCalls(t, sessionToken, applicationId);
 
     const accepted = await calls.accept();
-    expect(Object.keys(accepted).sort()).toEqual(["duplicate", "logId"]);
+    expect(Object.keys(accepted).sort()).toEqual(["duplicate", "queued"]);
     expect(JSON.stringify(accepted)).not.toContain("qrCodeToken");
 
     const listed = await calls.listApplications();
     const opened = await calls.openApplication();
     expect(JSON.stringify({ listed, opened })).not.toContain("qrCodeToken");
-
-    const participant = await t.run((ctx) => ctx.db.query("participants").unique());
-    expect(participant?.qrCodeToken).toMatch(/^[0-9a-f]{64}$/);
+    expect(await t.run((ctx) => ctx.db.query("participants").unique())).toBeNull();
   });
 
   it("keeps the same QR token when acceptance is retried", async () => {
@@ -227,13 +228,10 @@ describe("participant QR credentials", () => {
     const calls = protectedCalls(t, sessionToken, applicationId);
 
     await calls.accept();
-    const first = await t.run((ctx) => ctx.db.query("participants").unique());
     const retry = await calls.accept();
-    const second = await t.run((ctx) => ctx.db.query("participants").unique());
-
-    expect(retry).toMatchObject({ duplicate: true, logId: expect.anything() });
-    expect(second).toEqual(first);
-    expect(await countRows(t, "participants")).toBe(1);
+    expect(retry).toMatchObject({ duplicate: true, queued: true });
+    expect(await countRows(t, "participants")).toBe(0);
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect())).toHaveLength(1);
   });
 
   it("does not create a participant when an applicant session tries to accept", async () => {

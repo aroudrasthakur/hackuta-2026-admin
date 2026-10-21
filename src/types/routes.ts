@@ -1,6 +1,7 @@
 export const ADMIN_ROUTES = {
   login: "/admin/login",
   applications: "/admin/applications",
+  decisionEmails: "/admin/decision-emails",
   applicationReview: (applicationId: string) =>
     `/admin/applications/${applicationId}`,
 } as const;

@@ -52,6 +52,14 @@ export function useMutation(ref: unknown) {
   );
 }
 
+export function useAction(ref: unknown) {
+  const path = useMemo(() => convexRefPath(ref), [ref]);
+  return useCallback(
+    async (args: Record<string, unknown>) => e2eMockRunMutation(path, args),
+    [path],
+  );
+}
+
 type PaginatedStatus = "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted";
 
 export function usePaginatedQuery(

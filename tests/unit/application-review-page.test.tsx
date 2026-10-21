@@ -67,6 +67,7 @@ function applicationDetail(): ApplicationDetail {
       activeReviewStaleMs: 30 * 60 * 1000,
     },
     resume: { status: "available", url: "https://files.example.com/resume.pdf", filename: "Taylor.pdf" },
+    pendingDecision: null,
   };
 }
 
@@ -180,8 +181,11 @@ describe("read-only application review page", () => {
     expect(container.textContent).toContain("Need review");
     expect(container.querySelectorAll("input, textarea, select")).toHaveLength(0);
     expect(container.textContent).toContain("Start review");
-    expect(container.textContent).toContain("Accept");
+    expect(container.textContent).toContain("Change Decision");
     expect(mocks.finalizeDecision).not.toHaveBeenCalled();
+    await act(async () =>
+      Array.from(container.querySelectorAll("button")).find((el) => el.textContent === "Change Decision")!.click(),
+    );
     await act(async () =>
       Array.from(container.querySelectorAll("button")).find((el) => el.textContent === "Accept")!.click(),
     );

@@ -78,6 +78,7 @@ test.describe("applications queue", () => {
 
   test("keeps waitlisted decisions outside the default queue", async ({ page }) => {
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
+    await page.getByRole("button", { name: "Change Decision" }).click();
     await page.getByRole("button", { name: "Waitlist" }).click();
     await page.getByRole("button", { name: "Confirm waitlist" }).click();
     await expect(page.locator(".application-review-identity")).toContainText("Waitlisted");
@@ -147,15 +148,17 @@ test.describe("applications queue", () => {
     await selectAdminListbox(page, "Submission time", "newest");
     const queueUrl = page.url();
     await page.getByRole("link", { name: "Review application for Casey Decision" }).click();
+    await page.getByRole("button", { name: "Change Decision" }).click();
     await page.getByRole("button", { name: "Accept", exact: true }).click();
     await page.getByRole("button", { name: "Confirm acceptance", exact: true }).click();
-    await expect(page.locator(".application-review-identity")).toContainText("Accepted");
+    await expect(page.locator(".application-review-identity")).toContainText("In review");
+    await expect(page.getByText("Queued: Accepted — not released")).toBeVisible();
     await page.getByRole("link", { name: "Review next application", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Jordan Review", exact: true })).toBeFocused();
     await page.getByRole("link", { name: "Back to Applications" }).click();
     await expect(page).toHaveURL(queueUrl);
     await expectAdminListboxValue(page, "Review assignment", "available");
     await expectAdminListboxValue(page, "Submission time", "newest");
-    await expect(page.getByRole("status")).toContainText("2 matching applications (4 total)");
+    await expect(page.getByRole("status")).toContainText("3 matching applications (4 total)");
   });
 });

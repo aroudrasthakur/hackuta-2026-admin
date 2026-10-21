@@ -11,6 +11,11 @@ import type {
   logApplicationReviewAction,
   setApplicationDecision,
 } from "../../convex/admin/applicationReviewLogs";
+import type {
+  listDecisionEmailQueue,
+  retryFailedDecisionEmails,
+  setDecisionEmailHold,
+} from "../../convex/admin/decisionEmailQueue";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -75,3 +80,40 @@ export const setApplicationDecisionRef = adminModuleRef<
   FunctionArgs<SetApplicationDecisionMutation>,
   FunctionReturnType<SetApplicationDecisionMutation>
 >("admin/applicationReviewLogs:setApplicationDecision");
+
+type DecisionEmailQueueQuery = ApiFromModules<{
+  queue: { listDecisionEmailQueue: typeof listDecisionEmailQueue };
+}>["queue"]["listDecisionEmailQueue"];
+export type DecisionEmailQueue = FunctionReturnType<DecisionEmailQueueQuery>;
+
+export const listDecisionEmailQueueRef = adminModuleRef<
+  "query",
+  FunctionArgs<DecisionEmailQueueQuery>,
+  FunctionReturnType<DecisionEmailQueueQuery>
+>("admin/decisionEmailQueue:listDecisionEmailQueue");
+
+type HoldDecisionEmailMutation = ApiFromModules<{
+  queue: { setDecisionEmailHold: typeof setDecisionEmailHold };
+}>["queue"]["setDecisionEmailHold"];
+
+export const setDecisionEmailHoldRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<HoldDecisionEmailMutation>,
+  FunctionReturnType<HoldDecisionEmailMutation>
+>("admin/decisionEmailQueue:setDecisionEmailHold");
+
+type RetryDecisionEmailsMutation = ApiFromModules<{
+  queue: { retryFailedDecisionEmails: typeof retryFailedDecisionEmails };
+}>["queue"]["retryFailedDecisionEmails"];
+
+export const retryFailedDecisionEmailsRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<RetryDecisionEmailsMutation>,
+  FunctionReturnType<RetryDecisionEmailsMutation>
+>("admin/decisionEmailQueue:retryFailedDecisionEmails");
+
+export const releaseDecisionEmailsRef = makeFunctionReference<
+  "action",
+  { sessionToken: string; itemIds?: Array<DecisionEmailQueue["active"][number]["itemId"]> },
+  { sent: number; failed: number; total: number }
+>("admin/decisionEmailRelease:releaseDecisionEmails");
