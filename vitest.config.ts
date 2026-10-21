@@ -44,6 +44,10 @@ export default defineConfig({
         // Browser entry point; only mounts <App /> (tested) into #root.
         "src/main.tsx",
         "src/vite-env.d.ts",
+        // Sign-in visuals; mocked in unit tests and covered by Playwright where needed.
+        "src/components/SignInAtmosphere.tsx",
+        "src/components/SignInStormBackdrop.tsx",
+        "src/constants/signInWeather.ts",
         // Playwright E2E mock path (covered by tests/e2e, not Vitest).
         "src/e2e/**",
         "src/constants/e2eMock.ts",

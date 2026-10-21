@@ -1,3 +1,4 @@
+import { makeFunctionReference } from "convex/server";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import {
   listDecisionEmailQueueRef,
@@ -30,6 +31,16 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
+
+const finishDecisionEmailReleaseRef = makeFunctionReference<
+  "mutation",
+  {
+    itemId: string;
+    outcome: "sent" | "failed";
+    errorMessage?: string;
+  },
+  { applied: boolean }
+>("admin/decisionEmailQueue:finishDecisionEmailRelease");
 
 async function setup() {
   const t = createConvexTest();
@@ -197,6 +208,42 @@ describe("decision email queue", () => {
     expect(await countRows(t, "participants")).toBe(1);
   });
 
+  it("rejects send-all when nothing is queued", async () => {
+    const { release } = await setup();
+    await expectAdminErrorCode(release(), "DECISION_EMAIL_QUEUE_EMPTY");
+  });
+
+  it("rejects send-selected when the row is held", async () => {
+    const { t, admin, applicant, decide, release } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "accepted");
+    const row = await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique());
+    await t.mutation(setDecisionEmailHoldRef, {
+      sessionToken: admin.sessionToken,
+      itemId: row!._id,
+      held: true,
+    });
+    await expectAdminErrorCode(release([row!._id]), "DECISION_EMAIL_QUEUE_EMPTY");
+  });
+
+  it("fails release without emailing when the review is already final", async () => {
+    const { t, admin, applicant, decide, release } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "rejected");
+    await t.run(async (ctx) => {
+      const review = await ctx.db
+        .query("applicationReviews")
+        .withIndex("by_application", (q) => q.eq("applicationId", applicant.applicationId))
+        .unique();
+      await ctx.db.patch(review!._id, { status: "rejected", updatedAt: Date.now() });
+    });
+
+    const result = await release();
+    expect(result).toEqual({ sent: 0, failed: 1, total: 1 });
+    expect(email.fetchMock).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
+      status: "failed",
+    });
+  });
+
   it("rejects a second release while a row is already sending", async () => {
     const { t, admin, applicant, decide, release } = await setup();
     await decide(admin.sessionToken, applicant.applicationId, "rejected");
@@ -208,6 +255,73 @@ describe("decision email queue", () => {
     await expectAdminErrorCode(release(), "DECISION_EMAIL_SEND_IN_PROGRESS");
     expect((await getReview(t, applicant.applicationId))?.status).not.toBe("rejected");
     expect(email.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("marks a row failed when publish preconditions are missing after the mailer accepts", async () => {
+    const { t, admin, applicant, decide, release } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "accepted");
+    await t.run(async (ctx) => {
+      const review = await ctx.db
+        .query("applicationReviews")
+        .withIndex("by_application", (q) => q.eq("applicationId", applicant.applicationId))
+        .unique();
+      await ctx.db.delete(review!._id);
+    });
+
+    const result = await release();
+    expect(result).toEqual({ sent: 1, failed: 0, total: 1 });
+    expect(await countRows(t, "participants")).toBe(0);
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
+      status: "failed",
+      errorMessage: "The review state changed before this email could be released.",
+    });
+    expect(email.sentEmails()).toHaveLength(1);
+  });
+
+  it("returns immediately when hold state is unchanged", async () => {
+    const { t, admin, applicant, decide } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "waitlisted");
+    const row = await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique());
+    await t.mutation(setDecisionEmailHoldRef, {
+      sessionToken: admin.sessionToken,
+      itemId: row!._id,
+      held: true,
+    });
+    const again = await t.mutation(setDecisionEmailHoldRef, {
+      sessionToken: admin.sessionToken,
+      itemId: row!._id,
+      held: true,
+    });
+    expect(again).toEqual({ status: "held" });
+  });
+
+  it("stores a default failure message when a sending row is marked failed", async () => {
+    const { t, admin, applicant, decide } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "rejected");
+    const row = await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique());
+    await t.run(async (ctx) => {
+      await ctx.db.patch(row!._id, { status: "sending" });
+    });
+    await t.mutation(finishDecisionEmailReleaseRef, {
+      itemId: row!._id,
+      outcome: "failed",
+    });
+    expect(await t.run((ctx) => ctx.db.get(row!._id))).toMatchObject({
+      status: "failed",
+      errorMessage: "The email server rejected this message.",
+    });
+  });
+
+  it("ignores finish calls for rows that are not actively sending", async () => {
+    const { t, admin, applicant, decide } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "accepted");
+    const row = await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique());
+    const result = await t.mutation(finishDecisionEmailReleaseRef, {
+      itemId: row!._id,
+      outcome: "sent",
+    });
+    expect(result).toEqual({ applied: false });
+    expect(await t.run((ctx) => ctx.db.get(row!._id))).toMatchObject({ status: "queued" });
   });
 
   it("keeps a released waitlist in place until a later acceptance email is accepted", async () => {
