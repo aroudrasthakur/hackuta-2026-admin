@@ -9,6 +9,9 @@ import { requireAdminRole, requireReviewerAccess, sessionTokenArgs } from "./sta
 
 const openStatuses = new Set(["queued", "held", "sending"]);
 
+/** Cap sent rows returned to the admin UI (newest first). */
+const RECENTLY_SENT_QUERY_LIMIT = 20;
+
 export async function openDecisionEmailForApplication(
   ctx: QueryCtx | MutationCtx,
   applicationId: GenericId<"applications">,
@@ -52,7 +55,7 @@ export const listDecisionEmailQueue = query({
     const sent = rows
       .filter((row) => row.status === "sent")
       .sort((left, right) => (right.sentAt ?? right.updatedAt) - (left.sentAt ?? left.updatedAt))
-      .slice(0, 100);
+      .slice(0, RECENTLY_SENT_QUERY_LIMIT);
 
     const present = (row: (typeof rows)[number]) => ({
       itemId: row._id,

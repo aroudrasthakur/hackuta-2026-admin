@@ -166,6 +166,8 @@ describe("DecisionEmailQueuePage", () => {
     expect(container.textContent).toContain("Waitlisted");
     expect(container.textContent).toContain("Mailer rejected");
     expect(container.textContent).toContain("Done Applicant");
+    expect(container.textContent).toContain("Sent ");
+    expect(container.querySelector('[aria-label="Recently sent decision emails"] .admin-card__title')).not.toBeNull();
     expect(button("Send selected")).toBeDefined();
     expect(button("Send all queued")).toBeDefined();
     expect(button("Retry failed")).toBeDefined();
@@ -176,6 +178,29 @@ describe("DecisionEmailQueuePage", () => {
     expect(container.textContent).toContain("An admin releases these emails");
     expect(button("Send selected")).toBeUndefined();
     expect(button("Hold")).toBeUndefined();
+  });
+
+  it("shows at most five recently sent rows with a total count", async () => {
+    const sent = Array.from({ length: 7 }, (_, index) => ({
+      itemId: `item-sent-${index}` as DecisionEmailQueue["sent"][number]["itemId"],
+      applicationId: `app-${index}` as DecisionEmailQueue["sent"][number]["applicationId"],
+      decision: "accepted" as const,
+      recipientEmail: `person-${index}@example.com`,
+      applicantName: `Applicant ${index}`,
+      status: "sent" as const,
+      queuedAt: 1_700_000_000_000,
+      sentAt: 1_700_000_000_000 + index,
+      errorMessage: null,
+    }));
+    mocks.query.mockReturnValue(
+      sampleQueue({
+        sent,
+        counts: { queued: 0, held: 0, sending: 0, failed: 0, sent: 12 },
+      }),
+    );
+    await renderPage("admin");
+    expect(container.textContent).toContain("Showing 5 of 12 sent emails");
+    expect(container.querySelectorAll('[aria-label="Recently sent decision emails"] li')).toHaveLength(5);
   });
 
   it("shows empty-state copy when nothing is waiting or sent", async () => {

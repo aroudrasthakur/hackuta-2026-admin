@@ -251,7 +251,7 @@ export function ApplicationsPage() {
   return (
     <section aria-labelledby="applications-heading" className="space-y-5">
       <header className="space-y-2">
-        <h2 id="applications-heading" className="text-2xl font-semibold tracking-tight text-night">Applications</h2>
+        <h2 id="applications-heading" className="admin-page-title">Applications</h2>
         <p className="text-sm text-ocean">Review submitted applications and track participant decisions.</p>
       </header>
       {sessionToken ? (

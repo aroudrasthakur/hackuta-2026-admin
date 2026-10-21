@@ -12,9 +12,15 @@ import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { reportUserFacingError } from "../../lib/userFacingError";
 import { reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { ADMIN_ROUTES } from "../../types/routes";
+import { ApplicationDecisionBadge } from "../../components/ApplicationDecisionBadge";
 import { LoadingState } from "../../components/states/LoadingState";
+import { formatApplicationDisplayDate } from "../../lib/dateFormat";
 
 type QueueRow = DecisionEmailQueue["active"][number];
+type SentRow = DecisionEmailQueue["sent"][number];
+
+/** Maximum recently sent rows rendered on the decision emails page. */
+const RECENTLY_SENT_DISPLAY_LIMIT = 5;
 
 function decisionLabel(decision: QueueRow["decision"]) {
   if (decision === "accepted") return "Accepted";
@@ -41,12 +47,12 @@ function QueueTable({
   busy: boolean;
 }) {
   if (rows.length === 0) {
-    return <p className="text-sm text-ocean">No decision emails are waiting.</p>;
+    return <p className="admin-page-lead">No decision emails are waiting.</p>;
   }
 
   return (
     <div className="admin-card overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-base">
         <thead>
           <tr className="border-b border-sand text-ocean">
             {isAdmin ? <th className={`${queueTableHeadClass} w-12`}>Send</th> : null}
@@ -105,6 +111,55 @@ function QueueTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function RecentlySentSection({ rows, totalSent }: { rows: SentRow[]; totalSent: number }) {
+  const visible = rows.slice(0, RECENTLY_SENT_DISPLAY_LIMIT);
+  const showMoreNotice = totalSent > visible.length;
+
+  return (
+    <section aria-label="Recently sent decision emails" className="admin-card admin-card__body space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="admin-card__title">Recently sent</h3>
+        {totalSent > 0 ? (
+          <p className="admin-card__hint m-0">
+            {showMoreNotice
+              ? `Showing ${visible.length} of ${totalSent} sent emails`
+              : `${totalSent} sent email${totalSent === 1 ? "" : "s"}`}
+          </p>
+        ) : null}
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="admin-page-lead">No decision emails have been sent yet.</p>
+      ) : (
+        <ul className="divide-y divide-sand/80">
+          {visible.map((row) => {
+            const sentAt = row.sentAt ?? row.queuedAt;
+            return (
+              <li key={row.itemId} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 text-left">
+                  <Link
+                    className="font-semibold text-night underline"
+                    to={ADMIN_ROUTES.applicationReview(row.applicationId)}
+                  >
+                    {row.applicantName}
+                  </Link>
+                  <p className="decision-email-recent-item__email truncate">{row.recipientEmail}</p>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                  <ApplicationDecisionBadge status={row.decision} />
+                  <time className="decision-email-recent-item__time" dateTime={new Date(sentAt).toISOString()}>
+                    Sent {formatApplicationDisplayDate(sentAt)}
+                  </time>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -194,18 +249,18 @@ export function DecisionEmailQueuePage() {
   return (
     <section aria-labelledby="decision-emails-heading" className="space-y-5">
       <header className="space-y-2">
-        <h2 id="decision-emails-heading" className="text-2xl font-semibold tracking-tight text-night">
+        <h2 id="decision-emails-heading" className="admin-page-title">
           Decision emails
         </h2>
-        <p className="text-sm text-ocean">
+        <p className="admin-page-lead">
           Review queued decisions before they are emailed. Review status and participant records update only after the email server accepts each message.
         </p>
         {!isAdmin ? (
-          <p className="text-sm text-ocean">An admin releases these emails. You can review the queue, but you cannot send it.</p>
+          <p className="admin-page-lead">An admin releases these emails. You can review the queue, but you cannot send it.</p>
         ) : null}
       </header>
 
-      <p className="text-sm text-night">
+      <p className="admin-page-meta">
         Queued {queue.counts.queued} · Held {queue.counts.held} · Sending {queue.counts.sending} · Failed {queue.counts.failed}
       </p>
 
@@ -250,20 +305,7 @@ export function DecisionEmailQueuePage() {
         busy={busy || sending}
       />
 
-      <section aria-label="Recently sent decision emails" className="space-y-2">
-        <h3 className="text-lg font-semibold text-night">Recently sent</h3>
-        {queue.sent.length === 0 ? (
-          <p className="text-sm text-ocean">No decision emails have been sent yet.</p>
-        ) : (
-          <ul className="space-y-1 text-sm text-night">
-            {queue.sent.map((row) => (
-              <li key={row.itemId}>
-                {row.applicantName} · {decisionLabel(row.decision)} · {row.recipientEmail}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <RecentlySentSection rows={queue.sent} totalSent={queue.counts.sent} />
     </section>
   );
 }
