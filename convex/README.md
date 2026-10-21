@@ -1,6 +1,6 @@
 # Convex backend (`convex/`)
 
-Server functions, schema, HTTP routes, and auth for the shared HackUTA deployment. This repo is the **sole deploy path** — [hackuta-2026-register](../hackuta-2026-register) does not push backend code.
+Server functions, schema, HTTP routes, and auth copied into the shared HackUTA deployment. [hackuta-2026-profile](../hackuta-2026-profile) is the **sole deploy path**. [hackuta-2026-register](../hackuta-2026-register) does not push backend code. `npm run convex:dev`, `convex:push-dev`, and `convex:deploy` in this repo refuse.
 
 Generated types live in [_generated/](_generated/) (gitignored). Local typecheck uses a stub from [scripts/ensure-convex-server-stub.mjs](../scripts/ensure-convex-server-stub.mjs).
 
@@ -18,6 +18,13 @@ Generated types live in [_generated/](_generated/) (gitignored). Local typecheck
 
 ```bash
 npm run verify:register-schema-lock
+```
+
+After organizer Convex or schema edits, refresh the profile copy and push from that repo:
+
+```bash
+cd ../hackuta-2026-profile
+npm run admin-schema-lock:refresh
 npm run convex:push-dev
 ```
 
@@ -59,9 +66,9 @@ npm run convex:push-dev
 
 | Task | Command / location |
 | --- | --- |
-| Push to shared dev | npm run convex:push-dev |
-| Deploy production | npm run convex:deploy |
+| Generate types only | npm run convex:codegen |
 | Verify register lock | npm run verify:register-schema-lock |
+| Push shared dev or production | hackuta-2026-profile `npm run convex:push-dev` or `npm run convex:deploy` |
 | Operator docs | [docs/OPERATIONS.md](../docs/OPERATIONS.md) |
 
 ## Related

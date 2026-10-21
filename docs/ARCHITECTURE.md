@@ -6,7 +6,7 @@ High-level structure of the admin codebase.
 
 ```
 register.hackuta.com (registration UI) ──reads──► Convex (shared deployment)
-hackuta-2026-admin (this app)          ──deploys──► Convex (schema + functions)
+hackuta-2026-profile                   ──deploys──► Convex (schema + functions)
                                                       │
                                                       ├── standing-manatee-425 (dev)
                                                       └── production deployment
@@ -16,10 +16,8 @@ Organizer browser ──► admin SPA (Vercel) ──sessionToken──► admin
 
 Organizer auth is separate from applicant Convex Auth. Sessions are stored in `adminSessions`; roles come from `admins` only.
 
-```
-
 - **Registration frontend** lives in [hackuta-2026-register](../hackuta-2026-register). It does **not** push Convex code.
-- **This repo** is the sole deploy path for backend schema and functions on the shared HackUTA Convex project.
+- **This repo** edits organizer Convex modules. [hackuta-2026-profile](../hackuta-2026-profile) is the sole deploy path so `convex/profile` is not dropped on push.
 
 ## Repository layout
 
@@ -56,10 +54,12 @@ convex/admin/participants → participants row (QR token, check-in identity, `fo
 ### Deploy
 
 ```
-Edit admin-owned paths → npm run verify:register-schema-lock
-                      → npm run convex:push-dev (standing-manatee-425)
-                      → npm run convex:deploy (production)
+Edit admin-owned paths in this repo
+  → npm run admin-schema-lock:refresh in hackuta-2026-profile
+  → npm run convex:push-dev or npm run convex:deploy from hackuta-2026-profile
 ```
+
+`npm run convex:dev`, `convex:push-dev`, and `convex:deploy` in this repo exit immediately and do not upload functions.
 
 ## Related
 

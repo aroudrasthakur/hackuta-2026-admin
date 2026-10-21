@@ -1,6 +1,6 @@
 # Operations
 
-Deploy, configure, and maintain the organizer admin app and shared Convex backend.
+Deploy and configure the organizer admin app. Shared Convex backend pushes run from [hackuta-2026-profile](../hackuta-2026-profile).
 
 ## Deployments
 
@@ -9,29 +9,20 @@ Deploy, configure, and maintain the organizer admin app and shared Convex backen
 | Shared dev | [127.0.0.1:5373](http://127.0.0.1:5373) (local) | `standing-manatee-425` |
 | Production | Vercel (organizer URL TBD) | Production deployment (set in Vercel / Convex dashboard) |
 
-**Register repo does not push to Convex.** All backend deploys run from this repo.
+**Register repo does not push to Convex.** Backend pushes run from the profile repo only. `npm run convex:dev`, `convex:push-dev`, and `convex:deploy` in this repo refuse so an admin-only upload cannot drop `convex/profile`.
 
-## Deploy to shared dev
+## Backend release order
 
-`.env.example` intentionally targets the shared dev deployment because
-`convex:push-dev` loads that file directly. Keep personal deployment values in
-`.env.local`; do not copy personal deployment identifiers into `.env.example`.
+1. Change organizer Convex, `convex/schema.ts`, or `shared/admin` in this repo.
+2. In the profile repo, run `npm run admin-schema-lock:refresh` and commit the copied files.
+3. From the profile repo, run `npm run convex:push-dev` (shared dev) or `npm run convex:deploy` (production). Both commands verify the register lock and the admin lock first.
 
-```bash
-cp .env.example .env.local   # CONVEX_DEPLOYMENT=dev:standing-manatee-425
-npm run verify:register-schema-lock
-npm run convex:push-dev
-```
+`.env.example` still points local Convex CLI config at `standing-manatee-425`. Keep personal deployment values in `.env.local`. Use `npm run convex:codegen` here when you only need generated types. Do not upload functions from this repo.
 
-`convex:push-dev` runs schema lock verification automatically via `preconvex:push-dev`.
-To use a personal dev deployment for local app development, set its URL and
-`CONVEX_DEPLOYMENT` in `.env.local` and run `npm run convex:dev`. The shared-dev
-push command continues to target `standing-manatee-425`.
-
-## Production release checklist
+## Production frontend checklist
 
 1. **Quality gate:** `npm run check:whitespace && npm run verify:register-schema-lock && npm run lint && npm run typecheck && npm run build`
-2. **Convex prod:** `npm run convex:deploy`
+2. **Convex:** already deployed from the profile repo (see above).
 3. **Vercel:** push to `main` or promote deployment; set `VITE_CONVEX_URL`
 4. **Smoke test:** sign in, open `/admin/applications`, open one application review
 
@@ -65,7 +56,7 @@ check for HTTPS cookies and hosted API routing.
 
 Use this when shipping organizer sign-in, session, or review authorization changes:
 
-1. **Backend first:** `npm run convex:push-dev` (shared dev) or `npm run convex:deploy` (prod). Review-queue and detail views expect Convex to return `reviewClaim.expiresAt` and `reviewActivity.expiresAt` when a claim is active.
+1. **Backend first:** from hackuta-2026-profile, `npm run convex:push-dev` (shared dev) or `npm run convex:deploy` (prod), after `npm run admin-schema-lock:refresh` if this repo's Convex files changed. Review-queue and detail views expect Convex to return `reviewClaim.expiresAt` and `reviewActivity.expiresAt` when a claim is active.
 2. **Frontend:** deploy the admin app only after Convex functions are live on that deployment. If the frontend ships first, the UI falls back to legacy `isStale` / conservative “still under review” behavior until the backend is updated.
 3. **Optional gate:** `npm run test:smoke` against shared dev after the Convex push and before promoting the frontend.
 4. **Shared dev smoke:** sign in via `/admin/login`, open one application, log a view, sign out.
@@ -118,7 +109,9 @@ Do **not** set `VITE_E2E_MOCK` on Vercel (production or preview). It enables in-
 
 ## Register lock refresh
 
-When registration source files change in [hackuta-2026-register](../hackuta-2026-register) (rare):
+Register is in production. Do **not** run `register-schema-lock:refresh` in this repo or in the profile repo unless [hackuta-2026-register](../hackuta-2026-register) itself has shipped a backend change. Verification (`npm run verify:register-schema-lock`) stays required in CI.
+
+When that upstream backend change exists:
 
 ```bash
 npm run register-schema-lock:refresh
