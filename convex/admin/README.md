@@ -8,7 +8,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | --- | --- |
 | [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
 | [staffAuth.ts](staffAuth.ts) | Session resolution and role guards (see [VOLUNTEER_AUTHORIZATION.md](VOLUNTEER_AUTHORIZATION.md)) |
-| [volunteerAccounts.ts](volunteerAccounts.ts) | Admin-only volunteer creation, resets, revocation, restoration, capabilities, and event assignments |
+| [volunteers.ts](volunteers.ts) | Admin-only volunteer management: creation, participant promotion, resets, revoke/restore, capabilities, event assignments, and audit log queries |
 | [staffCredentials.ts](staffCredentials.ts) | Shared password validation, hashing, credential storage, and session invalidation |
 | [applications.ts](applications.ts) | Read-only application queue and submitted application detail (no audit logs on list) |
 | [passwordHash.ts](passwordHash.ts) | Scrypt password hash + verify |
@@ -55,9 +55,21 @@ Sign-in permits five failed attempts per normalized email within 15 minutes, acr
 
 Volunteers use this same staff login and cookie transport. Applicant Convex Auth never grants staff access. `getCurrentStaff` returns identity, expiry, and normalized capabilities; it never returns credentials, participant data, or point totals. The SPA sends volunteer sessions to `/volunteer`, blocks review routes, and returns to login on revocation or expiry, including idle and resumed tabs.
 
-All functions in `volunteerAccounts.ts` require a current administrator session. `createVolunteer` always creates a distinct staff account with role `volunteer` and both capabilities false. It rejects normalized staff-email collisions (including inactive accounts), duplicate participant links, missing/ineligible participants, and extra role/capability arguments. Generic organizer provisioning rejects volunteer targets; use the audited volunteer workflow instead.
+## Volunteer management (#62)
 
-`resetVolunteerPassword` accepts a replacement password that meets existing requirements and invalidates all old sessions. No password retrieval API exists. `revokeVolunteer` deactivates the account and deletes its sessions; `restoreVolunteer` reactivates it and clears any stale sessions again. Account/history rows and assignments remain intact. Capability changes preserve the login but permissions are checked again on each request. Assignment grants query the compound index before insertion to prevent duplicates. Each configuration mutation writes an audit record in the same transaction, without credentials or arbitrary text details.
+Every export in `volunteers.ts` calls `requireAdminRole` first. Reviewers get `ADMIN_ONLY` and volunteers get `NOT_AUTHORIZED`, so a volunteer cannot change their own capabilities or events, create or restore accounts, reset passwords, or read either audit log.
+
+- `createVolunteer` makes a standalone volunteer (not a participant). The role is always `volunteer`, the account is active, and `canCheckIn` / `canFoodCheckIn` are required booleans (only an explicit `true` grants access). The email is normalized like staff sign-in, and any existing staff row with that email (any role, active or not) is rejected. The password is validated and hashed with the shared staff credential helper.
+- `promoteParticipantToVolunteer` creates a **separate** staff account linked through `admins.participantId`. The participant must still be accepted. The email and name default to the registration values and can be overridden. It rejects a second link for the same participant and any email already used by staff, and never converts an admin or reviewer. The participant row (points, QR token), application, `users`, and `authAccounts` are not modified. It is audited as `volunteer_promoted` (with `targetParticipantId`); standalone creation is `volunteer_created`.
+- `listVolunteers` is paginated over `admins.by_role` and returns name, email, active status, linked participant, capabilities, assigned events, and created/updated times. No credentials, sessions, QR tokens, or points.
+- `resetVolunteerPassword` validates the new password and deletes all sessions. No password retrieval API exists.
+- `revokeVolunteer` sets `active: false` and deletes every session, which stops all scanning on the next request. Assignments, capabilities, and history are kept. `restoreVolunteer` reactivates the account and deletes sessions again, so a fresh login is always required.
+- `setVolunteerCapabilities` takes both booleans explicitly. Unchanged values are a no-op; otherwise the log records `changedFields`, `before`, and `after`.
+- `setVolunteerEventAccess` replaces the volunteer's event set. It validates the whole list (at most 50, no duplicates, every event exists, no new grants to a revoked volunteer) before any write. Unchanged rows are kept, removed ones are deleted, and duplicate rows for one event are collapsed. The log records the final list plus added and removed ids.
+- `listVolunteerActionLogs` filters by volunteer, action, participant, event, and a `from`/`to` date range, newest first, paginated. The most selective filter picks an index (`by_participant_createdAt`, `by_actor_createdAt`, `by_event_createdAt`, `by_action_createdAt`, or `by_createdAt`). Rows include actor and participant names, event name, point delta, and the reason for admin adjustments only.
+- `listStaffConfigLogs` lists configuration changes newest first, filterable by target staff account, action, and date range, with names and parsed details.
+
+Every configuration change writes a `staffConfigLogs` row with the acting admin and timestamp in the same transaction. Details go through `buildStaffConfigDetails`, which only stores allowlisted booleans, numbers, and ids. Generic organizer provisioning still rejects volunteer targets.
 
 | Entry point | Required access |
 | --- | --- |
@@ -66,13 +78,13 @@ All functions in `volunteerAccounts.ts` require a current administrator session.
 | Decision email queue reads | Reviewer or admin |
 | Decision email hold, retry, release (via the guarded internal claim mutation) | Admin |
 | Generic organizer provisioning | Admin; volunteer targets rejected |
-| Volunteer listing, creation, reset, revoke, restore, capabilities and assignments | Admin |
+| Volunteer listing, creation, promotion, reset, revoke, restore, capabilities, assignments, and audit logs | Admin |
 | Session profile/sign-out | The caller's staff session only |
 | Participant creation | Internal only; accepting staff must be active reviewer/admin |
 | Point ledger and participant eligibility helpers | Ordinary server helpers, not public Convex APIs |
 | Own scan options and QR scan preview | Volunteer, plus the purpose's capability or event assignment |
 
-No public participant roster, point-total, or configuration-audit listing API is added here. Scanner endpoints must independently call the relevant volunteer guard **inside their query/mutation** before using participant or ledger helpers. In particular, `awardEventPoints` is a ledger helper, not an authorization boundary: its caller must use `requireVolunteerEventAccess` and derive the actor and timestamp on the server. Scanner and management screens are separate work from this authentication foundation.
+No public participant roster or point-total API exists. Scanner endpoints must independently call the relevant volunteer guard **inside their query/mutation** before using participant or ledger helpers. In particular, `awardEventPoints` is a ledger helper, not an authorization boundary: its caller must use `requireVolunteerEventAccess` and derive the actor and timestamp on the server. Scanner and management screens are separate work from this authentication foundation.
 
 Deployment: sync these admin-owned modules and `shared/admin` helpers into `hackuta-2026-profile` using its `npm run admin-schema-lock:refresh`, verify its schema includes #58, and run backend checks there. Backend uploads must run from profile to preserve `convex/profile`. Do not upload from this repository or refresh register-owned files for this change.
 

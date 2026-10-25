@@ -13,7 +13,7 @@ Applicant Convex Auth (`convex/auth.ts`) never satisfies staff guards.
 | Helper | Who may pass | Use before |
 | --- | --- | --- |
 | `requireReviewerAccess` | Active reviewer or admin | Application list/detail, review activity, decisions, decision-email queue reads |
-| `requireAdminRole` | Active admin | Review history, sample apps, organizer provisioning, decision-email hold/retry/release, all of `volunteerAccounts.ts` |
+| `requireAdminRole` | Active admin | Review history, sample apps, organizer provisioning, decision-email hold/retry/release, all of `volunteers.ts` |
 | `requireVolunteerAccess` | Active volunteer only | Any volunteer-only participant/event operation (check-in, food, point scan UI) |
 | `requireVolunteerCapability` | Volunteer with explicit `true` on `canCheckIn` or `canFoodCheckIn` | Door check-in or food scan mutations (missing flag = denied) |
 | `requireVolunteerEventAccess` | Volunteer with a **current** `volunteerEventAccess` row and an **active** event | Point scan mutations that award event-fixed points |
@@ -25,7 +25,7 @@ Acting identity always comes from the guard return value (`admin._id`). Never tr
 ## Event assignment semantics (invariant)
 
 - Permission to award an event's points is **only** the presence of a `volunteerEventAccess` row for `(volunteerAdminId, eventId)` at the time of the request.
-- **Removing** an assignment (`setVolunteerEventAccess` with `granted: false`) deletes the row in that transaction. The volunteer loses access on the **next** scan request; there is no caching of assignments in sessions.
+- **Removing** an assignment (leaving the event out of the `setVolunteerEventAccess` list) deletes the row in that transaction. The volunteer loses access on the **next** scan request; there is no caching of assignments in sessions.
 - `events.startsAt` / `events.endsAt` are **reference schedule only**. They do **not** gate scanning (see [pointsLedger.ts](pointsLedger.ts)).
 - Inactive or missing events reject even when an assignment row still exists (`EVENT_INACTIVE`, `EVENT_NOT_FOUND`).
 
@@ -52,7 +52,7 @@ If you add a new public mutation that imports `pointsLedger`, add a row to the e
 | `decisionEmailQueue.ts` | `listDecisionEmailQueue` | `requireReviewerAccess` |
 | `decisionEmailQueue.ts` | `setDecisionEmailHold`, `retryFailedDecisionEmails`, `claimDecisionEmails` | `requireAdminRole` |
 | `decisionEmailRelease.ts` | `releaseDecisionEmails` | Admin session via action wrapper |
-| `volunteerAccounts.ts` | all exports | `requireAdminRole` |
+| `volunteers.ts` | all exports (accounts, promotion, capabilities, event access, `listVolunteerActionLogs`, `listStaffConfigLogs`) | `requireAdminRole` |
 | `volunteerScan.ts` | `listMyScanOptions`, `resolveQrForScan` | `requireVolunteerAccess`, then per-purpose capability / assignment checks |
 | `volunteerScanRateLimit.ts` | `pruneVolunteerScanRateLimits` | **Internal only** (`internalMutation`) |
 | `participants.ts` | — | **Internal only** (`internalMutation`) |

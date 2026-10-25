@@ -154,8 +154,29 @@ describe("staff config details", () => {
     { changedFields: [1] },
     { eventIds: Array.from({ length: 51 }, () => "evt1") },
     { changedFields: Array.from({ length: 51 }, () => "active") },
+    { before: null },
+    { before: "active" },
+    { before: [true] },
+    { after: { password: true } },
+    { after: { canCheckIn: "yes" } },
+    { addedEventIds: ["has space"] },
+    { removedEventIds: "evt1" },
   ])("rejects %#", (input) => {
     expect(() => buildStaffConfigDetails(input)).toThrow(/not allowed/);
+  });
+
+  it("stores boolean before/after snapshots and added/removed event ids", () => {
+    expect(buildStaffConfigDetails({
+      before: { canCheckIn: false, active: true },
+      after: { canCheckIn: true, canFoodCheckIn: false },
+      addedEventIds: ["evt2"],
+      removedEventIds: [],
+    })).toBe(JSON.stringify({
+      addedEventIds: ["evt2"],
+      removedEventIds: [],
+      before: { canCheckIn: false, active: true },
+      after: { canCheckIn: true, canFoodCheckIn: false },
+    }));
   });
 
   it("accepts a 40-character event id", () => {
