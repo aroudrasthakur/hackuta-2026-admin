@@ -54,8 +54,8 @@ export function AdminLoginPage() {
             <p className="text-xs uppercase tracking-wide text-mist">HackUTA 2026</p>
             <h1 className="sign-in-card__title">Organizer sign-in</h1>
             <p className="sign-in-card__subtitle">
-              Reviewer and admin accounts are provisioned by the organizing team. There is
-              no public sign-up.
+              Reviewer, admin, and volunteer accounts are provisioned by the organizing
+              team. There is no public sign-up.
             </p>
           </div>
 
