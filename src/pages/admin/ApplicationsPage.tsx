@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { AdminListboxSelect } from "../../components/AdminListboxSelect";
@@ -39,37 +39,52 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { status, sortOrder, reviewer } = queueControls(searchParams);
   const initialSearch = searchParams.get("search") ?? queueDefaults.search;
-  const latestSearchRef = useRef(initialSearch);
   const [searchInput, setSearchInput] = useState(initialSearch);
   const searchText = searchInput.trim().toLowerCase();
   const skipUrlSearchSync = useRef(false);
+  /**
+   * The router commits URL changes in a transition, so `searchParams` can lag
+   * behind a write made moments earlier. Rapid edits must build on the last
+   * written params or they silently drop the previous filter change.
+   */
+  const writtenParamsRef = useRef({ routed: searchParams.toString(), params: new URLSearchParams(searchParams) });
+
+  const writeParams = useCallback((mutate: (next: URLSearchParams) => void) => {
+    const routed = searchParams.toString();
+    const written = writtenParamsRef.current;
+    const next = new URLSearchParams(routed === written.routed ? written.params : searchParams);
+    mutate(next);
+    writtenParamsRef.current = { routed, params: next };
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const routed = searchParams.toString();
+    if (routed === writtenParamsRef.current.params.toString()) {
+      writtenParamsRef.current = { routed, params: new URLSearchParams(searchParams) };
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (skipUrlSearchSync.current) {
       skipUrlSearchSync.current = false;
       return;
     }
-    const urlSearch = searchParams.get("search") ?? queueDefaults.search;
-    latestSearchRef.current = urlSearch;
-    setSearchInput(urlSearch);
+    setSearchInput(searchParams.get("search") ?? queueDefaults.search);
   }, [searchParams]);
 
   function updateSearch(value: string) {
-    latestSearchRef.current = value;
     skipUrlSearchSync.current = true;
     flushSync(() => {
       setSearchInput(value);
-      setSearchParams((previous) => {
-        const term = latestSearchRef.current;
-        const next = new URLSearchParams(previous);
-        if (term === "" || term === queueDefaults.search) {
+      writeParams((next) => {
+        if (value === "" || value === queueDefaults.search) {
           next.delete("search");
         } else {
-          next.set("search", term);
+          next.set("search", value);
         }
         next.delete("page");
-        return next;
-      }, { replace: true });
+      });
     });
   }
 
@@ -79,16 +94,14 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
       return;
     }
     flushSync(() => {
-      setSearchParams((previous) => {
-        const next = new URLSearchParams(previous);
+      writeParams((next) => {
         if (value === "" || value === queueDefaults[key]) {
           next.delete(key);
         } else {
           next.set(key, value);
         }
         next.delete("page");
-        return next;
-      }, { replace: true });
+      });
     });
   }
 
@@ -114,27 +127,23 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
     const requested = Number.parseInt(requestedRaw, 10);
     if (!Number.isFinite(requested) || requested < 1) return;
     if (requested === page) return;
-    setSearchParams((previous) => {
-      const next = new URLSearchParams(previous);
+    writeParams((next) => {
       if (page <= 1) {
         next.delete("page");
       } else {
         next.set("page", String(page));
       }
-      return next;
-    }, { replace: true });
-  }, [page, searchParams, setSearchParams]);
+    });
+  }, [page, searchParams, writeParams]);
 
   function goToPage(nextPage: number) {
-    setSearchParams((previous) => {
-      const next = new URLSearchParams(previous);
+    writeParams((next) => {
       if (nextPage <= 1) {
         next.delete("page");
       } else {
         next.set("page", String(nextPage));
       }
-      return next;
-    }, { replace: true });
+    });
   }
 
   if (applications === undefined) {
