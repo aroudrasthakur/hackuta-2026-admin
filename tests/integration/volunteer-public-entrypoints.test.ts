@@ -38,6 +38,8 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "volunteerAccounts.ts", exportName: "resetVolunteerPassword", guard: "requireAdminRole" },
   { file: "volunteerAccounts.ts", exportName: "updateVolunteerCapabilities", guard: "requireAdminRole" },
   { file: "volunteerAccounts.ts", exportName: "setVolunteerEventAccess", guard: "requireAdminRole" },
+  { file: "volunteerScan.ts", exportName: "listMyScanOptions", guard: "requireVolunteerAccess" },
+  { file: "volunteerScan.ts", exportName: "resolveQrForScan", guard: "requireVolunteerAccess" },
 ] as const;
 
 function exportSection(source: string, exportName: string) {
@@ -75,6 +77,7 @@ describe("volunteer authorization contract (public entry points)", () => {
       "applicationReviewLogs.ts",
       "auth.ts",
       "volunteerAccounts.ts",
+      "volunteerScan.ts",
     ];
     for (const file of files) {
       const source = readFileSync(join(adminDir, file), "utf8");
