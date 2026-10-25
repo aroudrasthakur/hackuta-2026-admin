@@ -85,6 +85,7 @@ describe("confirmed acceptance participant creation (#17)", () => {
       acceptedBy: adminId,
       acceptedAt: review?.completedAt,
       foodRestriction: "Vegetarian",
+      points: 0,
     });
     expect(participant?.createdAt).toBeGreaterThanOrEqual(review?.completedAt ?? 0);
     expect(participant?.updatedAt).toBe(participant?.createdAt);
