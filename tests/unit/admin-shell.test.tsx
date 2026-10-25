@@ -69,6 +69,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  staff.expiresAt = Date.now() + 60_000;
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mocks.query.mockReset().mockReturnValue([]);
   mocks.paginatedQuery.mockReset().mockReturnValue({ results: [], status: "Exhausted", loadMore: vi.fn() });
@@ -84,6 +85,7 @@ afterEach(async () => {
   container.remove();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 async function render(node: ReactNode) {
@@ -99,7 +101,7 @@ function LiveAuth({ initial, children }: { initial: AdminAuthContextValue; child
   const [signedIn, setSignedIn] = useState(initial.isAuthenticated);
   const value: AdminAuthContextValue = {
     ...initial,
-    staff: signedIn ? staff : null,
+    staff: signedIn ? initial.staff ?? staff : null,
     isAuthenticated: signedIn,
     sessionToken: signedIn ? (initial.sessionToken ?? "s".repeat(64)) : null,
     signIn: async (email, password) => {
@@ -145,6 +147,36 @@ async function submitLogin() {
 }
 
 describe("app routes", () => {
+  it.each(["/admin/login", "/admin/applications", "/admin/applications/app-1", "/admin/decision-emails", "/"])(
+    "sends volunteers from %s to their own landing page without review queries", async (path) => {
+      await renderApp(path, authContext({ staff: { ...staff, role: "volunteer" } }));
+      expect(currentPath()).toBe("/volunteer");
+      expect(container.querySelector("h1")?.textContent).toBe("Volunteer access");
+      expect(container.textContent).toContain("Not assigned");
+      expect(container.querySelector('nav[aria-label="Admin"]')).toBeNull();
+      expect(mocks.query).not.toHaveBeenCalled();
+      expect(mocks.paginatedQuery).not.toHaveBeenCalled();
+    },
+  );
+
+  it("shows volunteer capabilities and permits signing out", async () => {
+    const context = authContext({ staff: { ...staff, role: "volunteer", canCheckIn: true, canFoodCheckIn: true } });
+    await renderApp("/volunteer", context);
+    expect(Array.from(container.querySelectorAll("dd"), (node) => node.textContent)).toEqual(["Enabled", "Enabled"]);
+    await act(async () => button("Sign out")!.click());
+    expect(currentPath()).toBe("/admin/login");
+    expect(context.signOut).toHaveBeenCalledOnce();
+  });
+
+  it.each(["reviewer", "admin"] as const)("redirects a %s away from volunteer operations", async (role) => {
+    await renderApp("/volunteer", authContext({ staff: { ...staff, role } }));
+    expect(currentPath()).toBe("/admin/applications");
+  });
+
+  it("sends a signed-out volunteer visitor to login", async () => {
+    await renderApp("/volunteer", authContext({ staff: null, isAuthenticated: false, sessionToken: null }));
+    expect(currentPath()).toBe("/admin/login");
+  });
   it.each(["/", "/admin", "/unknown"])("sends %s to the applications page", async (path) => {
     await renderApp(path, authContext());
     expect(currentPath()).toBe("/admin/applications");
@@ -492,6 +524,58 @@ describe("AdminAuthProvider", () => {
     mocks.query.mockReturnValue(null);
     await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
     expect(authErrorText()).toBe(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
+    expect(state().token).toBeNull();
+    expect(state().authed).toBe(false);
+  });
+
+  it("discards an already invalid cookie session on startup", async () => {
+    stubApi({ "/api/admin/session-token": () => new Response(token) });
+    mocks.query.mockImplementation((_ref, args) => args === "skip" ? undefined : null);
+    await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
+    expect(state()).toEqual({ token: null, ready: true, loading: false, authed: false });
+    expect(authErrorText()).toBe(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
+  });
+
+  it("returns a quiet volunteer tab to login at expiry without another query update", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    const volunteer = { ...staff, role: "volunteer", expiresAt: Date.now() + 1000 };
+    stubApi({ "/api/admin/session-token": () => new Response(token) });
+    mocks.query.mockImplementation((_ref, args) => args === "skip" ? undefined : volunteer);
+    await render(<AdminAuthProvider><MemoryRouter initialEntries={["/volunteer"]}><App /><CurrentPath /></MemoryRouter></AdminAuthProvider>);
+    expect(currentPath()).toBe("/volunteer");
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(currentPath()).toBe("/admin/login");
+    expect(container.textContent).toContain(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
+    expect(mocks.query).toHaveBeenLastCalledWith(getCurrentStaffRef, "skip");
+  });
+
+  it.each(["focus", "visibilitychange"])("checks expiry on %s when returning from a suspended tab", async (event) => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    const expiresAt = Date.now() + 1000;
+    stubApi({ "/api/admin/session-token": () => new Response(token) });
+    mocks.query.mockImplementation((_ref, args) => args === "skip" ? undefined : { ...staff, expiresAt });
+    await render(<AdminAuthProvider><Probe /></AdminAuthProvider>);
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(state().authed).toBe(true);
+    vi.setSystemTime(expiresAt);
+    await act(async () => {
+      (event === "focus" ? window : document).dispatchEvent(new Event(event));
+    });
+    expect(state().token).toBeNull();
+    expect(authErrorText()).toBe(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
+  });
+
+  it("returns a volunteer to login after server revocation", async () => {
+    stubApi({ "/api/admin/session-token": () => new Response(token) });
+    mocks.query.mockReturnValue({ ...staff, role: "volunteer" });
+    const app = <AdminAuthProvider><MemoryRouter initialEntries={["/volunteer"]}><App /><CurrentPath /></MemoryRouter></AdminAuthProvider>;
+    await render(app);
+    expect(currentPath()).toBe("/volunteer");
+    mocks.query.mockReturnValue(null);
+    // Re-render the existing provider so it observes the reactive server update.
+    await render(<AdminAuthProvider><MemoryRouter initialEntries={["/volunteer"]}><App /><CurrentPath /></MemoryRouter></AdminAuthProvider>);
+    expect(currentPath()).toBe("/admin/login");
+    expect(container.textContent).toContain(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
   });
 
   it("hides network details when the session check fails", async () => {

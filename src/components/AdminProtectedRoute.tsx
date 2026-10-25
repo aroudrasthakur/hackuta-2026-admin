@@ -6,11 +6,12 @@ import { ADMIN_ROUTES } from "../types/routes";
 
 type AdminProtectedRouteProps = {
   children: ReactNode;
+  volunteerOnly?: boolean;
 };
 
-export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
+export function AdminProtectedRoute({ children, volunteerOnly = false }: AdminProtectedRouteProps) {
   const location = useLocation();
-  const { isAuthenticated, isLoading, sessionReady } = useAdminAuth();
+  const { isAuthenticated, isLoading, sessionReady, staff } = useAdminAuth();
 
   if (!sessionReady || isLoading) {
     return <LoadingState message="Verifying organizer session…" />;
@@ -18,6 +19,13 @@ export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
 
   if (!isAuthenticated) {
     return <Navigate to={ADMIN_ROUTES.login} replace state={{ from: location }} />;
+  }
+
+  if (staff?.role === "volunteer" && !volunteerOnly) {
+    return <Navigate to={ADMIN_ROUTES.volunteer} replace />;
+  }
+  if (staff?.role !== "volunteer" && volunteerOnly) {
+    return <Navigate to={ADMIN_ROUTES.applications} replace />;
   }
 
   return children;

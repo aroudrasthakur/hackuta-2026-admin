@@ -27,7 +27,7 @@ export function AdminLoginPage() {
   }
 
   if (isAuthenticated && staff) {
-    return <Navigate to={ADMIN_ROUTES.applications} replace />;
+    return <Navigate to={staff.role === "volunteer" ? ADMIN_ROUTES.volunteer : ADMIN_ROUTES.applications} replace />;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

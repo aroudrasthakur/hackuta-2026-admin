@@ -15,7 +15,7 @@ import { verifyPassword } from "./passwordHash";
 import { ADMIN_SIGN_IN_DUMMY_PASSWORD_HASH } from "./signInSecurityConstants";
 import { createAdminSession } from "./sessionLifecycle";
 import { setStaffPassword } from "./staffCredentials";
-import { hashSessionToken, requireAdminRole, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
+import { hashSessionToken, requireAdminRole, resolveAdminSession, sessionTokenArgs, volunteerCapabilities } from "./staffAuth";
 
 type SignInFailureCode = "INVALID_CREDENTIALS" | "ACCOUNT_INACTIVE" | "SIGN_IN_RATE_LIMITED";
 
@@ -136,6 +136,7 @@ export const getCurrentStaff = query({
       email: admin.email,
       name: admin.name,
       role: admin.role,
+      ...volunteerCapabilities(admin),
       expiresAt: session.expiresAt,
     };
   },

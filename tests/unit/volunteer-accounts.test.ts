@@ -1,10 +1,7 @@
-import { makeFunctionReference, type FunctionArgs, type FunctionReturnType } from "convex/server";
+import { makeFunctionReference, type ApiFromModules, type FunctionArgs, type FunctionReturnType } from "convex/server";
 import { describe, expect, it, vi } from "vitest";
-import type {
-  createVolunteer, listVolunteers, resetVolunteerPassword, revokeVolunteer, restoreVolunteer,
-  updateVolunteerCapabilities, setVolunteerEventAccess,
-} from "../../convex/admin/volunteerAccounts";
-import type { createAndProvisionAdmin, provisionAdminAuthAccount, getCurrentStaff } from "../../convex/admin/auth";
+import type * as volunteerAccounts from "../../convex/admin/volunteerAccounts";
+import type * as staffAuth from "../../convex/admin/auth";
 import { verifyPassword } from "../../convex/admin/passwordHash";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest } from "../helpers/convexTestContext";
@@ -12,18 +9,21 @@ import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { insertStaffSession, mutateOrganizerSignIn, ORGANIZER_TEST_PASSWORD, signInOrganizer } from "../helpers/staffTestFixtures";
 import { requireVolunteerAccess, requireVolunteerCapability, requireVolunteerEventAccess } from "../../convex/admin/staffAuth";
 
-const createRef = makeFunctionReference<"mutation", FunctionArgs<typeof createVolunteer>, FunctionReturnType<typeof createVolunteer>>(
+type VolunteerApi = ApiFromModules<{ volunteers: typeof volunteerAccounts }>["volunteers"];
+type AuthApi = ApiFromModules<{ auth: typeof staffAuth }>["auth"];
+
+const createRef = makeFunctionReference<"mutation", FunctionArgs<VolunteerApi["createVolunteer"]>, FunctionReturnType<VolunteerApi["createVolunteer"]>>(
   "admin/volunteerAccounts:createVolunteer",
 );
-const promoteRef = makeFunctionReference<"mutation", FunctionArgs<typeof createAndProvisionAdmin>>("admin/auth:createAndProvisionAdmin");
-const provisionRef = makeFunctionReference<"mutation", FunctionArgs<typeof provisionAdminAuthAccount>>("admin/auth:provisionAdminAuthAccount");
-const staffRef = makeFunctionReference<"query", FunctionArgs<typeof getCurrentStaff>, FunctionReturnType<typeof getCurrentStaff>>("admin/auth:getCurrentStaff");
-const listRef = makeFunctionReference<"query", FunctionArgs<typeof listVolunteers>, FunctionReturnType<typeof listVolunteers>>("admin/volunteerAccounts:listVolunteers");
-const resetRef = makeFunctionReference<"mutation", FunctionArgs<typeof resetVolunteerPassword>>("admin/volunteerAccounts:resetVolunteerPassword");
-const revokeRef = makeFunctionReference<"mutation", FunctionArgs<typeof revokeVolunteer>>("admin/volunteerAccounts:revokeVolunteer");
-const restoreRef = makeFunctionReference<"mutation", FunctionArgs<typeof restoreVolunteer>>("admin/volunteerAccounts:restoreVolunteer");
-const capabilitiesRef = makeFunctionReference<"mutation", FunctionArgs<typeof updateVolunteerCapabilities>>("admin/volunteerAccounts:updateVolunteerCapabilities");
-const eventRef = makeFunctionReference<"mutation", FunctionArgs<typeof setVolunteerEventAccess>>("admin/volunteerAccounts:setVolunteerEventAccess");
+const promoteRef = makeFunctionReference<"mutation", FunctionArgs<AuthApi["createAndProvisionAdmin"]>>("admin/auth:createAndProvisionAdmin");
+const provisionRef = makeFunctionReference<"mutation", FunctionArgs<AuthApi["provisionAdminAuthAccount"]>>("admin/auth:provisionAdminAuthAccount");
+const staffRef = makeFunctionReference<"query", FunctionArgs<AuthApi["getCurrentStaff"]>, FunctionReturnType<AuthApi["getCurrentStaff"]>>("admin/auth:getCurrentStaff");
+const listRef = makeFunctionReference<"query", FunctionArgs<VolunteerApi["listVolunteers"]>, FunctionReturnType<VolunteerApi["listVolunteers"]>>("admin/volunteerAccounts:listVolunteers");
+const resetRef = makeFunctionReference<"mutation", FunctionArgs<VolunteerApi["resetVolunteerPassword"]>>("admin/volunteerAccounts:resetVolunteerPassword");
+const revokeRef = makeFunctionReference<"mutation", FunctionArgs<VolunteerApi["revokeVolunteer"]>>("admin/volunteerAccounts:revokeVolunteer");
+const restoreRef = makeFunctionReference<"mutation", FunctionArgs<VolunteerApi["restoreVolunteer"]>>("admin/volunteerAccounts:restoreVolunteer");
+const capabilitiesRef = makeFunctionReference<"mutation", FunctionArgs<VolunteerApi["updateVolunteerCapabilities"]>>("admin/volunteerAccounts:updateVolunteerCapabilities");
+const eventRef = makeFunctionReference<"mutation", FunctionArgs<VolunteerApi["setVolunteerEventAccess"]>>("admin/volunteerAccounts:setVolunteerEventAccess");
 
 async function fixture() {
   const t = createConvexTest();

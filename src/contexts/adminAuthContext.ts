@@ -4,7 +4,9 @@ export type StaffProfile = {
   adminId: string;
   email: string;
   name: string;
-  role: "reviewer" | "admin";
+  role: "reviewer" | "admin" | "volunteer";
+  canCheckIn?: boolean;
+  canFoodCheckIn?: boolean;
   expiresAt: number;
 };
 
