@@ -134,6 +134,18 @@ describe("reviewer permissions", () => {
   });
 });
 
+describe("volunteer review isolation", () => {
+  it.each(callNames)("rejects %s even with every scan capability granted", async (callName) => {
+    const t = createConvexTest();
+    const { adminId, sessionToken } = await seedStaff(t, { role: "volunteer" });
+    await t.run((ctx) => ctx.db.patch(adminId, { canCheckIn: true, canFoodCheckIn: true }));
+    const { applicationId } = await seedApplicant(t);
+    const before = await snapshotReviewState(t);
+    await expectAdminErrorCode(protectedCalls(t, sessionToken, applicationId)[callName](), "NOT_AUTHORIZED");
+    expect(await snapshotReviewState(t)).toEqual(before);
+  });
+});
+
 describe("admin permissions", () => {
   it("can do every review action and read the full history", async () => {
     const t = createConvexTest();

@@ -4,7 +4,7 @@ import type { ConvexTestInstance } from "./convexTestContext";
 import { ADMIN_SESSION_TTL_MS } from "../../convex/admin/staffAuth";
 import { insertStaffSession } from "./staffTestFixtures";
 
-export type StaffRole = "reviewer" | "admin";
+export type StaffRole = "reviewer" | "admin" | "volunteer";
 export type Decision = "accepted" | "rejected" | "waitlisted";
 
 let staffCounter = 0;
