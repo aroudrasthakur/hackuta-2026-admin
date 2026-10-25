@@ -4,6 +4,10 @@ import { AdminAccountControls } from "../components/AdminAccountControls";
 import { HackUtaLogo } from "../components/HackUtaLogo";
 import { StormPageFrame } from "../components/StormPageFrame";
 import { ADMIN_ROUTES } from "../types/routes";
+import { useAdminAuth } from "../hooks/useAdminAuth";
+import { useVolunteerAccess } from "../contexts/volunteerAccessContext";
+import { canAccessStaffRoute } from "../lib/staffRouteAccess";
+import { VolunteerPermissionNotice } from "../components/VolunteerPermissionNotice";
 
 function AdminTab({
   to,
@@ -27,11 +31,21 @@ function AdminTab({
 }
 
 export function AdminLayout() {
-  const { pathname } = useLocation();
-  const applicationsActive =
-    pathname === ADMIN_ROUTES.applications ||
-    pathname.startsWith(`${ADMIN_ROUTES.applications}/`);
-  const decisionEmailsActive = pathname === ADMIN_ROUTES.decisionEmails;
+  const { pathname, state } = useLocation();
+  const { staff } = useAdminAuth();
+  const options = useVolunteerAccess();
+  const tabs = staff?.role === "volunteer" ? [
+    { to: ADMIN_ROUTES.scan, label: "Dashboard" },
+    { to: ADMIN_ROUTES.scanCheckIn, label: "Check-in" },
+    { to: ADMIN_ROUTES.scanFood, label: "Food" },
+    { to: ADMIN_ROUTES.scanPoints, label: "Points" },
+  ] : [
+    { to: ADMIN_ROUTES.applications, label: "Applications" },
+    { to: ADMIN_ROUTES.decisionEmails, label: "Decision emails" },
+    { to: ADMIN_ROUTES.participants, label: "Participants" },
+    { to: ADMIN_ROUTES.volunteers, label: "Volunteers" },
+  ];
+  const accessNotice = (state as { accessNotice?: unknown } | null)?.accessNotice;
   const headerRef = useRef<HTMLElement>(null);
   const [headerOffset, setHeaderOffset] = useState(0);
 
@@ -76,17 +90,18 @@ export function AdminLayout() {
           </div>
         </header>
         <div style={{ height: headerOffset }} aria-hidden="true" />
-        <nav aria-label="Admin" className="mx-auto max-w-6xl px-4 pt-6">
-          <div role="tablist" aria-label="Admin sections" className="admin-nav-tabs">
-            <AdminTab to={ADMIN_ROUTES.applications} active={applicationsActive}>
-              Applications
-            </AdminTab>
-            <AdminTab to={ADMIN_ROUTES.decisionEmails} active={decisionEmailsActive}>
-              Decision emails
-            </AdminTab>
+        <nav aria-label={staff?.role === "volunteer" ? "Volunteer" : "Admin"} className="mx-auto max-w-6xl px-4 pt-6">
+          <div role="tablist" aria-label="Staff sections" className="admin-nav-tabs">
+            {tabs.filter(({ to }) => staff && canAccessStaffRoute(to, staff, options) === true).map(({ to, label }) => (
+              <AdminTab key={to} to={to} active={pathname === to || (to === ADMIN_ROUTES.applications && pathname.startsWith(`${to}/`))}>
+                {label}
+              </AdminTab>
+            ))}
           </div>
         </nav>
         <main id="admin-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-8">
+          {typeof accessNotice === "string" ? <p role="alert" className="admin-card mb-6 p-4">{accessNotice}</p> : null}
+          <VolunteerPermissionNotice />
           <Outlet />
         </main>
       </div>

@@ -14,6 +14,9 @@ vi.mock("../../src/components/AdminAccountControls", () => ({
 vi.mock("../../src/components/HackUtaLogo", () => ({
   HackUtaLogo: () => <div data-testid="logo" />,
 }));
+vi.mock("../../src/hooks/useAdminAuth", () => ({
+  useAdminAuth: () => ({ staff: { role: "reviewer" } }),
+}));
 
 describe("AdminLayout tabs", () => {
   let container: HTMLDivElement;
