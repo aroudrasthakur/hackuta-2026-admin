@@ -286,7 +286,7 @@ describe("admin point adjustments", () => {
     );
     await expectAdminErrorCode(
       t.run((ctx) => adjustPoints(ctx, { actorAdminId: adminId, participantId, delta: -1, reason: "   " })),
-      "INVALID_POINTS",
+      "INVALID_ADJUSTMENT_REASON",
     );
     await expectAdminErrorCode(
       t.run((ctx) =>
