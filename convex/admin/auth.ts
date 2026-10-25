@@ -11,9 +11,10 @@ import {
 import { normalizeEmail } from "../lib/normalizeEmail";
 import { ADMIN_ERROR_MESSAGES, adminError } from "../../shared/admin/errors";
 import { validatePasswordRequirements } from "../../shared/auth/password";
-import { hashPassword, verifyPassword } from "./passwordHash";
+import { verifyPassword } from "./passwordHash";
 import { ADMIN_SIGN_IN_DUMMY_PASSWORD_HASH } from "./signInSecurityConstants";
-import { createAdminSession, invalidateAdminSessions } from "./sessionLifecycle";
+import { createAdminSession } from "./sessionLifecycle";
+import { setStaffPassword } from "./staffCredentials";
 import { hashSessionToken, requireAdminRole, resolveAdminSession, sessionTokenArgs } from "./staffAuth";
 
 type SignInFailureCode = "INVALID_CREDENTIALS" | "ACCOUNT_INACTIVE" | "SIGN_IN_RATE_LIMITED";
@@ -154,25 +155,9 @@ export const provisionAdminAuthAccount = internalMutation({
       throw new Error("Admin not found.");
     }
 
-    const passwordHash = await hashPassword(password);
-    const now = Date.now();
-    const existing = await ctx.db
-      .query("adminAuthAccounts")
-      .withIndex("by_admin", (q) => q.eq("adminId", adminId))
-      .unique();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, { passwordHash, updatedAt: now });
-    } else {
-      await ctx.db.insert("adminAuthAccounts", {
-        adminId,
-        passwordHash,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    await invalidateAdminSessions(ctx, adminId);
+    // Volunteers use the audited, administrator-authorized reset workflow.
+    if (admin.role === "volunteer") throw adminError("NOT_AUTHORIZED");
+    await setStaffPassword(ctx, adminId, password);
     return { ok: true as const };
   },
 });
@@ -201,6 +186,10 @@ export const createAndProvisionAdmin = mutation({
       .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
       .unique();
 
+    if (existingAdmin?.role === "volunteer") {
+      throw adminError("STAFF_ACCOUNT_EXISTS");
+    }
+
     const profile = { name, role, active: true, updatedAt: now };
     const adminId =
       existingAdmin?._id ??
@@ -213,24 +202,7 @@ export const createAndProvisionAdmin = mutation({
       await ctx.db.patch(adminId, profile);
     }
 
-    const passwordHash = await hashPassword(password);
-    const existingAccount = await ctx.db
-      .query("adminAuthAccounts")
-      .withIndex("by_admin", (q) => q.eq("adminId", adminId))
-      .unique();
-
-    if (existingAccount) {
-      await ctx.db.patch(existingAccount._id, { passwordHash, updatedAt: now });
-    } else {
-      await ctx.db.insert("adminAuthAccounts", {
-        adminId,
-        passwordHash,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    await invalidateAdminSessions(ctx, adminId);
+    await setStaffPassword(ctx, adminId, password);
     return { adminId, email: normalizedEmail, ok: true as const };
   },
 });

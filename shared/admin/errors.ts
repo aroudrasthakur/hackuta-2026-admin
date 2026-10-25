@@ -46,6 +46,9 @@ export const ADMIN_ERROR_MESSAGES = {
   PARTICIPANT_NOT_ELIGIBLE: "This participant isn't eligible for that action.",
   VOLUNTEER_ONLY: "Only volunteers can perform this action.",
   CAPABILITY_DENIED: "You don't have permission for this scan.",
+  STAFF_ACCOUNT_EXISTS: "A staff account already uses that email or participant.",
+  VOLUNTEER_NOT_FOUND: "We couldn't find that volunteer account.",
+  INVALID_STAFF_NAME: "Enter a name for this staff account.",
 } as const;
 
 export type AdminErrorCode = keyof typeof ADMIN_ERROR_MESSAGES;
