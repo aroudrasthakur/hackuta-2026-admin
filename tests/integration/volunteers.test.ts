@@ -158,7 +158,10 @@ describe("promoteParticipantToVolunteer", () => {
       user: await ctx.db.get(userId),
     }))).toEqual(before);
     expect(await t.run((ctx) => ctx.db.query("authAccounts").collect())).toEqual([]);
-    expect((await configLogs(t)).at(-1)).toMatchObject({ action: "volunteer_created", targetParticipantId: participantId });
+    expect((await configLogs(t)).at(-1)).toMatchObject({
+      action: "volunteer_promoted", actorAdminId: actor.adminId, targetAdminId: result.adminId, targetParticipantId: participantId,
+      details: JSON.stringify({ after: { canCheckIn: false, canFoodCheckIn: true, active: true } }),
+    });
     expect((await signInOrganizer(t, "taylor@example.com")).ok).toBe(true);
   });
 
@@ -454,7 +457,7 @@ describe("audit log queries", () => {
 
     const all = await t.query(volunteers.listStaffConfigLogs, { sessionToken: actor.sessionToken, paginationOpts: page });
     expect(all.page.map((row) => row.action)).toEqual([
-      "event_updated", "volunteer_created", "volunteer_created", "volunteer_revoked", "volunteer_event_access_updated", "volunteer_created",
+      "event_updated", "volunteer_promoted", "volunteer_created", "volunteer_revoked", "volunteer_event_access_updated", "volunteer_created",
     ]);
     expect(all.page[0]).toMatchObject({ target: null, event: { eventId, name: "Workshop" }, participant: null, details: null });
     expect(all.page[1]).toMatchObject({ participant: { participantId, name: "Taylor Student" } });
@@ -468,6 +471,10 @@ describe("audit log queries", () => {
       sessionToken: actor.sessionToken, paginationOpts: page, action: "volunteer_revoked",
     });
     expect(revocations.page).toHaveLength(1);
+    const promotions = await t.query(volunteers.listStaffConfigLogs, {
+      sessionToken: actor.sessionToken, paginationOpts: page, action: "volunteer_promoted",
+    });
+    expect(promotions.page).toMatchObject([{ action: "volunteer_promoted", participant: { participantId } }]);
     await expectAdminErrorCode(t.query(volunteers.listStaffConfigLogs, {
       sessionToken: actor.sessionToken, paginationOpts: page, from: Number.NaN,
     }), "INVALID_LOG_FILTER");
