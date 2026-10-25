@@ -2,6 +2,7 @@ import { anyApi, type ApiFromModules } from "convex/server";
 import type { GenericId } from "convex/values";
 import { describe, expect, it, vi } from "vitest";
 import type * as volunteersModule from "../../convex/admin/volunteers";
+import type * as participantsAdminModule from "../../convex/admin/participantsAdmin";
 import type * as staffAuth from "../../convex/admin/auth";
 import { verifyPassword } from "../../convex/admin/passwordHash";
 import { MAX_VOLUNTEER_EVENTS } from "../../convex/admin/volunteers";
@@ -15,8 +16,9 @@ import {
   requireVolunteerAccess, requireVolunteerCapability, requireVolunteerEventAccess,
 } from "../../convex/admin/staffAuth";
 
-const { volunteers, auth } = (anyApi as ApiFromModules<{
+const { volunteers, participantsAdmin, auth } = (anyApi as ApiFromModules<{
   "admin/volunteers": typeof volunteersModule;
+  "admin/participantsAdmin": typeof participantsAdminModule;
   "admin/auth": typeof staffAuth;
 }>).admin;
 
@@ -145,7 +147,7 @@ describe("promoteParticipantToVolunteer", () => {
       application: await ctx.db.get(applicationId),
       user: await ctx.db.get(userId),
     }));
-    const result = await t.mutation(volunteers.promoteParticipantToVolunteer, {
+    const result = await t.mutation(participantsAdmin.promoteParticipantToVolunteer, {
       sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD, canFoodCheckIn: true,
     });
     expect(result).toMatchObject({ ok: true, email: "taylor@example.com" });
@@ -168,7 +170,7 @@ describe("promoteParticipantToVolunteer", () => {
   it("accepts an explicit email and name", async () => {
     const { t, actor } = await fixture();
     const { participantId } = await seedParticipant(t, actor.adminId);
-    const result = await t.mutation(volunteers.promoteParticipantToVolunteer, {
+    const result = await t.mutation(participantsAdmin.promoteParticipantToVolunteer, {
       sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD,
       email: " Staff.Taylor@HackUTA.org ", name: " T. Student ",
     });
@@ -178,7 +180,7 @@ describe("promoteParticipantToVolunteer", () => {
   it("rejects duplicate links, taken emails, and ineligible or missing participants without writes", async () => {
     const { t, actor } = await fixture();
     const { participantId } = await seedParticipant(t, actor.adminId);
-    const promote = (extra: Record<string, unknown> = {}) => t.mutation(volunteers.promoteParticipantToVolunteer, {
+    const promote = (extra: Record<string, unknown> = {}) => t.mutation(participantsAdmin.promoteParticipantToVolunteer, {
       sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD, ...extra,
     });
 
@@ -195,11 +197,11 @@ describe("promoteParticipantToVolunteer", () => {
     expect(await snapshot(t)).toEqual(before);
 
     const other = await seedParticipant(t, actor.adminId, "rejected");
-    await expectAdminErrorCode(t.mutation(volunteers.promoteParticipantToVolunteer, {
+    await expectAdminErrorCode(t.mutation(participantsAdmin.promoteParticipantToVolunteer, {
       sessionToken: actor.sessionToken, participantId: other.participantId, password: ORGANIZER_TEST_PASSWORD, email: "x@hackuta.org",
     }), "PARTICIPANT_NOT_ELIGIBLE");
     await t.run((ctx) => ctx.db.delete(other.participantId));
-    await expectAdminErrorCode(t.mutation(volunteers.promoteParticipantToVolunteer, {
+    await expectAdminErrorCode(t.mutation(participantsAdmin.promoteParticipantToVolunteer, {
       sessionToken: actor.sessionToken, participantId: other.participantId, password: ORGANIZER_TEST_PASSWORD, email: "y@hackuta.org",
     }), "PARTICIPANT_NOT_FOUND");
   });
@@ -219,7 +221,7 @@ describe("listVolunteers", () => {
   it("paginates volunteers with status, capabilities, events, and participant link only", async () => {
     const { t, actor, target, eventId } = await managedFixture();
     const { participantId } = await seedParticipant(t, actor.adminId);
-    await t.mutation(volunteers.promoteParticipantToVolunteer, {
+    await t.mutation(participantsAdmin.promoteParticipantToVolunteer, {
       sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD,
     });
     await t.mutation(volunteers.setVolunteerEventAccess, { ...target, eventIds: [eventId] });
@@ -452,7 +454,7 @@ describe("audit log queries", () => {
     await t.mutation(volunteers.revokeVolunteer, target);
     await t.mutation(volunteers.createVolunteer, { sessionToken: actor.sessionToken, email: "other@hackuta.org", name: "Other", password: ORGANIZER_TEST_PASSWORD, canCheckIn: false, canFoodCheckIn: false });
     const { participantId } = await seedParticipant(t, actor.adminId);
-    await t.mutation(volunteers.promoteParticipantToVolunteer, { sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD });
+    await t.mutation(participantsAdmin.promoteParticipantToVolunteer, { sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD });
     await t.run((ctx) => ctx.db.insert("staffConfigLogs", { actorAdminId: actor.adminId, action: "event_updated", targetEventId: eventId, createdAt: Date.now() + 1 }));
 
     const all = await t.query(volunteers.listStaffConfigLogs, { sessionToken: actor.sessionToken, paginationOpts: page });
