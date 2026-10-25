@@ -12,7 +12,7 @@ let staffCounter = 0;
 /** Inserts one staff account with a full-length session. Skips password hashing to stay fast. */
 export async function seedStaff(
   t: ConvexTestInstance,
-  fields: { role?: StaffRole; active?: boolean; name?: string } = {},
+  fields: { role?: StaffRole; active?: boolean; name?: string; expiresAt?: number } = {},
 ) {
   staffCounter += 1;
   const n = staffCounter;
@@ -26,12 +26,12 @@ export async function seedStaff(
       updatedAt: 1,
     }),
   );
-  const { sessionToken } = await insertStaffSession(t, {
+  const { sessionId, sessionToken } = await insertStaffSession(t, {
     adminId,
     sessionToken: n.toString(16).padStart(64, "0"),
-    expiresAt: Date.now() + ADMIN_SESSION_TTL_MS,
+    expiresAt: fields.expiresAt ?? Date.now() + ADMIN_SESSION_TTL_MS,
   });
-  return { adminId, sessionToken };
+  return { adminId, sessionId, sessionToken };
 }
 
 /** A full submitted application, so data-integrity checks compare real answers. */

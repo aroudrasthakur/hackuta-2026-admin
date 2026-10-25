@@ -5,7 +5,7 @@ import { isValidEmailSyntax, normalizeEmail } from "../lib/normalizeEmail";
 import { adminError } from "../../shared/admin/errors";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { requireEligibleParticipant } from "./pointsLedger";
-import { newVolunteerFields, requireAdminRole, sessionTokenArgs } from "./staffAuth";
+import { newVolunteerFields, requireAdminRole, sessionTokenArgs, volunteerCapabilities } from "./staffAuth";
 import { setStaffPassword } from "./staffCredentials";
 import { invalidateAdminSessions } from "./sessionLifecycle";
 import { buildStaffConfigDetails } from "../../shared/admin/volunteerRules";
@@ -72,8 +72,7 @@ export const listVolunteers = query({
     return volunteers.map((volunteer) => ({
       adminId: volunteer._id, email: volunteer.email, name: volunteer.name,
       active: volunteer.active, participantId: volunteer.participantId,
-      canCheckIn: volunteer.canCheckIn === true,
-      canFoodCheckIn: volunteer.canFoodCheckIn === true,
+      ...volunteerCapabilities(volunteer),
     }));
   },
 });
@@ -93,34 +92,27 @@ export const resetVolunteerPassword = mutation({
   },
 });
 
-async function setVolunteerActive(
-  ctx: MutationCtx, sessionToken: string, volunteerAdminId: GenericId<"admins">, active: boolean,
-) {
-  const actor = await requireAdminRole(ctx, sessionToken);
-  await requireVolunteerAccount(ctx, volunteerAdminId);
-  await ctx.db.patch(volunteerAdminId, { active, updatedAt: Date.now() });
-  // Clear sessions on both paths: restoration can never resurrect an old login.
-  await invalidateAdminSessions(ctx, volunteerAdminId);
-  await ctx.db.insert("staffConfigLogs", {
-    actorAdminId: actor._id, action: active ? "volunteer_restored" : "volunteer_revoked",
-    targetAdminId: volunteerAdminId, createdAt: Date.now(),
+function volunteerActiveMutation(active: boolean) {
+  return mutation({
+    args: volunteerArgs,
+    returns: okResult,
+    handler: async (ctx, { sessionToken, volunteerAdminId }) => {
+      const actor = await requireAdminRole(ctx, sessionToken);
+      await requireVolunteerAccount(ctx, volunteerAdminId);
+      await ctx.db.patch(volunteerAdminId, { active, updatedAt: Date.now() });
+      // Clear sessions on both paths: restoration can never resurrect an old login.
+      await invalidateAdminSessions(ctx, volunteerAdminId);
+      await ctx.db.insert("staffConfigLogs", {
+        actorAdminId: actor._id, action: active ? "volunteer_restored" : "volunteer_revoked",
+        targetAdminId: volunteerAdminId, createdAt: Date.now(),
+      });
+      return { ok: true as const };
+    },
   });
-  return { ok: true as const };
 }
 
-export const revokeVolunteer = mutation({
-  args: volunteerArgs,
-  returns: okResult,
-  handler: (ctx, { sessionToken, volunteerAdminId }) =>
-    setVolunteerActive(ctx, sessionToken, volunteerAdminId, false),
-});
-
-export const restoreVolunteer = mutation({
-  args: volunteerArgs,
-  returns: okResult,
-  handler: (ctx, { sessionToken, volunteerAdminId }) =>
-    setVolunteerActive(ctx, sessionToken, volunteerAdminId, true),
-});
+export const revokeVolunteer = volunteerActiveMutation(false);
+export const restoreVolunteer = volunteerActiveMutation(true);
 
 export const updateVolunteerCapabilities = mutation({
   args: { ...volunteerArgs, canCheckIn: v.boolean(), canFoodCheckIn: v.boolean() },

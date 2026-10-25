@@ -10,8 +10,8 @@ import {
 } from "../../convex/admin/staffAuth";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest } from "../helpers/convexTestContext";
+import { seedStaff } from "../helpers/reviewTestKit";
 import {
-  insertStaffSession,
   seedAdminAccount,
   signInOrganizer,
 } from "../helpers/staffTestFixtures";
@@ -62,17 +62,7 @@ describe("volunteer capabilities", () => {
 describe("volunteer session guards", () => {
   it("rejects volunteers from reviewer and admin operations", async () => {
     const t = createConvexTest();
-    const volunteerId = await t.run((ctx) =>
-      ctx.db.insert("admins", {
-        email: "volunteer@hackuta.org",
-        name: "Volunteer",
-        active: true,
-        createdAt: 1,
-        updatedAt: 1,
-        ...newVolunteerFields(),
-      }),
-    );
-    const { sessionToken } = await insertStaffSession(t, { adminId: volunteerId });
+    const { sessionToken } = await seedStaff(t, { role: "volunteer" });
 
     await expectAdminErrorCode(
       t.run((ctx) => requireReviewerAccess(ctx, sessionToken)),
@@ -86,28 +76,8 @@ describe("volunteer session guards", () => {
 
   it("rejects reviewers, admins, and signed-out callers from volunteer operations", async () => {
     const t = createConvexTest();
-    const reviewerId = await t.run((ctx) =>
-      ctx.db.insert("admins", {
-        email: "reviewer@hackuta.org",
-        name: "Reviewer",
-        role: "reviewer",
-        active: true,
-        createdAt: 1,
-        updatedAt: 1,
-      }),
-    );
-    const adminId = await t.run((ctx) =>
-      ctx.db.insert("admins", {
-        email: "admin@hackuta.org",
-        name: "Admin",
-        role: "admin",
-        active: true,
-        createdAt: 1,
-        updatedAt: 1,
-      }),
-    );
-    const reviewer = await insertStaffSession(t, { adminId: reviewerId, sessionToken: "r".repeat(64) });
-    const admin = await insertStaffSession(t, { adminId, sessionToken: "d".repeat(64) });
+    const reviewer = await seedStaff(t, { role: "reviewer" });
+    const admin = await seedStaff(t, { role: "admin" });
 
     await expectAdminErrorCode(
       t.run((ctx) => requireVolunteerAccess(ctx, reviewer.sessionToken)),
@@ -125,17 +95,7 @@ describe("volunteer session guards", () => {
 
   it("requires an explicit true capability on an active volunteer", async () => {
     const t = createConvexTest();
-    const volunteerId = await t.run((ctx) =>
-      ctx.db.insert("admins", {
-        email: "scanner@hackuta.org",
-        name: "Scanner",
-        active: true,
-        createdAt: 1,
-        updatedAt: 1,
-        role: "volunteer" as const,
-      }),
-    );
-    const { sessionToken } = await insertStaffSession(t, { adminId: volunteerId });
+    const { adminId: volunteerId, sessionToken } = await seedStaff(t, { role: "volunteer" });
 
     await expectAdminErrorCode(
       t.run((ctx) => requireVolunteerCapability(ctx, sessionToken, "canCheckIn")),
@@ -166,12 +126,8 @@ describe("volunteer session guards", () => {
   it.each(["invalid", "expired", "revoked", "orphaned"] as const)(
     "rejects a volunteer with an %s session", async (condition) => {
       const t = createConvexTest();
-      const adminId = await t.run((ctx) => ctx.db.insert("admins", {
-        email: "session@hackuta.org", name: "Volunteer", active: true,
-        createdAt: 1, updatedAt: 1, ...newVolunteerFields(),
-      }));
-      const { sessionId, sessionToken } = await insertStaffSession(t, {
-        adminId, expiresAt: condition === "expired" ? Date.now() - 1 : undefined,
+      const { adminId, sessionId, sessionToken } = await seedStaff(t, {
+        role: "volunteer", expiresAt: condition === "expired" ? Date.now() - 1 : undefined,
       });
       if (condition === "revoked") await t.run((ctx) => ctx.db.delete(sessionId));
       if (condition === "orphaned") await t.run((ctx) => ctx.db.delete(adminId));
@@ -186,11 +142,7 @@ describe("volunteer session guards", () => {
 describe("volunteer event authorization", () => {
   async function fixture() {
     const t = createConvexTest();
-    const adminId = await t.run((ctx) => ctx.db.insert("admins", {
-      email: "event@hackuta.org", name: "Volunteer", active: true,
-      createdAt: 1, updatedAt: 1, ...newVolunteerFields(),
-    }));
-    const { sessionToken } = await insertStaffSession(t, { adminId });
+    const { adminId, sessionToken } = await seedStaff(t, { role: "volunteer" });
     const startsAt = Date.now() - 1000;
     const endsAt = Date.now() + 10_000;
     const eventId = await t.run((ctx) => ctx.db.insert("events", {
