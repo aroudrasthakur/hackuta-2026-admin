@@ -1,11 +1,23 @@
-import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { v, type GenericId } from "convex/values";
+import { mutation, query } from "../_generated/server";
+import type { MutationCtx } from "../lib/dataModel";
 import { isValidEmailSyntax, normalizeEmail } from "../lib/normalizeEmail";
 import { adminError } from "../../shared/admin/errors";
 import { validatePasswordRequirements } from "../../shared/auth/password";
 import { requireEligibleParticipant } from "./pointsLedger";
 import { newVolunteerFields, requireAdminRole, sessionTokenArgs } from "./staffAuth";
 import { setStaffPassword } from "./staffCredentials";
+import { invalidateAdminSessions } from "./sessionLifecycle";
+import { buildStaffConfigDetails } from "../../shared/admin/volunteerRules";
+
+const volunteerArgs = { ...sessionTokenArgs, volunteerAdminId: v.id("admins") };
+const okResult = v.object({ ok: v.literal(true) });
+
+async function requireVolunteerAccount(ctx: MutationCtx, adminId: GenericId<"admins">) {
+  const volunteer = await ctx.db.get(adminId);
+  if (!volunteer || volunteer.role !== "volunteer") throw adminError("VOLUNTEER_NOT_FOUND");
+  return volunteer;
+}
 
 /** A new, distinct staff identity; existing staff accounts are never converted. */
 export const createVolunteer = mutation({
@@ -47,5 +59,108 @@ export const createVolunteer = mutation({
       createdAt: now,
     });
     return { ok: true as const, adminId, email: normalizedEmail };
+  },
+});
+
+/** Only administrators can enumerate volunteer staff; credentials are never returned. */
+export const listVolunteers = query({
+  args: sessionTokenArgs,
+  handler: async (ctx, { sessionToken }) => {
+    await requireAdminRole(ctx, sessionToken);
+    const volunteers = await ctx.db.query("admins")
+      .withIndex("by_role", (q) => q.eq("role", "volunteer")).collect();
+    return volunteers.map((volunteer) => ({
+      adminId: volunteer._id, email: volunteer.email, name: volunteer.name,
+      active: volunteer.active, participantId: volunteer.participantId,
+      canCheckIn: volunteer.canCheckIn === true,
+      canFoodCheckIn: volunteer.canFoodCheckIn === true,
+    }));
+  },
+});
+
+export const resetVolunteerPassword = mutation({
+  args: { ...volunteerArgs, password: v.string() },
+  returns: okResult,
+  handler: async (ctx, { sessionToken, volunteerAdminId, password }) => {
+    const actor = await requireAdminRole(ctx, sessionToken);
+    await requireVolunteerAccount(ctx, volunteerAdminId);
+    await setStaffPassword(ctx, volunteerAdminId, password);
+    await ctx.db.insert("staffConfigLogs", {
+      actorAdminId: actor._id, action: "volunteer_password_reset",
+      targetAdminId: volunteerAdminId, createdAt: Date.now(),
+    });
+    return { ok: true as const };
+  },
+});
+
+async function setVolunteerActive(
+  ctx: MutationCtx, sessionToken: string, volunteerAdminId: GenericId<"admins">, active: boolean,
+) {
+  const actor = await requireAdminRole(ctx, sessionToken);
+  await requireVolunteerAccount(ctx, volunteerAdminId);
+  await ctx.db.patch(volunteerAdminId, { active, updatedAt: Date.now() });
+  // Clear sessions on both paths: restoration can never resurrect an old login.
+  await invalidateAdminSessions(ctx, volunteerAdminId);
+  await ctx.db.insert("staffConfigLogs", {
+    actorAdminId: actor._id, action: active ? "volunteer_restored" : "volunteer_revoked",
+    targetAdminId: volunteerAdminId, createdAt: Date.now(),
+  });
+  return { ok: true as const };
+}
+
+export const revokeVolunteer = mutation({
+  args: volunteerArgs,
+  returns: okResult,
+  handler: (ctx, { sessionToken, volunteerAdminId }) =>
+    setVolunteerActive(ctx, sessionToken, volunteerAdminId, false),
+});
+
+export const restoreVolunteer = mutation({
+  args: volunteerArgs,
+  returns: okResult,
+  handler: (ctx, { sessionToken, volunteerAdminId }) =>
+    setVolunteerActive(ctx, sessionToken, volunteerAdminId, true),
+});
+
+export const updateVolunteerCapabilities = mutation({
+  args: { ...volunteerArgs, canCheckIn: v.boolean(), canFoodCheckIn: v.boolean() },
+  returns: okResult,
+  handler: async (ctx, { sessionToken, volunteerAdminId, canCheckIn, canFoodCheckIn }) => {
+    const actor = await requireAdminRole(ctx, sessionToken);
+    await requireVolunteerAccount(ctx, volunteerAdminId);
+    await ctx.db.patch(volunteerAdminId, { canCheckIn, canFoodCheckIn, updatedAt: Date.now() });
+    await ctx.db.insert("staffConfigLogs", {
+      actorAdminId: actor._id, action: "volunteer_capabilities_updated", targetAdminId: volunteerAdminId,
+      details: buildStaffConfigDetails({ canCheckIn, canFoodCheckIn }), createdAt: Date.now(),
+    });
+    return { ok: true as const };
+  },
+});
+
+/** Assignment existence is the permission. Convex indexes alone do not enforce uniqueness. */
+export const setVolunteerEventAccess = mutation({
+  args: { ...volunteerArgs, eventId: v.id("events"), granted: v.boolean() },
+  returns: okResult,
+  handler: async (ctx, { sessionToken, volunteerAdminId, eventId, granted }) => {
+    const actor = await requireAdminRole(ctx, sessionToken);
+    const volunteer = await requireVolunteerAccount(ctx, volunteerAdminId);
+    if (granted && !volunteer.active) throw adminError("ACCOUNT_INACTIVE");
+    if (!await ctx.db.get(eventId)) throw adminError("EVENT_NOT_FOUND");
+    const assignments = await ctx.db.query("volunteerEventAccess")
+      .withIndex("by_volunteer_event", (q) => q.eq("volunteerAdminId", volunteerAdminId).eq("eventId", eventId))
+      .collect();
+    if (granted && assignments.length === 0) {
+      await ctx.db.insert("volunteerEventAccess", {
+        volunteerAdminId, eventId, grantedBy: actor._id, createdAt: Date.now(),
+      });
+    } else if (!granted) {
+      for (const assignment of assignments) await ctx.db.delete(assignment._id);
+    }
+    await ctx.db.insert("staffConfigLogs", {
+      actorAdminId: actor._id, action: "volunteer_event_access_updated",
+      targetAdminId: volunteerAdminId, targetEventId: eventId,
+      details: buildStaffConfigDetails({ eventIds: granted ? [eventId] : [] }), createdAt: Date.now(),
+    });
+    return { ok: true as const };
   },
 });
