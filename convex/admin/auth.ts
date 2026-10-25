@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "../_generated/server";
 import {
+  ADMIN_SIGN_IN_ACCOUNT_FAILURE_BUCKET,
   ADMIN_SIGN_IN_CLIENT_IP_MAX_LENGTH,
   buildAdminSignInRateLimitKey,
   clearAdminSignInFailures,
@@ -66,7 +67,11 @@ export const signIn = mutation({
       return signInFailure("INVALID_CREDENTIALS");
     }
 
-    if (await isAdminSignInRateLimited(ctx, rateLimitKey)) {
+    // The public caller controls clientIp, so it cannot be the only throttle.
+    if (
+      await isAdminSignInRateLimited(ctx, normalizedEmail, ADMIN_SIGN_IN_ACCOUNT_FAILURE_BUCKET) ||
+      await isAdminSignInRateLimited(ctx, rateLimitKey)
+    ) {
       return signInFailure("SIGN_IN_RATE_LIMITED");
     }
 
@@ -88,6 +93,7 @@ export const signIn = mutation({
     );
 
     if (!admin || !authAccount || !valid) {
+      await recordFailedAdminSignIn(ctx, normalizedEmail, ADMIN_SIGN_IN_ACCOUNT_FAILURE_BUCKET);
       await recordFailedAdminSignIn(ctx, rateLimitKey);
       return signInFailure("INVALID_CREDENTIALS");
     }
@@ -96,6 +102,7 @@ export const signIn = mutation({
       return signInFailure("ACCOUNT_INACTIVE");
     }
 
+    await clearAdminSignInFailures(ctx, normalizedEmail, ADMIN_SIGN_IN_ACCOUNT_FAILURE_BUCKET);
     await clearAdminSignInFailures(ctx, rateLimitKey);
     const session = await createAdminSession(ctx, admin._id);
     return {

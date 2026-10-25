@@ -216,19 +216,23 @@ describe("volunteer event authorization", () => {
     await expectAdminErrorCode(check(), "EVENT_ACCESS_DENIED");
   });
 
-  it("rejects inactive, missing, upcoming, and ended events", async () => {
+  it("permits assigned active events before, during, and after their reference schedule", async () => {
     const { t, adminId, eventId, startsAt, endsAt, check } = await fixture();
     await t.run((ctx) => ctx.db.insert("volunteerEventAccess", {
       volunteerAdminId: adminId, eventId, grantedBy: adminId, createdAt: 1,
     }));
     vi.useFakeTimers();
-    vi.setSystemTime(startsAt - 1);
-    await expectAdminErrorCode(check(), "EVENT_OUTSIDE_WINDOW");
-    vi.setSystemTime(startsAt);
-    expect((await check()).event._id).toBe(eventId);
-    vi.setSystemTime(endsAt);
-    await expectAdminErrorCode(check(), "EVENT_OUTSIDE_WINDOW");
-    vi.setSystemTime(startsAt);
+    for (const now of [startsAt - 1, startsAt, endsAt, endsAt + 1]) {
+      vi.setSystemTime(now);
+      expect((await check()).event._id).toBe(eventId);
+    }
+  });
+
+  it("rejects inactive and missing events even with an assignment", async () => {
+    const { t, adminId, eventId, check } = await fixture();
+    await t.run((ctx) => ctx.db.insert("volunteerEventAccess", {
+      volunteerAdminId: adminId, eventId, grantedBy: adminId, createdAt: 1,
+    }));
     await t.run((ctx) => ctx.db.patch(eventId, { active: false }));
     await expectAdminErrorCode(check(), "EVENT_INACTIVE");
     await t.run((ctx) => ctx.db.delete(eventId));

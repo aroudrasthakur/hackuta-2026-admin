@@ -155,10 +155,5 @@ export async function requireVolunteerEventAccess(
   if (!event.active) {
     throw adminError("EVENT_INACTIVE");
   }
-  const now = Date.now();
-  if (!Number.isFinite(event.startsAt) || !Number.isFinite(event.endsAt) ||
-      now < event.startsAt || now >= event.endsAt) {
-    throw adminError("EVENT_OUTSIDE_WINDOW");
-  }
   return { volunteer, event };
 }

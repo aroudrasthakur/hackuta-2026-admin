@@ -120,7 +120,7 @@ describe("organizer auth boundary", () => {
     });
   });
 
-  it("rate-limits per IP and email so another IP can still attempt the same account", async () => {
+  it("preserves legacy IP/email lockouts recorded before account-wide throttling", async () => {
     const t = createTest();
     await seedAdminAccount(t, { email: "limited@hackuta.org", role: "admin", active: true });
     await seedAdminSignInFailures(t, "limited@hackuta.org", 5, "203.0.113.10");

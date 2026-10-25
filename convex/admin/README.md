@@ -39,13 +39,15 @@ Protected queries and mutations accept `sessionToken`. The helpers take `(ctx, s
 - `requireAdminRole` allows only active admins; historical review log queries use it.
 - `requireVolunteerAccess` allows only active volunteers; admins and reviewers cannot act as volunteers.
 - `requireVolunteerCapability` checks an explicit `true` for `canCheckIn` or `canFoodCheckIn` on each request.
-- `requireVolunteerEventAccess` checks the caller's own assignment and an active event within `[startsAt, endsAt)`. Removing an assignment takes effect on the next request.
+- `requireVolunteerEventAccess` checks the caller's own assignment and an active event. Schedule times are reference only. Removing an assignment takes effect on the next request.
 
 Each protected request resolves the current stored role and active status. Acting identity always comes from the returned `admin._id`, including `applicationReviews.reviewedBy`, `applicationReviewLogs.adminId`, and `participants.acceptedBy`; public operations never accept an acting admin ID or role. Applicant authentication cannot satisfy these guards.
 
 Application decisions require a submitted application, even if a draft already has a review row. Both the submission flag and legacy submission timestamp are supported. Draft rejection leaves the application, review, audit logs, and participants unchanged.
 
 The SPA obtains the token from `/api/admin/session-token`, which reads an HttpOnly cookie set by `/api/admin/sign-in`. Sign-in clears any prior sessions for that admin. These functions use the existing `standing-manatee-425` deployment configured in `.env.example`.
+
+Sign-in permits five failed attempts per normalized email within 15 minutes, across all callers. This account-wide counter prevents direct Convex callers from bypassing throttling by changing or omitting `clientIp`. The existing IP/email counter remains enforced, including previously recorded failures. Successful sign-in clears the account counter and the current IP/email counter; failures outside the window no longer count.
 
 ## Volunteer accounts and authorization audit (#59)
 
