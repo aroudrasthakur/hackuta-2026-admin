@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, type GenericId } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../lib/dataModel";
 import { sha256Hex } from "../lib/sha256Hex";
 import { adminError } from "../../shared/admin/errors";
@@ -105,7 +105,7 @@ export function newVolunteerFields() {
 }
 
 /** Active volunteer session. Reviewers and admins are rejected. */
-export async function requireVolunteer(
+export async function requireVolunteerAccess(
   ctx: QueryCtx | MutationCtx,
   sessionToken: string,
 ) {
@@ -125,9 +125,40 @@ export async function requireVolunteerCapability(
   sessionToken: string,
   capability: VolunteerCapability,
 ) {
-  const admin = await requireVolunteer(ctx, sessionToken);
+  const admin = await requireVolunteerAccess(ctx, sessionToken);
   if (!volunteerCapabilities(admin)[capability]) {
     throw adminError("CAPABILITY_DENIED");
   }
   return admin;
+}
+
+/** Checks the current assignment and event immediately before an event operation. */
+export async function requireVolunteerEventAccess(
+  ctx: QueryCtx | MutationCtx,
+  sessionToken: string,
+  eventId: GenericId<"events">,
+) {
+  const volunteer = await requireVolunteerAccess(ctx, sessionToken);
+  const assignment = await ctx.db
+    .query("volunteerEventAccess")
+    .withIndex("by_volunteer_event", (q) =>
+      q.eq("volunteerAdminId", volunteer._id).eq("eventId", eventId),
+    )
+    .unique();
+  if (!assignment) {
+    throw adminError("EVENT_ACCESS_DENIED");
+  }
+  const event = await ctx.db.get(eventId);
+  if (!event) {
+    throw adminError("EVENT_NOT_FOUND");
+  }
+  if (!event.active) {
+    throw adminError("EVENT_INACTIVE");
+  }
+  const now = Date.now();
+  if (!Number.isFinite(event.startsAt) || !Number.isFinite(event.endsAt) ||
+      now < event.startsAt || now >= event.endsAt) {
+    throw adminError("EVENT_OUTSIDE_WINDOW");
+  }
+  return { volunteer, event };
 }
