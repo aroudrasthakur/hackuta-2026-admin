@@ -1,7 +1,37 @@
 import { test, expect } from "@playwright/test";
 import { E2E_REVIEWER, signInOrganizer, signOutOrganizer } from "./fixtures/auth";
+import { E2E_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 
 test.describe("organizer authentication", () => {
+  async function signInVolunteer(page: import("@playwright/test").Page) {
+    await page.goto("/admin/login");
+    await page.getByLabel("Email").fill(E2E_VOLUNTEER.email);
+    await page.getByLabel("Password", { exact: true }).fill(E2E_VOLUNTEER.password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/volunteer$/);
+    await expect(page.getByRole("heading", { name: "Volunteer access" })).toBeVisible();
+  }
+
+  test("keeps volunteer sessions out of review pages and permits signing out", async ({ page }) => {
+    await signInVolunteer(page);
+    await expect(page.locator("dd")).toHaveText(["Enabled", "Not assigned"]);
+    await expect(page.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
+    for (const path of ["/admin/applications", "/admin/decision-emails", "/admin/applications/e2e-app-unreviewed"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/volunteer$/);
+      await expect(page.getByRole("heading", { name: "Volunteer access" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
+    }
+    await signOutOrganizer(page);
+  });
+
+  test("returns an idle volunteer session to login when it expires", async ({ page }) => {
+    await page.clock.install();
+    await signInVolunteer(page);
+    await page.clock.fastForward(24 * 60 * 60 * 1000 + 1000);
+    await expect(page).toHaveURL(/\/admin\/login$/);
+    await expect(page.getByRole("alert")).toHaveText("Your session has expired. Please sign in again.");
+  });
   test("redirects unauthenticated users to login", async ({ page }) => {
     await page.goto("/admin/applications");
     await expect(page).toHaveURL(/\/admin\/login$/);

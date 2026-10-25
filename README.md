@@ -13,6 +13,7 @@ Vite, React 19, TypeScript, React Router, Convex, Tailwind CSS v4.
 | Path | Purpose |
 | --- | --- |
 | `/admin/login` | Organizer sign-in |
+| `/volunteer` | Volunteer access and account controls |
 | `/admin/applications` | Submitted application queue |
 | `/admin/applications/:id` | Application review, decisions, history (admin) |
 
