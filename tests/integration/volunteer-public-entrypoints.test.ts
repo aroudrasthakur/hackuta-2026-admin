@@ -34,9 +34,13 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "decisionEmailQueue.ts", exportName: "retryFailedDecisionEmails", guard: "requireAdminRole" },
   { file: "auth.ts", exportName: "createAndProvisionAdmin", guard: "requireAdminRole" },
   ...[
-    "createVolunteer", "promoteParticipantToVolunteer", "listVolunteers", "resetVolunteerPassword",
+    "createVolunteer", "listVolunteers", "resetVolunteerPassword",
     "setVolunteerCapabilities", "setVolunteerEventAccess", "listVolunteerActionLogs", "listStaffConfigLogs",
   ].map((exportName) => ({ file: "volunteers.ts", exportName, guard: "requireAdminRole" })),
+  ...[
+    "listParticipants", "getParticipantDetails", "setParticipantPoints",
+    "listPointAdjustments", "promoteParticipantToVolunteer",
+  ].map((exportName) => ({ file: "participantsAdmin.ts", exportName, guard: "requireAdminRole" })),
   ...["revokeVolunteer", "restoreVolunteer"].map((exportName) => ({
     file: "volunteers.ts", exportName, guard: "volunteerActiveMutation",
   })),
@@ -76,7 +80,10 @@ describe("volunteer authorization contract (public entry points)", () => {
   });
 
   it("keeps participant and ledger modules off the public Convex API", () => {
-    for (const file of ["participants.ts", "pointsLedger.ts", "pointsBackfill.ts"]) {
+    for (const file of [
+      "participants.ts", "pointsLedger.ts", "pointsBackfill.ts",
+      "volunteerProvisioning.ts", "adminQueryHelpers.ts",
+    ]) {
       const source = readFileSync(join(adminDir, file), "utf8");
       expect(source).not.toMatch(/export const \w+ = (mutation|query|action)\(/);
     }
@@ -89,6 +96,7 @@ describe("volunteer authorization contract (public entry points)", () => {
       "auth.ts",
       "volunteers.ts",
       "volunteerScan.ts",
+      "participantsAdmin.ts",
     ];
     for (const file of files) {
       const source = readFileSync(join(adminDir, file), "utf8");

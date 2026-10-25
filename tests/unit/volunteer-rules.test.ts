@@ -48,11 +48,13 @@ describe("point amounts", () => {
     expect(normalizeAdjustmentReason("x".repeat(ADJUSTMENT_REASON_MAX_LENGTH))).toHaveLength(
       ADJUSTMENT_REASON_MAX_LENGTH,
     );
-    expect(errorCode(() => normalizeAdjustmentReason("   "))).toBe("INVALID_POINTS");
+    expect(errorCode(() => normalizeAdjustmentReason("   "))).toBe("INVALID_ADJUSTMENT_REASON");
     expect(errorCode(() => normalizeAdjustmentReason("x".repeat(ADJUSTMENT_REASON_MAX_LENGTH + 1)))).toBe(
-      "INVALID_POINTS",
+      "INVALID_ADJUSTMENT_REASON",
     );
-    expect(errorCode(() => normalizeAdjustmentReason(4 as unknown as string))).toBe("INVALID_POINTS");
+    expect(errorCode(() => normalizeAdjustmentReason(4 as unknown as string))).toBe(
+      "INVALID_ADJUSTMENT_REASON",
+    );
   });
 });
 
