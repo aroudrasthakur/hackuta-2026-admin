@@ -129,7 +129,13 @@ export const updateVolunteerCapabilities = mutation({
   },
 });
 
-/** Assignment existence is the permission. Convex indexes alone do not enforce uniqueness. */
+/**
+ * Grants or revokes event assignment rows. Assignment existence is the permission.
+ *
+ * Invariant: revoking (`granted: false`) deletes rows immediately; the volunteer
+ * loses access on the next scan because `requireVolunteerEventAccess` re-queries
+ * the index every time (no cached grants in sessions).
+ */
 export const setVolunteerEventAccess = mutation({
   args: { ...volunteerArgs, eventId: v.id("events"), granted: v.boolean() },
   returns: okResult,

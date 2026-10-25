@@ -1,3 +1,11 @@
+/**
+ * Staff session resolution and role guards.
+ *
+ * **Authorization contract:** [VOLUNTEER_AUTHORIZATION.md](./VOLUNTEER_AUTHORIZATION.md)
+ *
+ * UI route redirects are not security. Every public Convex handler that touches
+ * participant, event, or point data must call the appropriate guard here first.
+ */
 import { v, type GenericId } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../lib/dataModel";
 import { sha256Hex } from "../lib/sha256Hex";
@@ -132,7 +140,14 @@ export async function requireVolunteerCapability(
   return admin;
 }
 
-/** Checks the current assignment and event immediately before an event operation. */
+/**
+ * Checks the volunteer's **current** assignment and an active event immediately
+ * before a point-scan (or similar) operation.
+ *
+ * Invariant: deleting `volunteerEventAccess` takes effect on the next request;
+ * there is no session cache of assignments. Schedule fields on `events` are not
+ * checked here (reference only).
+ */
 export async function requireVolunteerEventAccess(
   ctx: QueryCtx | MutationCtx,
   sessionToken: string,

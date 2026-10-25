@@ -7,7 +7,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | Path | Summary |
 | --- | --- |
 | [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
-| [staffAuth.ts](staffAuth.ts) | Session resolution and reusable reviewer/admin authorization helpers |
+| [staffAuth.ts](staffAuth.ts) | Session resolution and role guards (see [VOLUNTEER_AUTHORIZATION.md](VOLUNTEER_AUTHORIZATION.md)) |
 | [volunteerAccounts.ts](volunteerAccounts.ts) | Admin-only volunteer creation, resets, revocation, restoration, capabilities, and event assignments |
 | [staffCredentials.ts](staffCredentials.ts) | Shared password validation, hashing, credential storage, and session invalidation |
 | [applications.ts](applications.ts) | Read-only application queue and submitted application detail (no audit logs on list) |
