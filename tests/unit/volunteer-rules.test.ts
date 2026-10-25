@@ -5,7 +5,6 @@ import {
   assertAdjustmentDelta,
   assertPointBalance,
   buildStaffConfigDetails,
-  isWithinEventWindow,
   normalizeAdjustmentReason,
   normalizeEventInput,
 } from "../../shared/admin/volunteerRules";
@@ -97,15 +96,6 @@ describe("event input", () => {
     { name: "Workshop", pointsAwarded: 10, startsAt: 1.5, endsAt: 2 },
   ])("rejects %#", (input) => {
     expect(errorCode(() => normalizeEventInput(input))).toBe("INVALID_EVENT");
-  });
-
-  it("treats the start as open and the end as closed", () => {
-    const event = { startsAt: 1_000, endsAt: 2_000 };
-    expect(isWithinEventWindow(event, 999)).toBe(false);
-    expect(isWithinEventWindow(event, 1_000)).toBe(true);
-    expect(isWithinEventWindow(event, 1_500)).toBe(true);
-    expect(isWithinEventWindow(event, 2_000)).toBe(false);
-    expect(isWithinEventWindow(event, 2_001)).toBe(false);
   });
 });
 

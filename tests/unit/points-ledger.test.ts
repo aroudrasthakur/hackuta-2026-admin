@@ -162,36 +162,31 @@ describe("event point awards", () => {
     expect(await logsFor(t, participantId)).toHaveLength(3);
   });
 
-  it("rejects an inactive event and a time outside the window", async () => {
+  it("awards points regardless of the event's startsAt and endsAt", async () => {
+    const t = createConvexTest();
+    const adminId = await insertAdmin(t);
+    const eventId = await insertEvent(t, { pointsAwarded: 3 });
+
+    for (const now of [START - 1, END, END + 1]) {
+      const participantId = await insertParticipant(t, adminId, "accepted", 0);
+      const result = await t.run((ctx) =>
+        awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now }),
+      );
+      expect(result.newPoints).toBe(3);
+    }
+  });
+
+  it("rejects an inactive, missing, or invalid event", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
     const participantId = await insertParticipant(t, adminId, "accepted", 4);
     const inactiveId = await insertEvent(t, { active: false });
-    const eventId = await insertEvent(t);
 
     await expectAdminErrorCode(
       t.run((ctx) =>
         awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId: inactiveId, now: NOW }),
       ),
       "EVENT_INACTIVE",
-    );
-    await expectAdminErrorCode(
-      t.run((ctx) =>
-        awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now: START - 1 }),
-      ),
-      "EVENT_OUTSIDE_WINDOW",
-    );
-    await expectAdminErrorCode(
-      t.run((ctx) =>
-        awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now: END }),
-      ),
-      "EVENT_OUTSIDE_WINDOW",
-    );
-    await expectAdminErrorCode(
-      t.run((ctx) =>
-        awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now: END + 1 }),
-      ),
-      "EVENT_OUTSIDE_WINDOW",
     );
 
     const eventIdToDelete = await insertEvent(t);
