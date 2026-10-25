@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { makeFunctionReference } from "convex/server";
 import { describe, expect, it } from "vitest";
 import { anyApi, type ApiFromModules } from "convex/server";
-import type * as volunteerAccounts from "../../convex/admin/volunteerAccounts";
+import type * as volunteersModule from "../../convex/admin/volunteers";
 import {
   getApplicationRef,
   listApplicationReviewLogsRef,
@@ -33,11 +33,13 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "decisionEmailQueue.ts", exportName: "setDecisionEmailHold", guard: "requireAdminRole" },
   { file: "decisionEmailQueue.ts", exportName: "retryFailedDecisionEmails", guard: "requireAdminRole" },
   { file: "auth.ts", exportName: "createAndProvisionAdmin", guard: "requireAdminRole" },
-  { file: "volunteerAccounts.ts", exportName: "createVolunteer", guard: "requireAdminRole" },
-  { file: "volunteerAccounts.ts", exportName: "listVolunteers", guard: "requireAdminRole" },
-  { file: "volunteerAccounts.ts", exportName: "resetVolunteerPassword", guard: "requireAdminRole" },
-  { file: "volunteerAccounts.ts", exportName: "updateVolunteerCapabilities", guard: "requireAdminRole" },
-  { file: "volunteerAccounts.ts", exportName: "setVolunteerEventAccess", guard: "requireAdminRole" },
+  ...[
+    "createVolunteer", "promoteParticipantToVolunteer", "listVolunteers", "resetVolunteerPassword",
+    "setVolunteerCapabilities", "setVolunteerEventAccess", "listVolunteerActionLogs", "listStaffConfigLogs",
+  ].map((exportName) => ({ file: "volunteers.ts", exportName, guard: "requireAdminRole" })),
+  ...["revokeVolunteer", "restoreVolunteer"].map((exportName) => ({
+    file: "volunteers.ts", exportName, guard: "volunteerActiveMutation",
+  })),
   { file: "volunteerScan.ts", exportName: "listMyScanOptions", guard: "requireVolunteerAccess" },
   { file: "volunteerScan.ts", exportName: "resolveQrForScan", guard: "requireVolunteerAccess" },
 ] as const;
@@ -64,6 +66,15 @@ describe("volunteer authorization contract (public entry points)", () => {
     expect(exportSection(source, exportName)).toContain(guard);
   });
 
+  it("guards the shared revoke/restore factory with requireAdminRole", () => {
+    const source = readFileSync(join(adminDir, "volunteers.ts"), "utf8");
+    const factory = source.slice(
+      source.indexOf("function volunteerActiveMutation"),
+      source.indexOf("export const revokeVolunteer"),
+    );
+    expect(factory).toContain("requireAdminRole");
+  });
+
   it("keeps participant and ledger modules off the public Convex API", () => {
     for (const file of ["participants.ts", "pointsLedger.ts", "pointsBackfill.ts"]) {
       const source = readFileSync(join(adminDir, file), "utf8");
@@ -76,7 +87,7 @@ describe("volunteer authorization contract (public entry points)", () => {
       "applications.ts",
       "applicationReviewLogs.ts",
       "auth.ts",
-      "volunteerAccounts.ts",
+      "volunteers.ts",
       "volunteerScan.ts",
     ];
     for (const file of files) {
@@ -147,8 +158,8 @@ describe("volunteer unsafe-path invariants", () => {
       });
     });
 
-    const { volunteerAccounts: volunteers } = (anyApi as ApiFromModules<{
-      "admin/volunteerAccounts": typeof volunteerAccounts;
+    const { volunteers } = (anyApi as ApiFromModules<{
+      "admin/volunteers": typeof volunteersModule;
     }>).admin;
 
     await expectAdminErrorCode(
