@@ -168,6 +168,8 @@ describe("volunteer unsafe-path invariants", () => {
         email: "new-v@example.com",
         name: "New",
         password: ORGANIZER_TEST_PASSWORD,
+        canCheckIn: true,
+        canFoodCheckIn: true,
       }),
       "NOT_AUTHORIZED",
     );

@@ -27,6 +27,7 @@ async function fixture() {
   const actor = await seedStaff(t, { role: "admin", name: "Admin Ada" });
   const args = {
     sessionToken: actor.sessionToken, email: "volunteer@hackuta.org", name: "Volunteer", password: ORGANIZER_TEST_PASSWORD,
+    canCheckIn: false, canFoodCheckIn: false,
   };
   return { t, actor, args };
 }
@@ -92,10 +93,14 @@ describe("createVolunteer", () => {
     }
   });
 
-  it("grants only the capabilities passed explicitly", async () => {
+  it("requires explicit capability booleans and grants only those set to true", async () => {
     const { t, args } = await fixture();
     const { adminId } = await t.mutation(volunteers.createVolunteer, { ...args, canCheckIn: true });
     expect(await t.run((ctx) => ctx.db.get(adminId))).toMatchObject({ canCheckIn: true, canFoodCheckIn: false });
+    const { canCheckIn: _omitted, ...missingCapability } = args;
+    void _omitted;
+    await expect(t.mutation(volunteers.createVolunteer, { ...missingCapability, email: "other@hackuta.org" } as never)).rejects.toThrow();
+    await expect(t.mutation(volunteers.createVolunteer, { ...args, email: "third@hackuta.org", canFoodCheckIn: "yes" } as never)).rejects.toThrow();
   });
 
   it.each(["admin", "reviewer", "volunteer"] as const)("rejects an email used by an existing %s without modifying it", async (role) => {
@@ -124,7 +129,8 @@ describe("createVolunteer", () => {
   it("blocks generic provisioning from converting or resetting volunteer accounts", async () => {
     const { t, args } = await fixture();
     const { adminId } = await t.mutation(volunteers.createVolunteer, args);
-    await expectAdminErrorCode(t.mutation(auth.createAndProvisionAdmin, { ...args, role: "admin" }), "STAFF_ACCOUNT_EXISTS");
+    const { sessionToken, email, name, password } = args;
+    await expectAdminErrorCode(t.mutation(auth.createAndProvisionAdmin, { sessionToken, email, name, password, role: "admin" }), "STAFF_ACCOUNT_EXISTS");
     await expectAdminErrorCode(t.mutation(auth.provisionAdminAuthAccount, { adminId, password: ORGANIZER_TEST_PASSWORD }), "NOT_AUTHORIZED");
     expect((await t.run((ctx) => ctx.db.get(adminId)))?.role).toBe("volunteer");
   });
@@ -441,7 +447,7 @@ describe("audit log queries", () => {
     const { t, actor, target, eventId, adminId } = await managedFixture();
     await t.mutation(volunteers.setVolunteerEventAccess, { ...target, eventIds: [eventId] });
     await t.mutation(volunteers.revokeVolunteer, target);
-    await t.mutation(volunteers.createVolunteer, { sessionToken: actor.sessionToken, email: "other@hackuta.org", name: "Other", password: ORGANIZER_TEST_PASSWORD });
+    await t.mutation(volunteers.createVolunteer, { sessionToken: actor.sessionToken, email: "other@hackuta.org", name: "Other", password: ORGANIZER_TEST_PASSWORD, canCheckIn: false, canFoodCheckIn: false });
     const { participantId } = await seedParticipant(t, actor.adminId);
     await t.mutation(volunteers.promoteParticipantToVolunteer, { sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD });
     await t.run((ctx) => ctx.db.insert("staffConfigLogs", { actorAdminId: actor.adminId, action: "event_updated", targetEventId: eventId, createdAt: Date.now() + 1 }));
@@ -475,7 +481,7 @@ describe("privilege escalation", () => {
       () => t(f).query(volunteers.listVolunteers, { sessionToken, paginationOpts: page }),
       () => t(f).query(volunteers.listVolunteerActionLogs, { sessionToken, paginationOpts: page }),
       () => t(f).query(volunteers.listStaffConfigLogs, { sessionToken, paginationOpts: page }),
-      () => t(f).mutation(volunteers.createVolunteer, { sessionToken, email: "new@hackuta.org", name: "New", password: ORGANIZER_TEST_PASSWORD }),
+      () => t(f).mutation(volunteers.createVolunteer, { sessionToken, email: "new@hackuta.org", name: "New", password: ORGANIZER_TEST_PASSWORD, canCheckIn: true, canFoodCheckIn: true }),
       () => t(f).mutation(volunteers.resetVolunteerPassword, { ...target, password: "Replacement123" }),
       () => t(f).mutation(volunteers.revokeVolunteer, target),
       () => t(f).mutation(volunteers.restoreVolunteer, target),
