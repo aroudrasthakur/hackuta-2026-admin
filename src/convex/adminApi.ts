@@ -17,6 +17,7 @@ import type {
   retryFailedDecisionEmails,
   setDecisionEmailHold,
 } from "../../convex/admin/decisionEmailQueue";
+import type { listMyScanOptions, resolveQrForScan } from "../../convex/admin/volunteerScan";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -124,3 +125,25 @@ export const releaseDecisionEmailsRef = makeFunctionReference<
   { sessionToken: string; itemIds?: Array<DecisionEmailQueue["active"][number]["itemId"]> },
   { sent: number; failed: number; total: number }
 >("admin/decisionEmailRelease:releaseDecisionEmails");
+
+type ScanOptionsQuery = ApiFromModules<{
+  scan: { listMyScanOptions: typeof listMyScanOptions };
+}>["scan"]["listMyScanOptions"];
+export type VolunteerScanOptions = FunctionReturnType<ScanOptionsQuery>;
+
+export const listMyScanOptionsRef = adminModuleRef<
+  "query",
+  FunctionArgs<ScanOptionsQuery>,
+  FunctionReturnType<ScanOptionsQuery>
+>("admin/volunteerScan:listMyScanOptions");
+
+type ResolveQrMutation = ApiFromModules<{
+  scan: { resolveQrForScan: typeof resolveQrForScan };
+}>["scan"]["resolveQrForScan"];
+export type QrScanPreview = FunctionReturnType<ResolveQrMutation>;
+
+export const resolveQrForScanRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<ResolveQrMutation>,
+  FunctionReturnType<ResolveQrMutation>
+>("admin/volunteerScan:resolveQrForScan");

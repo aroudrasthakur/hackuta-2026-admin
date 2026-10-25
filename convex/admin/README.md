@@ -21,6 +21,8 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [decisionEmailService.ts](decisionEmailService.ts) | Decision mail via register-locked `sendMailMessage` (same email service HTTP client) |
 | [sendDecisionEmails.ts](sendDecisionEmails.ts) | Internal action that sends decision notifications |
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
+| [volunteerScan.ts](volunteerScan.ts) | Volunteer scan options and read-only QR preview (`listMyScanOptions`, `resolveQrForScan`) |
+| [volunteerScanRateLimit.ts](volunteerScanRateLimit.ts) | Per-volunteer QR lookup throttling in `rateLimits`, plus internal cleanup |
 
 ## Authentication
 
@@ -68,6 +70,7 @@ All functions in `volunteerAccounts.ts` require a current administrator session.
 | Session profile/sign-out | The caller's staff session only |
 | Participant creation | Internal only; accepting staff must be active reviewer/admin |
 | Point ledger and participant eligibility helpers | Ordinary server helpers, not public Convex APIs |
+| Own scan options and QR scan preview | Volunteer, plus the purpose's capability or event assignment |
 
 No public participant roster, point-total, or configuration-audit listing API is added here. Scanner endpoints must independently call the relevant volunteer guard **inside their query/mutation** before using participant or ledger helpers. In particular, `awardEventPoints` is a ledger helper, not an authorization boundary: its caller must use `requireVolunteerEventAccess` and derive the actor and timestamp on the server. Scanner and management screens are separate work from this authentication foundation.
 
@@ -76,6 +79,10 @@ Deployment: sync these admin-owned modules and `shared/admin` helpers into `hack
 `getApplication` uses `requireReviewerAccess` before reading applicant data. It returns `null` for malformed, missing, or unsubmitted applications, and returns resume availability separately from the application. A missing review record remains missing; reading detail never creates review rows, audit events, or participants. No historical reviewer logs are returned.
 
 After detail loads, the page calls `logApplicationReviewAction` with `action: "viewed"`. The mutation requires a submitted application and appends an event with the session-derived admin ID and server timestamp. Repeated visits remain separate events; viewing never claims the application or changes review state.
+
+## Volunteer QR scan preview (#60)
+
+`listMyScanOptions` returns the caller's own `canCheckIn` / `canFoodCheckIn` and their assigned active events (name, points, schedule). `resolveQrForScan` previews one scanned QR code for `check_in`, `food_check_in`, or `point_scan` and returns a typed status instead of throwing, so its rate-limit rows persist. It changes no participant, award, or log rows; the later state-changing scan mutations must re-check everything. Dietary info appears only in food previews; point totals, emails, applications, and tokens never appear. Order of checks, response fields, and the rate-limit thresholds and cleanup are in [VOLUNTEER_AUTHORIZATION.md](VOLUNTEER_AUTHORIZATION.md#qr-scan-preview-volunteerscants).
 
 ## Schema notes
 
