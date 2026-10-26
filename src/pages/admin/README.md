@@ -7,12 +7,14 @@
 | [`ApplicationReviewPage.tsx`](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` |
 | [`DecisionEmailQueuePage.tsx`](DecisionEmailQueuePage.tsx) | `/admin/decision-emails` |
 | [`VolunteerDashboardPage.tsx`](VolunteerDashboardPage.tsx) | `/admin/scan` |
+| [`ShopPage.tsx`](ShopPage.tsx) | `/admin/shop` (admins): items, flash sales, history |
+| [`VolunteerShopPage.tsx`](VolunteerShopPage.tsx) | `/admin/scan/shop` (volunteers with shop access) |
 | [`StaffWorkflowPage.tsx`](StaffWorkflowPage.tsx) | `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points`, `/admin/participants`, `/admin/volunteers` |
 
 Admins and reviewers land on applications; volunteers land on `/admin/scan`.
 Login restores authorized internal destinations; unknown routes return home.
 
-Scan access follows `listMyScanOptions`: check-in and food need explicit grants,
+Scan access follows `listMyScanOptions`: check-in, food, and shop need explicit grants,
 and points need an assigned active event. Revoked access hides actions and
 redirects stale routes. Event times are advisory. Scanner and management pages
 are placeholders; management requires an admin. Every backend operation enforces

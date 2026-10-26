@@ -15,7 +15,7 @@ export function canAccessStaffRoute(
 ): boolean | undefined {
   pathname = pathname.replace(/\/+$/, "");
   if (pathname === "/admin") return true;
-  if (pathname === ADMIN_ROUTES.participants || pathname === ADMIN_ROUTES.volunteers) {
+  if (pathname === ADMIN_ROUTES.participants || pathname === ADMIN_ROUTES.volunteers || pathname === ADMIN_ROUTES.shop) {
     return staff.role === "admin";
   }
   if (pathname === ADMIN_ROUTES.applications || pathname === ADMIN_ROUTES.decisionEmails ||
@@ -25,11 +25,12 @@ export function canAccessStaffRoute(
   if (pathname === ADMIN_ROUTES.scan || pathname === ADMIN_ROUTES.volunteer) {
     return staff.role === "volunteer";
   }
-  if ([ADMIN_ROUTES.scanCheckIn, ADMIN_ROUTES.scanFood, ADMIN_ROUTES.scanPoints].some((path) => path === pathname)) {
+  if ([ADMIN_ROUTES.scanCheckIn, ADMIN_ROUTES.scanFood, ADMIN_ROUTES.scanPoints, ADMIN_ROUTES.scanShop].some((path) => path === pathname)) {
     if (staff.role !== "volunteer") return false;
     if (!options) return undefined;
     if (pathname === ADMIN_ROUTES.scanCheckIn) return staff.canCheckIn === true && options.canCheckIn;
     if (pathname === ADMIN_ROUTES.scanFood) return staff.canFoodCheckIn === true && options.canFoodCheckIn;
+    if (pathname === ADMIN_ROUTES.scanShop) return staff.canRedeemShop === true && options.canRedeemShop;
     const eventId = new URLSearchParams(search).get("event");
     return options.events.length > 0 && (!eventId || options.events.some((event) => event.eventId === eventId));
   }

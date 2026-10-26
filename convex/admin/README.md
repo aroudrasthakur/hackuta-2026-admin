@@ -26,6 +26,11 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
 | [volunteerScan.ts](volunteerScan.ts) | Volunteer scan options and read-only QR preview (`listMyScanOptions`, `resolveQrForScan`) |
 | [volunteerScanRateLimit.ts](volunteerScanRateLimit.ts) | Per-volunteer QR lookup throttling in `rateLimits`, plus internal cleanup |
+| [shopAdmin.ts](shopAdmin.ts) | Admin-only shop items, images, stock adjustments, purchase history, refunds, and volunteer shop access |
+| [shopFlashSales.ts](shopFlashSales.ts) | Admin-only flash sales and their participant announcements |
+| [shopRedemption.ts](shopRedemption.ts) | Volunteer shop catalog, purchase preview, and the purchase mutation (`canRedeemShop`) |
+| [shopLedger.ts](shopLedger.ts), [shopPricing.ts](shopPricing.ts) | Internal stock, points, refund, and pricing helpers (not auth boundaries) |
+| [participantShop.ts](participantShop.ts) | Participant shop, own purchase history, and announcements for the profile portal |
 
 ## Authentication
 

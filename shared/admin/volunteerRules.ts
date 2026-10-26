@@ -7,6 +7,7 @@ const STAFF_CONFIG_KEYS = [
   "changedFields",
   "canCheckIn",
   "canFoodCheckIn",
+  "canRedeemShop",
   "active",
   "pointsAwarded",
   "startsAt",
@@ -21,7 +22,7 @@ const STAFF_CONFIG_KEYS = [
 type StaffConfigKey = (typeof STAFF_CONFIG_KEYS)[number];
 
 /** Keys allowed inside a `before` / `after` snapshot. All boolean. */
-const SNAPSHOT_KEYS = ["canCheckIn", "canFoodCheckIn", "active"] as const;
+const SNAPSHOT_KEYS = ["canCheckIn", "canFoodCheckIn", "canRedeemShop", "active"] as const;
 
 const CHANGED_FIELD_NAMES = new Set([
   "name",
@@ -32,9 +33,18 @@ const CHANGED_FIELD_NAMES = new Set([
   "active",
   "canCheckIn",
   "canFoodCheckIn",
+  "canRedeemShop",
   "eventIds",
   "role",
   "participantId",
+  "pointsCost",
+  "featured",
+  "status",
+  "imageStorageId",
+  "lowStockThreshold",
+  "title",
+  "message",
+  "items",
 ]);
 
 /** Convex ids are short and alphanumeric. Longer strings would fit a QR token. */
@@ -185,6 +195,7 @@ function readDetailValue(key: StaffConfigKey, value: unknown): unknown {
       return readSnapshot(value);
     case "canCheckIn":
     case "canFoodCheckIn":
+    case "canRedeemShop":
     case "active":
       if (typeof value !== "boolean") {
         rejectDetails();

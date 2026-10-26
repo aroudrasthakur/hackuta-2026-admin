@@ -23,6 +23,9 @@ import type {
   checkInParticipant,
   foodCheckInParticipant,
 } from "../../convex/admin/volunteerOperations";
+import type * as shopAdmin from "../../convex/admin/shopAdmin";
+import type * as shopFlashSales from "../../convex/admin/shopFlashSales";
+import type * as shopRedemption from "../../convex/admin/shopRedemption";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -181,3 +184,67 @@ export const awardEventPointsRef = adminModuleRef<
   FunctionArgs<VolunteerOperations["awardEventPoints"]>,
   AwardEventPointsResult
 >("admin/volunteerOperations:awardEventPoints");
+
+type ShopAdmin = ApiFromModules<{ shop: typeof shopAdmin }>["shop"];
+export type ShopItemAdminList = FunctionReturnType<ShopAdmin["listShopItemsAdmin"]>;
+export type ShopItemAdminRow = ShopItemAdminList["items"][number];
+export type ShopInventoryAdjustmentPage = FunctionReturnType<ShopAdmin["listInventoryAdjustments"]>;
+export type ShopRedemptionPage = FunctionReturnType<ShopAdmin["listShopRedemptions"]>;
+export type ShopRedemptionRow = ShopRedemptionPage["page"][number];
+export type ShopVolunteerRow = FunctionReturnType<ShopAdmin["listShopVolunteers"]>[number];
+
+function shopAdminRef<Name extends keyof ShopAdmin>(name: Name) {
+  return adminModuleRef<
+    ShopAdmin[Name]["_type"],
+    FunctionArgs<ShopAdmin[Name]>,
+    FunctionReturnType<ShopAdmin[Name]>
+  >(`admin/shopAdmin:${name}`);
+}
+
+export const generateShopImageUploadUrlRef = shopAdminRef("generateShopImageUploadUrl");
+export const createShopItemRef = shopAdminRef("createShopItem");
+export const updateShopItemRef = shopAdminRef("updateShopItem");
+export const setShopItemStatusRef = shopAdminRef("setShopItemStatus");
+export const adjustShopStockRef = shopAdminRef("adjustShopStock");
+export const listShopItemsAdminRef = shopAdminRef("listShopItemsAdmin");
+export const listInventoryAdjustmentsRef = shopAdminRef("listInventoryAdjustments");
+export const listShopRedemptionsRef = shopAdminRef("listShopRedemptions");
+export const refundShopRedemptionRef = shopAdminRef("refundShopRedemption");
+export const listShopVolunteersRef = shopAdminRef("listShopVolunteers");
+export const setVolunteerShopAccessRef = shopAdminRef("setVolunteerShopAccess");
+
+type ShopFlashSales = ApiFromModules<{ sales: typeof shopFlashSales }>["sales"];
+export type FlashSaleRow = FunctionReturnType<ShopFlashSales["listFlashSales"]>[number];
+
+function flashSaleRef<Name extends keyof ShopFlashSales>(name: Name) {
+  return adminModuleRef<
+    ShopFlashSales[Name]["_type"],
+    FunctionArgs<ShopFlashSales[Name]>,
+    FunctionReturnType<ShopFlashSales[Name]>
+  >(`admin/shopFlashSales:${name}`);
+}
+
+export const createFlashSaleRef = flashSaleRef("createFlashSale");
+export const updateFlashSaleRef = flashSaleRef("updateFlashSale");
+export const cancelFlashSaleRef = flashSaleRef("cancelFlashSale");
+export const listFlashSalesRef = flashSaleRef("listFlashSales");
+
+type ShopRedemption = ApiFromModules<{ redeem: typeof shopRedemption }>["redeem"];
+export type ShopCatalog = FunctionReturnType<ShopRedemption["listShopCatalogForVolunteer"]>;
+export type ShopCatalogItem = ShopCatalog["items"][number];
+export type ShopCustomer = FunctionReturnType<ShopRedemption["getShopCustomer"]>;
+export type ShopPurchasePreview = FunctionReturnType<ShopRedemption["previewShopPurchase"]>;
+export type ShopPurchaseResult = FunctionReturnType<ShopRedemption["purchaseShopItem"]>;
+
+function shopRedemptionRef<Name extends keyof ShopRedemption>(name: Name) {
+  return adminModuleRef<
+    ShopRedemption[Name]["_type"],
+    FunctionArgs<ShopRedemption[Name]>,
+    FunctionReturnType<ShopRedemption[Name]>
+  >(`admin/shopRedemption:${name}`);
+}
+
+export const listShopCatalogForVolunteerRef = shopRedemptionRef("listShopCatalogForVolunteer");
+export const getShopCustomerRef = shopRedemptionRef("getShopCustomer");
+export const previewShopPurchaseRef = shopRedemptionRef("previewShopPurchase");
+export const purchaseShopItemRef = shopRedemptionRef("purchaseShopItem");

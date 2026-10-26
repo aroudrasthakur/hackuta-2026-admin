@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./storm.css";
 @import "./dashboard.css";
+@import "./shop.css";
 
 @theme {
   --font-sans: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;

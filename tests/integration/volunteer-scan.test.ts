@@ -118,6 +118,7 @@ describe("listMyScanOptions", () => {
     expect(options).toEqual({
       canCheckIn: true,
       canFoodCheckIn: false,
+      canRedeemShop: false,
       events: [
         { eventId: early, name: "Early", pointsAwarded: 10, startsAt: 10, endsAt: 20 },
         { eventId: late, name: "Late", pointsAwarded: 10, startsAt: 50, endsAt: 60 },

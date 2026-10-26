@@ -7,6 +7,7 @@ const paths = {
   checkIn: "M4 8V4h4m8 0h4v4M4 16v4h4m8 0h4v-4M8 12l3 3 5-6",
   food: "M4 3v6a3 3 0 0 0 6 0V3M7 3v18M20 21V3c-5 3-5 9 0 9",
   points: "M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9z",
+  shop: "M4 9h16l-1.2 11H5.2zM8.5 9V7a3.5 3.5 0 0 1 7 0v2",
 } as const;
 
 export type SectionIconName = keyof typeof paths;
