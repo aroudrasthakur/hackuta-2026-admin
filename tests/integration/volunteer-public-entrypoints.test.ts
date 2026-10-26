@@ -23,6 +23,7 @@ const adminDir = join(process.cwd(), "convex", "admin");
 
 /** Each public organizer API must call its guard before sensitive reads/writes. Update when adding endpoints. */
 const PUBLIC_ENTRY_GUARDS = [
+  ...["listMealPeriods", "listMealRedemptions", "createMealPeriod", "updateMealPeriod", "setMealPeriodActive", "removeMealPeriod"].map((exportName) => ({ file: "meals.ts", exportName, guard: "requireAdminRole" })),
   { file: "applications.ts", exportName: "listSubmittedApplications", guard: "requireReviewerAccess" },
   { file: "applications.ts", exportName: "getApplication", guard: "requireReviewerAccess" },
   { file: "applications.ts", exportName: "createSampleApplication", guard: "requireAdminRole" },

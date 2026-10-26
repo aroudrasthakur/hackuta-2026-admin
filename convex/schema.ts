@@ -254,12 +254,13 @@ export default defineSchema({
     .index("by_event_createdAt", ["eventId", "createdAt"])
     .index("by_action_createdAt", ["action", "createdAt"]),
 
-  /** Admin-only audit for volunteer, event, and access configuration changes. */
+  /** Admin-only audit for volunteer, event, meal, and access configuration changes. */
   staffConfigLogs: defineTable({
     actorAdminId: v.id("admins"),
     action: staffConfigLogAction,
     targetAdminId: v.optional(v.id("admins")),
     targetEventId: v.optional(v.id("events")),
+    targetMealPeriodId: v.optional(v.id("mealPeriods")),
     targetParticipantId: v.optional(v.id("participants")),
     details: v.optional(v.string()),
     createdAt: v.number(),
