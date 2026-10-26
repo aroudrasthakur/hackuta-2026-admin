@@ -48,6 +48,8 @@ test("requires a meal choice when multiple periods are available and clears priv
   await expect(page.getByRole("button", { name: "Look up participant" })).toHaveCount(0);
   await page.getByRole("radio", { name: /Lunch/ }).click(); await scan(page);
   await expect(page.getByText("Vegetarian; Allergies: peanuts")).toBeVisible();
+  // Meal switching is locked while a participant confirmation is open.
+  await page.getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("button", { name: "Change meal" }).click();
   await expect(page.getByText("Vegetarian; Allergies: peanuts")).toHaveCount(0);
   await page.getByRole("radio", { name: /Snack/ }).click();
