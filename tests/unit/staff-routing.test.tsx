@@ -9,13 +9,14 @@ import { AdminAuthContext, type AdminAuthContextValue, type StaffProfile } from 
 import { listMyScanOptionsRef, type VolunteerScanOptions } from "../../src/convex/adminApi";
 import { canAccessStaffRoute, intendedStaffDestination, staffHome } from "../../src/lib/staffRouteAccess";
 import { ADMIN_ROUTES } from "../../src/types/routes";
+vi.mock("../../src/components/WeatherMoodToggle", () => ({ WeatherMoodToggle: () => null }));
 
 vi.mock("../../src/components/StormPageFrame", () => ({ StormPageFrame: ({ children }: { children: unknown }) => <div>{children}</div> }));
 vi.mock("../../src/pages/admin/ApplicationsPage", () => ({ ApplicationsPage: () => <h1>Applications queue</h1> }));
 vi.mock("../../src/pages/admin/ApplicationReviewPage", () => ({ ApplicationReviewPage: () => <h1>Application review</h1> }));
 vi.mock("../../src/pages/admin/DecisionEmailQueuePage", () => ({ DecisionEmailQueuePage: () => <h1>Decision email queue</h1> }));
 const query = vi.hoisted(() => vi.fn());
-vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query }));
+vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query, useMutation: () => vi.fn() }));
 
 const staff: StaffProfile = { adminId: "staff", email: "staff@example.com", name: "Avery", role: "volunteer", canCheckIn: true, canFoodCheckIn: true, expiresAt: Date.now() + 60_000 };
 const event = { eventId: "event-1" as GenericId<"events">, name: "Opening workshop", pointsAwarded: 20, startsAt: Date.now() - 1000, endsAt: Date.now() + 60_000 };
@@ -174,7 +175,8 @@ describe("protected staff screens", () => {
 
     options = undefined;
     await render(ADMIN_ROUTES.scan);
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Loading your responsibilities");
+    expect(container.textContent).not.toContain("scan access was removed");
     expect(links()).toEqual(["Dashboard"]);
 
     options = allOptions;

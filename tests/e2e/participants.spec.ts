@@ -3,7 +3,7 @@ import { E2E_ADMIN, signInOrganizer } from "./fixtures/auth";
 
 test("admins can adjust points, promote a participant, and revoke linked volunteer access", async ({ page }) => {
   await signInOrganizer(page, E2E_ADMIN);
-  await page.getByRole("tab", { name: "Participants", exact: true }).click();
+  await page.getByRole("link", { name: "Participants", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Participants", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Alex Accepted", exact: true }).click();
 
@@ -35,7 +35,7 @@ test("admins can adjust points, promote a participant, and revoke linked volunte
 test("participant roster and details fit a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await signInOrganizer(page, E2E_ADMIN);
-  await page.getByRole("tab", { name: "Participants", exact: true }).click();
+  await page.getByRole("link", { name: "Participants", exact: true }).click();
   await expect(page.getByRole("button", { name: "Alex Accepted", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole("button", { name: "Alex Accepted", exact: true }).click();

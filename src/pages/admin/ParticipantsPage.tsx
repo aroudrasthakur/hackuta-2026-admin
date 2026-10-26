@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { usePaginatedQuery, useMutation, useQuery } from "../../convex/reactBindings";
@@ -509,10 +510,7 @@ function ParticipantsPageContent() {
 
   return (
     <section aria-labelledby="participants-heading" className="space-y-5">
-      <header className="space-y-2">
-        <h1 id="participants-heading" className="admin-page-title">Participants</h1>
-        <p className="admin-page-lead">Manage accepted participants, check-in and food status, points, and linked volunteer access.</p>
-      </header>
+      <AdminPageHeader id="participants-heading" title="Participants" description="Manage accepted participants, check-in and food status, points, and linked volunteer access." />
       {staff?.role === "admin" && sessionToken ? (
         <ParticipantsRoster sessionToken={sessionToken} onOpen={openDetails} />
       ) : (

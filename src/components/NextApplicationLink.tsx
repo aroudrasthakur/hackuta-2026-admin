@@ -15,7 +15,7 @@ export function NextApplicationLink({ applicationId, sessionToken, staffAdminId,
   const next = nextApplicationInQueue(applications, applicationId, new URLSearchParams(applicationsSearch), staffAdminId, now);
   return (
     <nav aria-label="Review navigation" className="application-review-actions-panel__group space-y-3">
-      <h3 className="application-review-actions-panel__heading">Continue reviewing</h3>
+      <h2 className="application-review-actions-panel__heading">Continue reviewing</h2>
       {next ? <>
         <Link className={`${reviewSecondaryButtonClass} w-full`} to={ADMIN_ROUTES.applicationReview(next.applicationId)} state={{ applicationsSearch }}>Review next application</Link>
         <p className="break-words text-sm text-ocean">Next: {next.applicantName}</p>

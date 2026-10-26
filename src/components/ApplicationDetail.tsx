@@ -76,7 +76,7 @@ export function ApplicationDetail({ detail, children }: { detail: ApplicationDet
   function renderSection({ title, fields }: Section) {
     return (
       <section key={title} aria-label={title} className="admin-card admin-card__body">
-        <h3 className="admin-card__title">{title}</h3>
+        <h2 className="admin-card__title">{title}</h2>
         <dl className="mt-4 grid gap-5 sm:grid-cols-2">
           {fields.map(([field, label]) => {
             const value: unknown = application[field];

@@ -29,22 +29,24 @@
   "dependencies": {
     "@convex-dev/auth": "^0.0.96",
     "@paper-design/shaders-react": "^0.0.80",
+    "barcode-detector": "^3.2.3",
     "convex": "^1.45.0",
     "libphonenumber-js": "^1.13.14",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-pdf": "^10.5.0",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "zxing-wasm": "3.1.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.1",
     "@types/node": "^26.4.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "@testing-library/dom": "^10.4.1",
     "@vitest/coverage-istanbul": "^5.0.3",
     "convex-test": "^0.0.58",
     "eslint": "^10.10.0",

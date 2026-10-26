@@ -1,4 +1,7 @@
 import {
+  awardEventPointsRef,
+  checkInParticipantRef,
+  foodCheckInParticipantRef,
   getApplicationRef,
   getCurrentStaffRef,
   getParticipantDetailsRef,
@@ -9,6 +12,7 @@ import {
   listSubmittedApplicationsRef,
   logApplicationReviewActionRef,
   releaseDecisionEmailsRef,
+  resolveQrForScanRef,
   retryFailedDecisionEmailsRef,
   setApplicationDecisionRef,
   setDecisionEmailHoldRef,
@@ -21,6 +25,10 @@ import {
 const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
   [getCurrentStaffRef, "admin/auth:getCurrentStaff"],
   [listMyScanOptionsRef, "admin/volunteerScan:listMyScanOptions"],
+  [resolveQrForScanRef, "admin/volunteerScan:resolveQrForScan"],
+  [checkInParticipantRef, "admin/volunteerOperations:checkInParticipant"],
+  [foodCheckInParticipantRef, "admin/volunteerOperations:foodCheckInParticipant"],
+  [awardEventPointsRef, "admin/volunteerOperations:awardEventPoints"],
   [listSubmittedApplicationsRef, "admin/applications:listSubmittedApplications"],
   [getApplicationRef, "admin/applications:getApplication"],
   [listApplicationReviewLogsRef, "admin/applicationReviewLogs:listApplicationReviewLogs"],

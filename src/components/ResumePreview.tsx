@@ -43,7 +43,7 @@ export function ResumePreview({ resume }: { resume: ApplicationDetail["resume"] 
     <section aria-label="Resume" className="admin-card admin-card__body">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="admin-card__title">Resume</h3>
+          <h2 className="admin-card__title">Resume</h2>
           {resume.status === "available" && <p className="admin-card__hint break-all">{resume.filename || "Applicant resume"}{!unsupported && " · PDF"}</p>}
         </div>
         {resume.status === "available" && resume.url && !unsupported ? (
@@ -54,7 +54,7 @@ export function ResumePreview({ resume }: { resume: ApplicationDetail["resume"] 
         ) : <p className="text-sm text-ocean">{unsupported ? "Preview is only available for PDF resumes. This file format is not supported." : resume.status === "missing" ? "The attached resume is no longer available." : "No resume was attached."}</p>}
       </div>
       <dialog ref={dialog} aria-labelledby={titleId} aria-modal="true" aria-label="Resume preview" className="resume-dialog" onCancel={(event) => { event.preventDefault(); close(); }} onClose={() => { setOpen(false); trigger.current?.focus(); }}>
-        <header className="border-b border-sand bg-light px-4 py-3">
+        <header className="border-b border-border bg-surface px-5 py-4">
           <h2 id={titleId} className="break-all text-base font-semibold text-night">{resume.filename || "Applicant resume"}</h2>
         </header>
         {open && resume.url && (

@@ -5,9 +5,10 @@ import { WeatherMoodToggle } from "./WeatherMoodToggle";
 
 type StormPageFrameProps = {
   children: ReactNode;
+  embeddedWeather?: boolean;
 };
 
-function StormPageFrameInner({ children }: StormPageFrameProps) {
+function StormPageFrameInner({ children, embeddedWeather }: StormPageFrameProps) {
   const { isEnraged } = useWeatherMood();
 
   return (
@@ -19,16 +20,16 @@ function StormPageFrameInner({ children }: StormPageFrameProps) {
         Skip to content
       </a>
       <SignInStormBackdrop active={isEnraged} />
-      <WeatherMoodToggle />
+      {!embeddedWeather ? <WeatherMoodToggle /> : null}
       <div className="relative z-10">{children}</div>
     </div>
   );
 }
 
-export function StormPageFrame({ children }: StormPageFrameProps) {
+export function StormPageFrame({ children, embeddedWeather = false }: StormPageFrameProps) {
   return (
     <WeatherMoodProvider>
-      <StormPageFrameInner>{children}</StormPageFrameInner>
+      <StormPageFrameInner embeddedWeather={embeddedWeather}>{children}</StormPageFrameInner>
     </WeatherMoodProvider>
   );
 }

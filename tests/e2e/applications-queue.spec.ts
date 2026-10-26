@@ -99,12 +99,12 @@ test.describe("applications queue", () => {
 
     await signOutOrganizer(page);
     await signInOrganizerOnLoginPage(page, E2E_ADMIN);
-    await page.getByRole("tab", { name: "Decision emails" }).click();
+    await page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Decision emails" }).click();
     await expect(page.getByRole("button", { name: "Send all queued" })).toBeEnabled();
     await page.getByRole("button", { name: "Send all queued" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Sent 1 of 1" })).toBeVisible();
 
-    await page.getByRole("tab", { name: "Applications" }).click();
+    await page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Applications", exact: true }).click();
     await selectAdminListbox(page, "Review status", "waitlisted");
     await expect(applicationsListStatus(page)).toContainText("1 matching applications (4 total)");
     await expect(page.getByRole("link", { name: /Review application for Casey Decision/ })).toHaveCount(1);

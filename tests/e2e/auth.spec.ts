@@ -1,20 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signOutOrganizer } from "./fixtures/auth";
-import { E2E_VOLUNTEER } from "../../shared/admin/e2e/credentials";
+import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
 
 test.describe("organizer authentication", () => {
-  async function signInVolunteer(page: import("@playwright/test").Page) {
-    await page.goto("/admin/login");
-    await page.getByLabel("Email").fill(E2E_VOLUNTEER.email);
-    await page.getByLabel("Password", { exact: true }).fill(E2E_VOLUNTEER.password);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/admin\/scan$/);
-    await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
-  }
-
   test("keeps volunteer sessions out of review pages and permits signing out", async ({ page }) => {
     await signInVolunteer(page);
-    await expect(page.getByRole("navigation", { name: "Volunteer" }).getByRole("tab")).toHaveText(["Dashboard", "Check-in"]);
+    await expect(page.getByRole("navigation", { name: "Volunteer" }).getByRole("link")).toHaveText(["Dashboard", "Check-in"]);
     await expect(page.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
     for (const path of ["/admin/applications", "/admin/decision-emails", "/admin/applications/e2e-app-unreviewed", "/admin/participants", "/admin/volunteers", "/admin/scan/food", "/admin/scan/points"]) {
       await page.goto(path);
@@ -47,7 +37,7 @@ test.describe("organizer authentication", () => {
 
   test("restricts management pages to administrators", async ({ page }) => {
     await signInOrganizer(page, E2E_REVIEWER);
-    await expect(page.getByRole("tab")).toHaveText(["Applications", "Decision emails"]);
+    await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Applications", "Decision emails"]);
     for (const path of ["/admin/participants", "/admin/volunteers"]) {
       await page.goto(path);
       await expect(page).toHaveURL(/\/admin\/applications$/);
@@ -55,10 +45,10 @@ test.describe("organizer authentication", () => {
     }
     await signOutOrganizer(page);
     await signInOrganizer(page, E2E_ADMIN);
-    await expect(page.getByRole("tab")).toHaveText(["Applications", "Decision emails", "Participants", "Volunteers"]);
-    await page.getByRole("tab", { name: "Participants", exact: true }).click();
+    await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Applications", "Decision emails", "Participants", "Volunteers"]);
+    await page.getByRole("link", { name: "Participants", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Participants", exact: true })).toBeVisible();
-    await page.getByRole("tab", { name: "Volunteers", exact: true }).click();
+    await page.getByRole("link", { name: "Volunteers", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Volunteers", exact: true })).toBeVisible();
   });
 
@@ -66,8 +56,8 @@ test.describe("organizer authentication", () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await signInVolunteer(page);
     const navigation = page.getByRole("navigation", { name: "Volunteer" });
-    await expect(navigation.getByRole("tab")).toHaveText(["Dashboard", "Check-in"]);
-    await navigation.getByRole("tab", { name: "Check-in", exact: true }).click();
+    await expect(navigation.getByRole("link")).toHaveText(["Dashboard", "Check-in"]);
+    await navigation.getByRole("link", { name: "Check-in", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/scan\/check-in$/);
     await page.goBack();
     await expect(page).toHaveURL(/\/admin\/scan$/);
