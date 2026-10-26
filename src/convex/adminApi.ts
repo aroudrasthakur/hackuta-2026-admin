@@ -24,7 +24,6 @@ import type {
   foodCheckInParticipant,
 } from "../../convex/admin/volunteerOperations";
 import type {
-<<<<<<< HEAD
   createEvent,
   getEvent,
   listEvents,
@@ -32,7 +31,7 @@ import type {
   setEventPoints,
   updateEvent,
 } from "../../convex/admin/events";
-=======
+import type {
   getParticipantDetails,
   listParticipants,
   promoteParticipantToVolunteer,
@@ -42,7 +41,6 @@ import type {
   restoreVolunteer,
   revokeVolunteer,
 } from "../../convex/admin/volunteers";
->>>>>>> fc256ddb3ad69bb55fd12a0e587528270f0c1cc6
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -202,7 +200,6 @@ export const awardEventPointsRef = adminModuleRef<
   AwardEventPointsResult
 >("admin/volunteerOperations:awardEventPoints");
 
-<<<<<<< HEAD
 type EventAdmin = ApiFromModules<{
   events: {
     listEvents: typeof listEvents;
@@ -253,7 +250,7 @@ export const setEventPointsRef = adminModuleRef<
   FunctionArgs<EventAdmin["setEventPoints"]>,
   FunctionReturnType<EventAdmin["setEventPoints"]>
 >("admin/events:setEventPoints");
-=======
+
 type ParticipantsAdmin = ApiFromModules<{
   participants: {
     getParticipantDetails: typeof getParticipantDetails;
@@ -308,4 +305,3 @@ export const restoreVolunteerRef = adminModuleRef<
   FunctionArgs<VolunteerManagement["restoreVolunteer"]>,
   FunctionReturnType<VolunteerManagement["restoreVolunteer"]>
 >("admin/volunteers:restoreVolunteer");
->>>>>>> fc256ddb3ad69bb55fd12a0e587528270f0c1cc6
