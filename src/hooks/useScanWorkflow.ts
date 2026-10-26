@@ -1,0 +1,138 @@
+import { useCallback, useRef, useState } from "react";
+import type { GenericId } from "convex/values";
+import { useMutation } from "../convex/reactBindings";
+import {
+  awardEventPointsRef,
+  checkInParticipantRef,
+  foodCheckInParticipantRef,
+  resolveQrForScanRef,
+} from "../convex/adminApi";
+import {
+  awardOutcome,
+  checkInOutcome,
+  foodOutcome,
+  INVALID_QR_OUTCOME,
+  normalizeQrToken,
+  previewOutcome,
+  scanErrorOutcome,
+  scanFailureOutcome,
+  withScanTimeout,
+  type ScanOutcome,
+  type ScanPreview,
+  type ScanPurpose,
+} from "../lib/scanResults";
+import { useAdminAuth } from "./useAdminAuth";
+
+export type ScanWorkflowState =
+  | { step: "scan" }
+  | { step: "resolving" }
+  | { step: "confirm"; preview: ScanPreview; submitting: boolean; error: ScanOutcome | null }
+  | { step: "result"; outcome: ScanOutcome };
+
+/**
+ * Scan → confirm → result for one purpose (and event, for points). The
+ * preview only identifies the participant; the confirmation mutation re-runs
+ * every check on the server and its result is what the volunteer sees.
+ *
+ * The QR token lives only in a ref between preview and confirmation and is
+ * dropped on any result or reset. Remount (key by purpose and event) to clear
+ * everything when either changes.
+ */
+export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"events">) {
+  const { sessionToken } = useAdminAuth();
+  const resolve = useMutation(resolveQrForScanRef);
+  const checkIn = useMutation(checkInParticipantRef);
+  const redeemFood = useMutation(foodCheckInParticipantRef);
+  const awardPoints = useMutation(awardEventPointsRef);
+  const [state, setState] = useState<ScanWorkflowState>({ step: "scan" });
+  const tokenRef = useRef<string | null>(null);
+  const busyRef = useRef(false);
+  const requestRef = useRef(0);
+
+  const finish = useCallback((outcome: ScanOutcome) => {
+    tokenRef.current = null;
+    setState({ step: "result", outcome });
+  }, []);
+
+  const scan = useCallback(async (rawValue: string) => {
+    if (busyRef.current || tokenRef.current) return;
+    const token = normalizeQrToken(rawValue);
+    if (!token) return finish(INVALID_QR_OUTCOME);
+    if (!sessionToken) return finish(scanFailureOutcome("session_expired"));
+    if (purpose === "point_scan" && !eventId) return finish(scanFailureOutcome("event_denied"));
+
+    busyRef.current = true;
+    const request = ++requestRef.current;
+    setState({ step: "resolving" });
+    try {
+      const preview = await withScanTimeout(() => resolve({
+        sessionToken,
+        qrCodeToken: token,
+        purpose,
+        ...(purpose === "point_scan" && eventId ? { eventId } : {}),
+      }));
+      if (request !== requestRef.current) return;
+      const ended = previewOutcome(preview);
+      if (ended) return finish(ended);
+      tokenRef.current = token;
+      setState({ step: "confirm", preview: preview as ScanPreview, submitting: false, error: null });
+    } catch (caught) {
+      if (request === requestRef.current) finish(scanErrorOutcome(caught, "Volunteer QR lookup failed"));
+    } finally {
+      if (request === requestRef.current) busyRef.current = false;
+    }
+  }, [eventId, finish, purpose, resolve, sessionToken]);
+
+  const confirm = useCallback(async () => {
+    const token = tokenRef.current;
+    if (busyRef.current || state.step !== "confirm" || !token) return;
+    if (!sessionToken) return finish(scanFailureOutcome("session_expired"));
+    const { preview } = state;
+    busyRef.current = true;
+    const request = ++requestRef.current;
+    setState({ ...state, submitting: true, error: null });
+
+    const retryable = (outcome: ScanOutcome) => {
+      setState({ step: "confirm", preview, submitting: false, error: outcome });
+    };
+    try {
+      const name = preview.participant.name;
+      const args = { sessionToken, qrCodeToken: token };
+      let outcome: ScanOutcome;
+      let rateLimited: boolean;
+      if (preview.purpose === "point_scan") {
+        const result = await withScanTimeout(() => awardPoints({ ...args, eventId: preview.event.eventId }));
+        outcome = awardOutcome(result, name, preview.event.name);
+        rateLimited = result.status === "rate_limited";
+      } else if (preview.purpose === "food_check_in") {
+        const result = await withScanTimeout(() => redeemFood(args));
+        outcome = foodOutcome(result, name);
+        rateLimited = result.status === "rate_limited";
+      } else {
+        const result = await withScanTimeout(() => checkIn(args));
+        outcome = checkInOutcome(result, name);
+        rateLimited = result.status === "rate_limited";
+      }
+      if (request !== requestRef.current) return;
+      if (rateLimited) retryable(outcome);
+      else finish(outcome);
+    } catch (caught) {
+      if (request !== requestRef.current) return;
+      const outcome = scanErrorOutcome(caught, "Volunteer scan confirmation failed");
+      if (outcome === scanFailureOutcome("network")) retryable(outcome);
+      else finish(outcome);
+    } finally {
+      if (request === requestRef.current) busyRef.current = false;
+    }
+  }, [awardPoints, checkIn, finish, redeemFood, sessionToken, state]);
+
+  /** Back to scanning. Ignores any response still in flight. */
+  const reset = useCallback(() => {
+    requestRef.current += 1;
+    busyRef.current = false;
+    tokenRef.current = null;
+    setState({ step: "scan" });
+  }, []);
+
+  return { state, scan, confirm, reset };
+}
