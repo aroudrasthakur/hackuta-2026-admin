@@ -10,6 +10,7 @@ import {
 } from "./fixtures/auth";
 import { expectAdminListboxValue, selectAdminListbox } from "./fixtures/listbox";
 import { resetE2eMockBackend } from "./fixtures/resetMock";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 test.describe("applications queue", () => {
   test.beforeEach(async ({ page }) => {
@@ -122,7 +123,7 @@ test.describe("applications queue", () => {
       ).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       if (width === 1440 || width === 375) {
-        await page.screenshot({ path: testInfo.outputPath(`applications-${width}.png`), fullPage: true });
+        await reviewScreenshot(page, `applications-${width}.png`, testInfo);
       }
     }
     await page.getByRole("link", { name: "Review application for Taylor Unreviewed" }).click();

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { E2E_ADMIN, signInOrganizerOnLoginPage, signOutOrganizer } from "./fixtures/auth";
 import { setMealScenario } from "./fixtures/meals";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 async function start(page: Page) {
   await page.setViewportSize({ width: 375, height: 812 });
@@ -22,14 +23,14 @@ test("collects once per meal, preserves legacy eligibility, and automatically mo
   await page.clock.install(); await start(page);
   await expect(page.getByText("Lunch", { exact: true })).toBeVisible();
   await scan(page); await expect(page.getByText("Vegetarian; Allergies: peanuts")).toBeVisible();
-  await page.screenshot({ path: info.outputPath("meal-confirm-mobile.png"), fullPage: true });
+  await reviewScreenshot(page, "meal-confirm-mobile.png", info);
   await page.getByRole("button", { name: "Confirm food given" }).click();
   await expect(page.getByRole("status")).toContainText("food collection for Lunch is recorded");
   await page.getByRole("button", { name: "Scan next" }).click(); await scan(page);
   await expect(page.getByRole("status")).toContainText("Food Already Collected");
   await expect(page.getByRole("status")).toContainText("already received their food for Lunch.");
   await expect(page.getByRole("button", { name: "Scan next" })).toBeFocused();
-  await page.screenshot({ path: info.outputPath("meal-duplicate-mobile.png"), fullPage: true });
+  await reviewScreenshot(page, "meal-duplicate-mobile.png", info);
   await page.getByRole("button", { name: "Scan next" }).click(); await scan(page, E2E_QR_TOKENS.checkedIn);
   await expect(page.getByRole("heading", { name: "Morgan Present" })).toBeVisible();
   await page.getByRole("button", { name: "Confirm food given" }).click();

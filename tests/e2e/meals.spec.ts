@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 test("admin manages a meal on mobile, checks history, and removes an unused meal", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -13,17 +14,17 @@ test("admin manages a meal on mobile, checks history, and removes an unused meal
   await dialog.getByLabel("Description").fill("Fruit, pastries, and coffee");
   await dialog.getByLabel("Starts at").fill("2027-01-10T10:00");
   await dialog.getByLabel("Ends at").fill("2027-01-10T12:00");
-  await page.screenshot({ path: test.info().outputPath("meal-form-mobile.png"), fullPage: true });
+  await reviewScreenshot(page, "meal-form-mobile.png", test.info());
   await dialog.getByRole("button", { name: "Save meal" }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByText("Meal created.", { exact: true })).toBeVisible();
   await expect(page.getByRole("cell", { name: "Upcoming", exact: true })).toBeVisible();
   await expect(page.getByRole("cell", { name: "0", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath("meals-mobile.png"), fullPage: true });
+  await reviewScreenshot(page, "meals-mobile.png", test.info());
   await page.setViewportSize({ width: 1440, height: 1000 });
   await expect(page.getByRole("heading", { name: "Meals", exact: true })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath("meals-desktop.png"), fullPage: true });
+  await reviewScreenshot(page, "meals-desktop.png", test.info());
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Edit Sunday brunch", exact: true }).click();
   await dialog.getByLabel("Meal name").fill("Sunday lunch");

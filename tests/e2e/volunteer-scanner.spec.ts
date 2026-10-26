@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { E2E_EVENTS, E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { qrCodeSvg, showQrToCamera } from "./fixtures/qrCamera";
 import { setMealScenario } from "./fixtures/meals";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 /**
  * Full Chromium (the default headless shell has no media capture) with its
@@ -48,12 +49,12 @@ test.describe("volunteer QR scanner", () => {
     await expect(confirmation).not.toContainText("Dietary");
     await expect(page.getByRole("heading", { name: "Riley Ready" })).toBeFocused();
     await expectNoHorizontalScroll(page);
-    await page.screenshot({ path: "test-results/scanner-check-in-confirm-mobile.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/scanner-check-in-confirm-mobile.png");
 
     await page.getByRole("button", { name: "Confirm check-in" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toContainText("Riley Ready is checked in.");
     await expect(page.getByRole("button", { name: "Scan next" })).toBeFocused();
-    await page.screenshot({ path: "test-results/scanner-check-in-success-mobile.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/scanner-check-in-success-mobile.png");
 
     await page.getByRole("button", { name: "Scan next" }).click();
     await lookUp(page, E2E_QR_TOKENS.ready);
@@ -82,7 +83,7 @@ test.describe("volunteer QR scanner", () => {
     await lookUp(page, E2E_QR_TOKENS.ready);
     await expect(page.getByText("Not redeemed yet")).toBeVisible();
     await expectNoHorizontalScroll(page);
-    await page.screenshot({ path: "test-results/scanner-food-confirm-mobile.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/scanner-food-confirm-mobile.png");
 
     await page.getByRole("button", { name: "Confirm food given" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Food collected" })).toBeVisible();
@@ -115,7 +116,7 @@ test.describe("volunteer QR scanner", () => {
     await lookUp(page, E2E_QR_TOKENS.checkedIn);
     await expect(page.getByRole("region", { name: "Morgan Present" })).toContainText(E2E_EVENTS.workshop.name);
     await expectNoHorizontalScroll(page);
-    await page.screenshot({ path: "test-results/scanner-points-confirm-mobile.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/scanner-points-confirm-mobile.png");
 
     await page.getByRole("button", { name: "Change event" }).click();
     await expect(page.getByRole("region", { name: "Morgan Present" })).toHaveCount(0);
@@ -157,7 +158,7 @@ test.describe("volunteer camera scanner", () => {
     await expect(page.getByRole("status")).toHaveText("Point the camera at the participant's QR code.", { timeout: 15_000 });
     await expect(video).toBeVisible();
     await expectNoHorizontalScroll(page);
-    await page.screenshot({ path: "test-results/scanner-camera-mobile.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/scanner-camera-mobile.png");
 
     const tracks = await video.evaluate((element: HTMLVideoElement) => {
       const stream = element.srcObject as MediaStream;

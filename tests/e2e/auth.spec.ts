@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 test.describe("organizer authentication", () => {
   test("keeps volunteer sessions out of review pages and permits signing out", async ({ page }) => {
@@ -70,7 +71,7 @@ test.describe("organizer authentication", () => {
     await page.getByRole("link", { name: "Back to volunteer dashboard" }).click();
     await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.screenshot({ path: "test-results/volunteer-dashboard-mobile.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/volunteer-dashboard-mobile.png");
   });
   test("redirects unauthenticated users to login", async ({ page }) => {
     await page.goto("/admin/applications");

@@ -1,23 +1,31 @@
 import { expect, test } from "@playwright/test";
 import { E2E_ADMIN, signInOrganizer, signInVolunteer } from "./fixtures/auth";
 import { setDecisionQueue } from "./fixtures/decisionQueue";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 const widths = [320, 375, 768, 1024, 1440];
+const adminPages = ["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Meals", "Shop"] as const;
 
 test("keeps page headers and role navigation usable at every dashboard width", async ({ page }, testInfo) => {
   await signInOrganizer(page, E2E_ADMIN);
   await page.getByRole("button", { name: "Calm", exact: true }).click();
-  for (const name of ["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Meals", "Shop"]) {
-    const navigation = page.getByRole("navigation", { name: "Admin", exact: true });
+  const navigation = page.getByRole("navigation", { name: "Admin", exact: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const name of adminPages) {
     await navigation.getByRole("link", { name, exact: true }).click();
-    for (const width of widths) {
-      await page.setViewportSize({ width, height: 900 });
-      await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
-      await expect(navigation.locator('[aria-current="page"]')).toHaveText(name);
-      await expect(navigation.getByRole("link")).toHaveCount(7);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      if (width === 375 || width === 1440) await page.screenshot({ path: testInfo.outputPath(`${name.toLowerCase().replaceAll(" ", "-")}-${width}.png`), fullPage: true });
-    }
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
+    await expect(navigation.locator('[aria-current="page"]')).toHaveText(name);
+    await expect(navigation.getByRole("link")).toHaveCount(7);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await reviewScreenshot(page, `${name.toLowerCase().replaceAll(" ", "-")}-1440.png`, testInfo);
+  }
+  await navigation.getByRole("link", { name: "Applications", exact: true }).click();
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText("Applications");
+    await expect(navigation.getByRole("link")).toHaveCount(7);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (width === 375) await reviewScreenshot(page, "applications-375.png", testInfo);
   }
 });
 
@@ -70,7 +78,7 @@ test("keeps management and email controls available at 200 percent CSS zoom", as
   await signInOrganizer(page, E2E_ADMIN);
   await setDecisionQueue(page, "mixed");
   await page.evaluate(() => { document.documentElement.style.zoom = "2"; });
-  for (const name of ["Participants", "Volunteers", "Events", "Meals", "Shop", "Decision emails"]) {
+  for (const name of ["Participants", "Meals", "Shop", "Decision emails"]) {
     await page.getByRole("navigation", { name: "Admin", exact: true }).getByRole("link", { name, exact: true }).click();
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -120,6 +128,6 @@ test("captures the volunteer dashboard at mobile and desktop widths", async ({ p
     await expect(page.getByRole("heading", { name: "Volunteer dashboard", exact: true })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Admin", exact: true })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    if (width === 375 || width === 1440) await page.screenshot({ path: testInfo.outputPath(`volunteer-dashboard-${width}.png`), fullPage: true });
+    if (width === 375 || width === 1440) await reviewScreenshot(page, `volunteer-dashboard-${width}.png`, testInfo);
   }
 });

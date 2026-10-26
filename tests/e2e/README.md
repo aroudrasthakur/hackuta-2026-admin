@@ -26,7 +26,8 @@ Config: [playwright.config.ts](../../playwright.config.ts).
 
 Decision-email scenarios: [`fixtures/decisionQueue.ts`](fixtures/decisionQueue.ts).
 Coverage uses Chromium and CSS zoom; manual browser zoom and assistive-technology
-checks remain separate. Screenshots in `test-results/` are review artifacts.
+checks remain separate. Screenshots in `test-results/` are local review artifacts
+and are skipped in CI so full-page captures of the storm UI do not dominate runtime.
 
 ## Windows runner shutdown
 

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { E2E_ADMIN, signInOrganizer, signInOrganizerOnLoginPage, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 async function openShop(page: Page) {
   await page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Shop", exact: true }).click();
@@ -62,7 +63,7 @@ test.describe("admin shop", () => {
     await expect(access).toHaveAttribute("aria-checked", "false");
     await access.click();
     await expect(access).toHaveAttribute("aria-checked", "true");
-    await page.screenshot({ path: "test-results/shop-admin-items.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/shop-admin-items.png");
 
     await openSection(page, "Flash sales");
     await expect(page.getByText("Midnight tee sale")).toBeVisible();
@@ -78,7 +79,7 @@ test.describe("admin shop", () => {
     await page.getByRole("button", { name: "Schedule sale" }).click();
     await expect(page.locator(".admin-callout--success")).toContainText("Sale scheduled.");
     await expect(page.locator(".shop-sale", { hasText: "Late-night drop" })).toContainText("Scheduled");
-    await page.screenshot({ path: "test-results/shop-admin-sales.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/shop-admin-sales.png");
   });
 
   test("hides shop redemption from volunteers without shop access", async ({ page }) => {
@@ -107,7 +108,7 @@ test.describe("volunteer shop purchase", () => {
     await expect(review).toContainText("Total600 pts");
     await expect(review).toContainText("Balance after650 pts");
     await expectNoHorizontalScroll(page);
-    await page.screenshot({ path: "test-results/shop-volunteer-review-mobile.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/shop-volunteer-review-mobile.png");
 
     await page.evaluate(() => (window as Window & { __dropNextE2eShopPurchase?: () => void }).__dropNextE2eShopPurchase?.());
     await page.getByRole("button", { name: "Confirm · 600 pts" }).click();
@@ -117,7 +118,7 @@ test.describe("volunteer shop purchase", () => {
     await expect(result).toContainText("No extra points were taken.");
     await expect(result).toContainText("New balance650 pts");
     await expect(page.getByRole("button", { name: "Scan next" })).toBeFocused();
-    await page.screenshot({ path: "test-results/shop-volunteer-duplicate-mobile.png", fullPage: true });
+    await reviewScreenshot(page, "test-results/shop-volunteer-duplicate-mobile.png");
 
     await page.getByRole("button", { name: "Scan next" }).click();
     await lookUp(page, E2E_QR_TOKENS.ready);

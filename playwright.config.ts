@@ -7,8 +7,11 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Spec files can share a worker pool; tests in one file stay serial so
+  // viewport/zoom cases do not fight the same page. Two CI workers keep the
+  // merged meals+shop suite under the job timeout.
   fullyParallel: false,
-  workers: 1,
+  workers: process.env.CI ? 2 : 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",

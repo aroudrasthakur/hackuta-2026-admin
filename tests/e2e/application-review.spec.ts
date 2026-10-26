@@ -6,6 +6,7 @@ import {
   signInOrganizer,
 } from "./fixtures/auth";
 import { resetE2eMockBackend } from "./fixtures/resetMock";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 test.describe("application review workflow", () => {
   test.beforeEach(async ({ page }) => {
@@ -51,7 +52,7 @@ test.describe("application review workflow", () => {
         expect((await responses.boundingBox())!.y).toBeLessThan(720);
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      if (width === 1440 || width === 375) await page.screenshot({ path: testInfo.outputPath(`review-${width}.png`), fullPage: true });
+      if (width === 1440 || width === 375) await reviewScreenshot(page, `review-${width}.png`, testInfo);
     }
     await expect(page.getByRole("region", { name: "Personal and contact information" })).toBeHidden();
     await page.getByText("Additional applicant information", { exact: true }).click();
