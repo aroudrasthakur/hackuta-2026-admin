@@ -1,6 +1,6 @@
 /** Shared Tailwind classes for admin and review workflow buttons. */
 const adminButtonBase =
-  "admin-btn inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold no-underline shadow-sm transition-[background-color,border-color,color,box-shadow] duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-60";
+  "admin-btn inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-sm font-semibold no-underline transition-[background-color,border-color,color,box-shadow] duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-60";
 
 export const reviewPrimaryButtonClass =
   `${adminButtonBase} border border-ocean bg-ocean text-light hover:border-ink hover:bg-ink`;

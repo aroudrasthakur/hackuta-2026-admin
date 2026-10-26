@@ -1,24 +1,22 @@
 import type { SubmittedApplicationSummary } from "../convex/adminApi";
+import { AdminStatusBadge } from "./AdminStatusBadge";
 
 const decisionPresentations = {
   accepted: {
     label: "Accepted",
-    className: "border-green-200 bg-green-50 text-green-800",
+    tone: "positive",
   },
   rejected: {
     label: "Rejected",
-    className: "border-red-200 bg-red-50 text-red-800",
+    tone: "negative",
   },
   waitlisted: {
     label: "Waitlisted",
-    className: "border-amber-200 bg-amber-50 text-amber-800",
+    tone: "warning",
   },
 } as const;
 
 type FinalDecisionStatus = keyof typeof decisionPresentations;
-
-const DECISION_BADGE_BASE_CLASS =
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide";
 
 function decisionPresentationForStatus(
   status: SubmittedApplicationSummary["reviewStatus"],
@@ -39,11 +37,11 @@ export function ApplicationDecisionBadge({
   if (!decision) return null;
 
   return (
-    <span
-      aria-label={`Decision: ${decision.label}`}
-      className={`${DECISION_BADGE_BASE_CLASS} ${decision.className}`}
+    <AdminStatusBadge
+      label={`Decision: ${decision.label}`}
+      tone={decision.tone}
     >
       {decision.label}
-    </span>
+    </AdminStatusBadge>
   );
 }
