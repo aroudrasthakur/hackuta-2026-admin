@@ -156,7 +156,12 @@ export const updateEvent = mutation({
       changedFields.push("name");
     }
     if ((normalized.description ?? null) !== (event.description ?? null)) {
-      patch.description = normalized.description;
+      if (normalized.description === undefined) {
+        // Convex treats `undefined` as clearing an optional field in a patch.
+        (patch as unknown as { description?: undefined }).description = undefined;
+      } else {
+        patch.description = normalized.description;
+      }
       changedFields.push("description");
     }
     if (normalized.startsAt !== event.startsAt) {

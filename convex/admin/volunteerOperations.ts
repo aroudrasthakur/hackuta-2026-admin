@@ -9,7 +9,7 @@
  *
  * Same throttle rules as the preview: session failures throw before any
  * write, and every outcome after the attempt row is returned, not thrown.
- * Event `startsAt` / `endsAt` are reference only and do not gate awards.
+ * Event `startsAt` / `endsAt` are enforced for point awards.
  */
 import { v } from "convex/values";
 import type { GenericId } from "convex/values";
@@ -137,6 +137,7 @@ export const awardEventPoints = mutation({
     const event = assignment ? await ctx.db.get(eventId) : null;
     if (!event) return deny(ctx, scan, "event_denied");
     if (!event.active) return deny(ctx, scan, "event_inactive");
+    if (scan.now < event.startsAt || scan.now >= event.endsAt) return deny(ctx, scan, "event_inactive");
 
     const found = await eligibleParticipant(ctx, scan, qrCodeToken);
     if ("failure" in found) return found.failure;

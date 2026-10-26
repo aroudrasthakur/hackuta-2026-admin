@@ -74,7 +74,8 @@ export const listMyScanOptions = query({
 /**
  * Event for a point-scan preview, or null. Missing, unassigned, and inactive
  * events look the same so volunteers learn nothing about events outside their
- * assignments. Schedule fields are reference only and are not checked.
+ * assignments. Schedule fields are returned for UI context, but **award**
+ * mutations re-check the event window and can still reject.
  */
 async function assignedActiveEvent(
   ctx: MutationCtx,

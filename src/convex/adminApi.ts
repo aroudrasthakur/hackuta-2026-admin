@@ -23,6 +23,14 @@ import type {
   checkInParticipant,
   foodCheckInParticipant,
 } from "../../convex/admin/volunteerOperations";
+import type {
+  createEvent,
+  getEvent,
+  listEvents,
+  setEventActive,
+  setEventPoints,
+  updateEvent,
+} from "../../convex/admin/events";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -181,3 +189,54 @@ export const awardEventPointsRef = adminModuleRef<
   FunctionArgs<VolunteerOperations["awardEventPoints"]>,
   AwardEventPointsResult
 >("admin/volunteerOperations:awardEventPoints");
+
+type EventAdmin = ApiFromModules<{
+  events: {
+    listEvents: typeof listEvents;
+    getEvent: typeof getEvent;
+    createEvent: typeof createEvent;
+    updateEvent: typeof updateEvent;
+    setEventActive: typeof setEventActive;
+    setEventPoints: typeof setEventPoints;
+  };
+}>["events"];
+
+export type AdminEventsPage = FunctionReturnType<EventAdmin["listEvents"]>;
+
+export const listEventsRef = adminModuleRef<
+  "query",
+  FunctionArgs<EventAdmin["listEvents"]>,
+  AdminEventsPage
+>("admin/events:listEvents");
+
+export type AdminEventDetail = FunctionReturnType<EventAdmin["getEvent"]>;
+
+export const getEventRef = adminModuleRef<
+  "query",
+  FunctionArgs<EventAdmin["getEvent"]>,
+  AdminEventDetail
+>("admin/events:getEvent");
+
+export const createEventRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["createEvent"]>,
+  FunctionReturnType<EventAdmin["createEvent"]>
+>("admin/events:createEvent");
+
+export const updateEventRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["updateEvent"]>,
+  FunctionReturnType<EventAdmin["updateEvent"]>
+>("admin/events:updateEvent");
+
+export const setEventActiveRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["setEventActive"]>,
+  FunctionReturnType<EventAdmin["setEventActive"]>
+>("admin/events:setEventActive");
+
+export const setEventPointsRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["setEventPoints"]>,
+  FunctionReturnType<EventAdmin["setEventPoints"]>
+>("admin/events:setEventPoints");

@@ -285,15 +285,25 @@ describe("awardEventPoints", () => {
     expect(await snapshot(t)).toEqual(before);
   });
 
-  it("does not gate awards on the event schedule", async () => {
+  it("rejects awards outside the configured event window", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t);
     const { adminId } = await seedParticipant(t, { fields: { checkedInAt: 1 } });
-    const eventId = await seedEvent(t, { startsAt: 1, endsAt: 2 });
-    await assign(t, volunteer.adminId, eventId, adminId);
+    const endedEvent = await seedEvent(t, { startsAt: 1, endsAt: 2 });
+    await assign(t, volunteer.adminId, endedEvent, adminId);
     expect(await t.mutation(awardEventPointsRef, {
-      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, eventId,
-    })).toEqual({ status: "success", pointsAwarded: 10 });
+      sessionToken: volunteer.sessionToken,
+      qrCodeToken: QR_TOKEN,
+      eventId: endedEvent,
+    })).toEqual({ status: "event_inactive" });
+
+    const upcomingEvent = await seedEvent(t, { startsAt: NOW + 60_000, endsAt: NOW + 120_000 });
+    await assign(t, volunteer.adminId, upcomingEvent, adminId);
+    expect(await t.mutation(awardEventPointsRef, {
+      sessionToken: volunteer.sessionToken,
+      qrCodeToken: QR_TOKEN,
+      eventId: upcomingEvent,
+    })).toEqual({ status: "event_inactive" });
   });
 
   it("applies event changes and revoked assignments on the next scan", async () => {

@@ -26,7 +26,7 @@ Acting identity always comes from the guard return value (`admin._id`). Never tr
 
 - Permission to award an event's points is **only** the presence of a `volunteerEventAccess` row for `(volunteerAdminId, eventId)` at the time of the request.
 - **Removing** an assignment (leaving the event out of the `setVolunteerEventAccess` list) deletes the row in that transaction. The volunteer loses access on the **next** scan request; there is no caching of assignments in sessions.
-- `events.startsAt` / `events.endsAt` are **reference schedule only**. They do **not** gate scanning (see [pointsLedger.ts](pointsLedger.ts)).
+- `events.startsAt` / `events.endsAt` gate point awards: an event must be within its configured time window to award points.
 - Inactive or missing events reject even when an assignment row still exists (`EVENT_INACTIVE`, `EVENT_NOT_FOUND`).
 
 ## Ledger helpers are not auth boundaries
@@ -88,7 +88,7 @@ Response fields by purpose. Point totals, emails, applications, and QR tokens ar
 | `food_check_in` | name, `foodCheckedIn`, `foodCheckedInAt`, `dietaryInfo` (the only response with dietary data) |
 | `point_scan` | name, event name, event `pointsAwarded`, `alreadyAwarded` |
 
-Event `startsAt` / `endsAt` are not checked for point scans (reference schedule only, same as `awardEventPoints`).
+Event `startsAt` / `endsAt` are not checked for point-scan previews. The award mutation enforces the time window.
 
 ## Scan operations (`volunteerOperations.ts`)
 
@@ -104,7 +104,7 @@ These mutations do the real work. Each one re-checks everything itself and share
 - Repeat scans change nothing and return `already_checked_in` (with `checkedInAt`), `already_food_checked_in` (with `foodCheckedInAt`), or `already_awarded`.
 - Other results: `qr_not_found`, `not_authorized` (missing capability), `event_denied` (unassigned or missing event), `event_inactive`, `participant_not_checked_in`, `participant_not_eligible`, `rate_limited`.
 - One award per participant and event comes from the `by_participant_event` lookup inside the mutation's transaction. If two scans race, Convex retries one of them, and the retry sees the first award. The index alone does not enforce uniqueness.
-- Event times are not checked, same as the preview.
+- Event times are enforced for point awards (previews can be stale).
 - Logs never contain QR tokens, session tokens, or dietary data.
 
 ### Rate limits

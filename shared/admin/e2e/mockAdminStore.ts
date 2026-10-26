@@ -606,6 +606,7 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       const target = scanTarget(requireVolunteer(sessionToken), args, "point_scan");
       if ("failure" in target) return { status: target.failure };
       const { participant, event } = target;
+      if (now < event!.startsAt || now >= event!.endsAt) return { status: "event_inactive" };
       if (participant.checkedInAt === undefined) return { status: "participant_not_checked_in" };
       if (participant.awardedEventIds.has(event!.eventId)) return { status: "already_awarded" };
       participant.awardedEventIds.add(event!.eventId);
