@@ -9,6 +9,7 @@ import { QR_SCAN_FAILURE_LIMIT } from "../../convex/admin/volunteerScanRateLimit
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
+import { seedMealPeriod } from "../helpers/mealTestKit";
 
 const QR_TOKEN = "ab".repeat(32);
 const UNKNOWN_TOKEN = "cd".repeat(32);
@@ -174,14 +175,16 @@ describe("foodCheckInParticipant", () => {
   it("redeems once without requiring door check-in", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t, { canFoodCheckIn: true });
-    const { participantId } = await seedParticipant(t);
-    const args = { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN };
+    const { participantId, adminId } = await seedParticipant(t);
+    const mealPeriodId = await seedMealPeriod(t, adminId);
+    const args = { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, mealPeriodId };
 
     const result = await t.mutation(foodCheckInParticipantRef, args);
-    expect(result).toEqual({ status: "success", foodCheckedInAt: NOW });
+    expect(result).toEqual({ status: "success", redeemedAt: NOW, meal: { mealPeriodId, name: "Lunch" } });
     expectNoSensitiveData(result);
     const participant = await getParticipant(t, participantId);
-    expect(participant).toMatchObject({ foodCheckedInAt: NOW, updatedAt: NOW });
+    expect(participant?.foodCheckedInAt).toBeUndefined();
+    expect(participant?.updatedAt).toBe(1);
     expect(participant?.checkedInAt).toBeUndefined();
     const rows = await logs(t);
     expect(rows).toEqual([expect.objectContaining({
@@ -192,7 +195,7 @@ describe("foodCheckInParticipant", () => {
     vi.setSystemTime(NOW + 5000);
     const before = await snapshot(t);
     expect(await t.mutation(foodCheckInParticipantRef, args))
-      .toEqual({ status: "already_food_checked_in", foodCheckedInAt: NOW });
+      .toEqual({ status: "already_redeemed", redeemedAt: NOW, meal: { mealPeriodId, name: "Lunch" } });
     expect(await snapshot(t)).toEqual(before);
   });
 
@@ -209,10 +212,11 @@ describe("foodCheckInParticipant", () => {
   it("rejects ineligible participants", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t, { canFoodCheckIn: true });
-    await seedParticipant(t, { status: "rejected" });
+    const { adminId } = await seedParticipant(t, { status: "rejected" });
+    const mealPeriodId = await seedMealPeriod(t, adminId);
     expect(await t.mutation(foodCheckInParticipantRef, {
-      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN,
-    })).toEqual({ status: "participant_not_eligible" });
+      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, mealPeriodId,
+    })).toEqual({ status: "participant_ineligible" });
   });
 });
 
@@ -342,13 +346,14 @@ describe("concurrent scans", () => {
   it("produce one check-in and one food redemption", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t, { canCheckIn: true, canFoodCheckIn: true });
-    await seedParticipant(t);
+    const { adminId } = await seedParticipant(t);
+    const mealPeriodId = await seedMealPeriod(t, adminId);
     const args = { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN };
     const checkIns = await Promise.all(
       Array.from({ length: SCANS }, () => t.mutation(checkInParticipantRef, args)),
     );
     const food = await Promise.all(
-      Array.from({ length: SCANS }, () => t.mutation(foodCheckInParticipantRef, args)),
+      Array.from({ length: SCANS }, () => t.mutation(foodCheckInParticipantRef, { ...args, mealPeriodId })),
     );
     expect(checkIns.filter((r) => r.status === "success")).toHaveLength(1);
     expect(food.filter((r) => r.status === "success")).toHaveLength(1);

@@ -13,6 +13,7 @@ import {
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
+import { seedMealPeriod } from "../helpers/mealTestKit";
 
 const QR_TOKEN = "ab".repeat(32);
 const UNKNOWN_TOKEN = "cd".repeat(32);
@@ -155,16 +156,18 @@ describe("resolveQrForScan", () => {
   it("includes dietary info only for food check-in", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t, { canFoodCheckIn: true });
-    await seedParticipant(t);
+    const { adminId } = await seedParticipant(t);
+    const mealPeriodId = await seedMealPeriod(t, adminId);
     expect(await t.mutation(resolveQrForScanRef, {
-      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "food_check_in",
+      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "food_check_in", mealPeriodId,
     })).toEqual({
       status: "ok",
       purpose: "food_check_in",
+      meal: { mealPeriodId, name: "Lunch" },
       participant: {
         name: "Taylor Student",
-        foodCheckedIn: false,
-        foodCheckedInAt: null,
+        alreadyRedeemed: false,
+        redeemedAt: null,
         dietaryInfo: "Vegetarian; peanut allergy",
       },
     });
@@ -198,6 +201,7 @@ describe("resolveQrForScan", () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t, { canCheckIn: true, canFoodCheckIn: true });
     const { adminId } = await seedParticipant(t);
+    const mealPeriodId = await seedMealPeriod(t, adminId);
     const eventId = await seedEvent(t);
     await assign(t, volunteer.adminId, eventId, adminId);
     const snapshot = () => t.run(async (ctx) => ({
@@ -207,7 +211,7 @@ describe("resolveQrForScan", () => {
     }));
     const before = await snapshot();
     for (const purpose of ["check_in", "food_check_in", "point_scan"] as const) {
-      await t.mutation(resolveQrForScanRef, { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose, eventId });
+      expect(await t.mutation(resolveQrForScanRef, { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose, eventId, mealPeriodId })).toMatchObject({ status: "ok" });
     }
     expect(await snapshot()).toEqual(before);
   });
@@ -229,10 +233,11 @@ describe("resolveQrForScan", () => {
   it("reveals nothing about ineligible participants", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t, { canFoodCheckIn: true });
-    await seedParticipant(t, { status: "rejected" });
+    const { adminId } = await seedParticipant(t, { status: "rejected" });
+    const mealPeriodId = await seedMealPeriod(t, adminId);
     expect(await t.mutation(resolveQrForScanRef, {
-      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "food_check_in",
-    })).toEqual({ status: "participant_not_eligible" });
+      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "food_check_in", mealPeriodId,
+    })).toEqual({ status: "participant_ineligible" });
   });
 
   it("denies missing capabilities and event access before looking up the token", async () => {

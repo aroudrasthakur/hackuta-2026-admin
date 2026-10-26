@@ -240,6 +240,7 @@ export default defineSchema({
     participantId: v.id("participants"),
     action: volunteerActionLogAction,
     eventId: v.optional(v.id("events")),
+    mealPeriodId: v.optional(v.id("mealPeriods")),
     pointsDelta: v.optional(v.number()),
     previousPoints: v.optional(v.number()),
     newPoints: v.optional(v.number()),
