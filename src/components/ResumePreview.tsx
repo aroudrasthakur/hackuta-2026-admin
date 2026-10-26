@@ -43,7 +43,7 @@ export function ResumePreview({ resume }: { resume: ApplicationDetail["resume"] 
     <section aria-label="Resume" className="admin-card admin-card__body">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="admin-card__title">Resume</h3>
+          <h2 className="admin-card__title">Resume</h2>
           {resume.status === "available" && <p className="admin-card__hint break-all">{resume.filename || "Applicant resume"}{!unsupported && " · PDF"}</p>}
         </div>
         {resume.status === "available" && resume.url && !unsupported ? (

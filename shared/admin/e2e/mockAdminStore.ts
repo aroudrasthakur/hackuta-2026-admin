@@ -82,7 +82,7 @@ const decisionQueue = new Map<string, {
   queuedAt: number;
   errorMessage?: string;
 }>();
-export type DecisionQueueScenario = "mixed" | "sending" | "empty" | "loading" | "error" | "ready";
+export type DecisionQueueScenario = "mixed" | "sending" | "empty" | "loading" | "error" | "ready" | "long-content";
 let decisionQueueScenario: DecisionQueueScenario = "ready";
 let nextLogId = 100;
 
@@ -233,6 +233,14 @@ export function resetE2eMockStore() {
 /** Deterministic browser fixtures; exposed only when VITE_E2E_MOCK is enabled. */
 export function configureE2eDecisionQueue(scenario: DecisionQueueScenario) {
   decisionQueueScenario = scenario;
+  if (scenario === "long-content") {
+    for (const staff of staffById.values()) staff.name = "Alexandria Montgomery-Wellington, HackUTA Operations";
+    for (const application of applications.values()) {
+      application.lastName = "Montgomery-Wellington-With-A-Very-Long-Family-Name";
+      application.email = `${"longemail".repeat(8)}@example.com`;
+      application.school = "The International University of Engineering, Technology, and Applied Sciences";
+    }
+  }
   if (scenario === "mixed" || scenario === "sending" || scenario === "empty") {
     decisionQueue.clear();
     if (scenario !== "empty") {

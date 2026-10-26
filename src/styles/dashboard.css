@@ -93,7 +93,7 @@
     text-decoration: none;
     transition: background-color 160ms, color 160ms;
   }
-  .admin-section-link svg { flex-shrink: 0; }
+  .admin-section-link svg { flex-shrink: 0; width: var(--spacing-icon); height: var(--spacing-icon); }
   .admin-section-link:hover { background: var(--color-surface-muted); border-color: var(--color-border); }
   .admin-section-link[aria-current="page"] { background: var(--color-night); color: white; border-color: var(--color-night); }
   @media (min-width: 640px) {
@@ -106,6 +106,7 @@
 
   .admin-workspace {
     --color-mist: var(--color-muted);
+    background: rgb(246 237 223 / 0.95);
     font-size: 1rem;
     line-height: 1.5;
   }

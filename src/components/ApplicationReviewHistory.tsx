@@ -178,7 +178,7 @@ function ReviewHistoryEvents({ applicationId, sessionToken }: ReviewHistoryProps
 export function ApplicationReviewHistory(props: ReviewHistoryProps) {
   return (
     <section aria-label="Review history" className="admin-card admin-card__body space-y-3">
-      <h3 className="admin-card__title">Review History</h3>
+      <h2 className="admin-card__title">Review History</h2>
       <ErrorBoundary
         fallback={
           <p role="alert" className="rounded-lg border border-sand bg-clay/30 p-3 text-sm">

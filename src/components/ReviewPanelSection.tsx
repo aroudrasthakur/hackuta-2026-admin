@@ -20,7 +20,7 @@ export function ReviewPanelSection({
       className="admin-card admin-card__body space-y-3"
     >
       <div className="space-y-1">
-        <h3 className="admin-card__title">{title}</h3>
+        <h2 className="admin-card__title">{title}</h2>
         {description ? <p className="admin-card__hint">{description}</p> : null}
       </div>
       {children}

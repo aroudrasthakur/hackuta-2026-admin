@@ -124,7 +124,7 @@ function RecentlySentSection({ rows, totalSent }: { rows: SentRow[]; totalSent: 
   return (
     <section aria-label="Recently sent decision emails" className="admin-card admin-card__body space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="admin-card__title">Recently sent</h3>
+        <h2 className="admin-card__title">Recently sent</h2>
         {totalSent > 0 ? (
           <p className="admin-card__hint m-0">
             {showMoreNotice

@@ -15,11 +15,19 @@ Browser tests for the organizer admin SPA. They run against **`VITE_E2E_MOCK=tru
 | --- | --- |
 | [auth.spec.ts](auth.spec.ts) | Login redirect, invalid credentials, sign-out, home redirect, volunteer isolation and idle expiry |
 | [applications-queue.spec.ts](applications-queue.spec.ts) | Search/status/assignment/sort controls, preserved queue context, next review, live claim expiry, desktop/mobile layout, keyboard navigation |
-| [application-review.spec.ts](application-review.spec.ts) | Evidence-first layout, start/reclaim review, keyboard confirmation/completion, waitlist promotion, busy-review skipping, admin history |
+| [application-review.spec.ts](application-review.spec.ts) | Evidence-first layout, start/reclaim review, keyboard confirmation/completion, native resume-dialog focus, waitlist promotion, busy-review skipping, admin history |
+| [decision-email-queue.spec.ts](decision-email-queue.spec.ts) | Reviewer read-only view, admin hold/unhold/send/retry, delivery states, query recovery, contextual loading, mobile table scrolling |
+| [dashboard-layout.spec.ts](dashboard-layout.spec.ts) | Cross-page headers and navigation, widths 320–1440, long content, mobile account keyboard behavior, reduced motion, 200% CSS zoom, status/action contrast and review screenshots |
 
 Mock organizer accounts: [shared/admin/e2e/credentials.ts](../../shared/admin/e2e/credentials.ts).
 
 Config: [playwright.config.ts](../../playwright.config.ts).
+
+Decision-email scenarios use `fixtures/decisionQueue.ts` and the existing in-memory
+store. The fixture hook is exposed only in mock mode. No scenario uses live data or
+sends email. Screenshot files in `test-results/` are review evidence, not pixel
+regression baselines. Automated browser coverage is Chromium; the CSS zoom check
+does not replace manual browser zoom or assistive-technology review.
 
 ## Windows runner shutdown
 

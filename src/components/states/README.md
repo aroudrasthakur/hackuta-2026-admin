@@ -6,7 +6,8 @@ Reusable loading, error, and empty UI for admin routes. Flat directory.
 
 | File | Summary |
 | --- | --- |
-| [LoadingState.tsx](LoadingState.tsx) | Centered spinner/message while data loads |
+| [LoadingState.tsx](LoadingState.tsx) | One loading announcement with compact or row skeletons; animation respects reduced motion |
+| [QueryErrorState.tsx](QueryErrorState.tsx) | Inline query failure with a retry callback |
 | [ErrorState.tsx](ErrorState.tsx) | Error panel with title and message (also used when Convex env missing) |
 | [EmptyState.tsx](EmptyState.tsx) | Empty list placeholder with optional action slot |
 
@@ -14,9 +15,10 @@ Reusable loading, error, and empty UI for admin routes. Flat directory.
 
 | Export | Used by |
 | --- | --- |
-| LoadingState | Admin pages (future data-fetch views) |
+| LoadingState | Auth checks, application lists/detail, decision emails, volunteer assignments, and review history |
+| QueryErrorState | Application queue and decision-email query boundaries |
 | ErrorState | [main.tsx](../../main.tsx) (missing VITE_CONVEX_URL), [ErrorBoundary](../ErrorBoundary.tsx) |
-| EmptyState | Application queue and roster placeholders (future) |
+| EmptyState | Application queue, decision emails, volunteer dashboard and workflow entry pages |
 
 ## Related
 

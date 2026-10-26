@@ -100,7 +100,7 @@ export function AdminAccountControls() {
           <p className="admin-topbar__identity" title={`${staff.name} · ${roleLabel}`}>
             <span className="admin-topbar__identity-name">{staff.name}</span>
             {roleLabel ? (
-              <span className="admin-topbar__identity-role"> · {roleLabel}</span>
+              <span className="admin-topbar__identity-role">{roleLabel}</span>
             ) : null}
           </p>
           <span className="admin-topbar__divider" aria-hidden="true">

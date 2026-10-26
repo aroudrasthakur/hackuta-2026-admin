@@ -1,17 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signOutOrganizer } from "./fixtures/auth";
-import { E2E_VOLUNTEER } from "../../shared/admin/e2e/credentials";
+import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
 
 test.describe("organizer authentication", () => {
-  async function signInVolunteer(page: import("@playwright/test").Page) {
-    await page.goto("/admin/login");
-    await page.getByLabel("Email").fill(E2E_VOLUNTEER.email);
-    await page.getByLabel("Password", { exact: true }).fill(E2E_VOLUNTEER.password);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/admin\/scan$/);
-    await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
-  }
-
   test("keeps volunteer sessions out of review pages and permits signing out", async ({ page }) => {
     await signInVolunteer(page);
     await expect(page.getByRole("navigation", { name: "Volunteer" }).getByRole("link")).toHaveText(["Dashboard", "Check-in"]);

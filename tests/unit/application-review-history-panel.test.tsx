@@ -214,7 +214,7 @@ describe("application review history panel", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.paginatedQuery.mockImplementation(() => { throw new Error("Private backend error"); });
     await render();
-    expect(container.querySelector("h3")?.textContent).toBe("Review History");
+    expect(container.querySelector("h2")?.textContent).toBe("Review History");
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("couldn’t load the review history");
     expect(container.textContent).not.toContain("Private backend error");
   });

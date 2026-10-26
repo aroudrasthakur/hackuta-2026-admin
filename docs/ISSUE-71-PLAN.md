@@ -1,8 +1,9 @@
 # Issue #71: organizer dashboard commit and test plan
 
-Review draft for [issue #71](https://github.com/aroudrasthakur/hackuta-2026-admin/issues/71).
+Approved implementation plan for [issue #71](https://github.com/aroudrasthakur/hackuta-2026-admin/issues/71).
 Inspected on 2026-10-25 against `main` at `9de23a9`.
-Only this plan is being added; implementation has not started.
+Implementation follows this plan on `feat/71-dashboard-redesign`.
+See [the review notes](ISSUE-71-REVIEW.md) for completed work and verification.
 
 ## What exists and what needs work
 
@@ -195,7 +196,8 @@ baseline run, not a full coverage, integration, build, or browser verification.
 
 ## Review decisions
 
-The proposed defaults are the existing brand palette, a compact header with wrapping
+The approved defaults are the existing brand palette, a compact header with wrapping
 section navigation, contextual skeletons, and reusable patterns for workflows that
-are still placeholders. Review the design direction, seven-commit sequence, and
-missing-interface acceptance limitation before implementation begins.
+are still placeholders. The missing-interface acceptance limitation remains in
+effect: those separate workflows must be implemented before their full table/form
+criteria can be checked off.

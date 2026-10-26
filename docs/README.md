@@ -4,6 +4,8 @@
 | --- | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Developers | Repo layout, deploy ownership, register lock, flows |
 | [OPERATIONS.md](OPERATIONS.md) | Operators | Deploy checklist, env vars, Convex push workflow |
+| [ISSUE-71-PLAN.md](ISSUE-71-PLAN.md) | Reviewers | Dashboard redesign commit and test plan |
+| [ISSUE-71-REVIEW.md](ISSUE-71-REVIEW.md) | Reviewers | Dashboard changes, validation and remaining workflow scope |
 
 ## Directory READMEs
 
