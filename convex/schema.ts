@@ -8,6 +8,7 @@ import {
 } from "./applicationFields";
 import {
   applicationReviewLogAction,
+  staffRole,
   staffConfigLogAction,
   volunteerActionLogAction,
 } from "./admin/fields";
@@ -115,7 +116,7 @@ export default defineSchema({
   admins: defineTable({
     email: v.string(),
     name: v.string(),
-    role: v.union(v.literal("reviewer"), v.literal("admin"), v.literal("volunteer")),
+    role: staffRole,
     active: v.boolean(),
     /** When a participant is promoted to volunteer staff. */
     participantId: v.optional(v.id("participants")),

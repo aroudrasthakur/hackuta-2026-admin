@@ -64,7 +64,7 @@ async function seedEvent(
       name: fields.name ?? "Workshop",
       pointsAwarded: 10,
       startsAt: fields.startsAt ?? 1,
-      endsAt: fields.endsAt ?? 2,
+      endsAt: fields.endsAt ?? Number.MAX_SAFE_INTEGER,
       active: fields.active ?? true,
       createdAt: 1,
       updatedAt: 1,
@@ -170,11 +170,11 @@ describe("resolveQrForScan", () => {
     });
   });
 
-  it("previews a point scan with the event value and already-awarded flag, ignoring the schedule", async () => {
+  it("previews a point scan with the event value and already-awarded flag", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t);
     const { participantId, adminId } = await seedParticipant(t);
-    const eventId = await seedEvent(t, { name: "Past workshop", startsAt: 1, endsAt: 2 });
+    const eventId = await seedEvent(t, { name: "Open workshop" });
     await assign(t, volunteer.adminId, eventId, adminId);
     const args = { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "point_scan" as const, eventId };
 
@@ -183,7 +183,7 @@ describe("resolveQrForScan", () => {
       status: "ok",
       purpose: "point_scan",
       participant: { name: "Taylor Student" },
-      event: { eventId, name: "Past workshop", pointsAwarded: 10 },
+      event: { eventId, name: "Open workshop", pointsAwarded: 10 },
       alreadyAwarded: false,
     });
     expect(JSON.stringify(first)).not.toMatch(/Vegetarian|"points"/);
@@ -192,6 +192,20 @@ describe("resolveQrForScan", () => {
       participantId, eventId, pointsAwarded: 10, awardedBy: volunteer.adminId, awardedAt: 3,
     }));
     expect(await t.mutation(resolveQrForScanRef, args)).toMatchObject({ status: "ok", alreadyAwarded: true });
+  });
+
+  it("refuses a point scan preview for an assigned event outside its time window", async () => {
+    const t = createConvexTest();
+    const volunteer = await seedVolunteer(t);
+    const { adminId } = await seedParticipant(t);
+    const ended = await seedEvent(t, { startsAt: 1, endsAt: 2 });
+    const upcoming = await seedEvent(t, { startsAt: Number.MAX_SAFE_INTEGER - 1 });
+    for (const eventId of [ended, upcoming]) {
+      await assign(t, volunteer.adminId, eventId, adminId);
+      expect(await t.mutation(resolveQrForScanRef, {
+        sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "point_scan", eventId,
+      })).toEqual({ status: "not_authorized" });
+    }
   });
 
   it("is a preview only: participant, award, and log rows are unchanged", async () => {

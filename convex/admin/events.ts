@@ -1,119 +1,91 @@
 /**
- * Administrator-only event administration.
+ * Administrator-only event management. Volunteers award an event's fixed
+ * points through `volunteerOperations.ts`; this module only configures events.
  *
- * Volunteer event visibility and scan-time assignment checks live in
- * `volunteerScan.ts` and `staffAuth.ts` (see VOLUNTEER_AUTHORIZATION.md).
+ * Every export calls `requireAdminRole` first. Changes are audited in
+ * `staffConfigLogs` with `targetEventId` and before/after values. Points lock
+ * once a participant has been awarded them (`eventHasAwards`). Awards are
+ * possible only while `eventStatus` is `active` (switched on and inside the
+ * window); the frontend derives the same status from these fields.
  */
-
-import { paginationOptsValidator } from "convex/server";
+import { paginationOptsValidator, type DocumentByName } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import type { DataModel, QueryCtx } from "../lib/dataModel";
 import { adminError } from "../../shared/admin/errors";
 import {
+  assertEventPoints,
   buildStaffConfigDetails,
   normalizeEventInput,
-  type EventScheduleInput,
 } from "../../shared/admin/volunteerRules";
+import { eventHasAwards } from "./pointsLedger";
 import { requireAdminRole, sessionTokenArgs } from "./staffAuth";
 
-const EVENT_NAME_MAX_LENGTH = 120;
-const EVENT_DESCRIPTION_MAX_LENGTH = 2_000;
-const EVENT_POINTS_MAX_VALUE = 1_000_000;
+type EventDoc = DocumentByName<DataModel, "events">;
 
-type EventTimeStatus = "upcoming" | "open" | "ended";
+const eventArgs = { ...sessionTokenArgs, eventId: v.id("events") };
+const scheduleFields = {
+  name: v.string(),
+  description: v.optional(v.string()),
+  startsAt: v.number(),
+  endsAt: v.number(),
+};
+const changedResult = v.object({ ok: v.literal(true), changed: v.boolean() });
 
-function computeTimeStatus(event: { startsAt: number; endsAt: number }, now: number): EventTimeStatus {
-  if (now < event.startsAt) return "upcoming";
-  if (now >= event.endsAt) return "ended";
-  return "open";
-}
-
-function buildEventMetadata(event: { startsAt: number; endsAt: number; active: boolean }, now: number) {
-  const timeStatus = computeTimeStatus(event, now);
+async function eventRow(ctx: QueryCtx, event: EventDoc) {
   return {
-    timeStatus,
-    awardWindowOpen: event.active && timeStatus === "open",
+    eventId: event._id,
+    name: event.name,
+    description: event.description ?? null,
+    pointsAwarded: event.pointsAwarded,
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    active: event.active,
+    pointsLocked: await eventHasAwards(ctx, event._id),
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt,
   };
 }
 
-function validateEventInputWithLimits(input: EventScheduleInput) {
-  const normalized = normalizeEventInput(input);
-  if (normalized.name.length > EVENT_NAME_MAX_LENGTH) {
-    throw adminError("INVALID_EVENT");
-  }
-  if (normalized.description && normalized.description.length > EVENT_DESCRIPTION_MAX_LENGTH) {
-    throw adminError("INVALID_EVENT");
-  }
-  if (normalized.pointsAwarded > EVENT_POINTS_MAX_VALUE) {
-    throw adminError("INVALID_EVENT");
-  }
-  return normalized;
-}
-
+/** Every event, including inactive, upcoming, and ended ones. Newest first, paginated. */
 export const listEvents = query({
-  args: {
-    ...sessionTokenArgs,
-    paginationOpts: paginationOptsValidator,
-  },
+  args: { ...sessionTokenArgs, paginationOpts: paginationOptsValidator },
   handler: async (ctx, { sessionToken, paginationOpts }) => {
     await requireAdminRole(ctx, sessionToken);
-    const now = Date.now();
     const result = await ctx.db.query("events").order("desc").paginate(paginationOpts);
-    return {
-      ...result,
-      page: result.page.map((event) => ({
-        ...event,
-        ...buildEventMetadata(event, now),
-      })),
-    };
+    const page = [];
+    for (const event of result.page) page.push(await eventRow(ctx, event));
+    return { ...result, page };
   },
 });
 
+/** One event in the list shape, or null when it does not exist. */
 export const getEvent = query({
-  args: {
-    ...sessionTokenArgs,
-    eventId: v.id("events"),
-  },
+  args: eventArgs,
   handler: async (ctx, { sessionToken, eventId }) => {
     await requireAdminRole(ctx, sessionToken);
     const event = await ctx.db.get(eventId);
-    if (!event) throw adminError("EVENT_NOT_FOUND");
-    const now = Date.now();
-    return {
-      ...event,
-      ...buildEventMetadata(event, now),
-    };
+    return event ? eventRow(ctx, event) : null;
   },
 });
 
+/** New events start switched on; awards still wait for `startsAt`. */
 export const createEvent = mutation({
-  args: {
-    ...sessionTokenArgs,
-    name: v.string(),
-    description: v.optional(v.union(v.string(), v.null())),
-    pointsAwarded: v.number(),
-    startsAt: v.number(),
-    endsAt: v.number(),
-  },
+  args: { ...sessionTokenArgs, ...scheduleFields, pointsAwarded: v.number() },
+  returns: v.object({ ok: v.literal(true), eventId: v.id("events") }),
   handler: async (ctx, { sessionToken, ...input }) => {
     const actor = await requireAdminRole(ctx, sessionToken);
-    const normalized = validateEventInputWithLimits(input);
+    const fields = normalizeEventInput(input);
     const now = Date.now();
     const eventId = await ctx.db.insert("events", {
-      ...normalized,
-      active: false,
-      createdAt: now,
-      updatedAt: now,
+      ...fields, active: true, createdAt: now, updatedAt: now,
     });
     await ctx.db.insert("staffConfigLogs", {
       actorAdminId: actor._id,
       action: "event_created",
       targetEventId: eventId,
       details: buildStaffConfigDetails({
-        pointsAwarded: normalized.pointsAwarded,
-        startsAt: normalized.startsAt,
-        endsAt: normalized.endsAt,
-        active: false,
+        after: { active: true, pointsAwarded: fields.pointsAwarded, startsAt: fields.startsAt, endsAt: fields.endsAt },
       }),
       createdAt: now,
     });
@@ -121,152 +93,94 @@ export const createEvent = mutation({
   },
 });
 
+/**
+ * Replaces name, description, and schedule. Points change only through
+ * `setEventPoints`. Awards already given are never touched; a new window
+ * applies to the next scan, and assignments are kept.
+ */
 export const updateEvent = mutation({
-  args: {
-    ...sessionTokenArgs,
-    eventId: v.id("events"),
-    name: v.optional(v.string()),
-    description: v.optional(v.union(v.string(), v.null())),
-    startsAt: v.optional(v.number()),
-    endsAt: v.optional(v.number()),
-  },
-  handler: async (ctx, { sessionToken, eventId, ...updates }) => {
+  args: { ...eventArgs, ...scheduleFields },
+  returns: changedResult,
+  handler: async (ctx, { sessionToken, eventId, ...input }) => {
     const actor = await requireAdminRole(ctx, sessionToken);
     const event = await ctx.db.get(eventId);
     if (!event) throw adminError("EVENT_NOT_FOUND");
+    const fields = normalizeEventInput({ ...input, pointsAwarded: event.pointsAwarded });
 
-    const nextName = updates.name === undefined ? event.name : updates.name;
-    const nextDescription = updates.description === undefined ? event.description ?? null : updates.description;
-    const nextStartsAt = updates.startsAt === undefined ? event.startsAt : updates.startsAt;
-    const nextEndsAt = updates.endsAt === undefined ? event.endsAt : updates.endsAt;
-
-    const normalized = validateEventInputWithLimits({
-      name: nextName,
-      description: nextDescription,
-      pointsAwarded: event.pointsAwarded,
-      startsAt: nextStartsAt,
-      endsAt: nextEndsAt,
-    });
-
-    const patch: Partial<typeof event> = {};
-    const changedFields: string[] = [];
-
-    if (normalized.name !== event.name) {
-      patch.name = normalized.name;
-      changedFields.push("name");
-    }
-    if ((normalized.description ?? null) !== (event.description ?? null)) {
-      if (normalized.description === undefined) {
-        // Convex treats `undefined` as clearing an optional field in a patch.
-        (patch as unknown as { description?: undefined }).description = undefined;
-      } else {
-        patch.description = normalized.description;
-      }
-      changedFields.push("description");
-    }
-    if (normalized.startsAt !== event.startsAt) {
-      patch.startsAt = normalized.startsAt;
-      changedFields.push("startsAt");
-    }
-    if (normalized.endsAt !== event.endsAt) {
-      patch.endsAt = normalized.endsAt;
-      changedFields.push("endsAt");
-    }
-
-    if (changedFields.length === 0) {
-      return { ok: true as const, updated: false as const };
-    }
+    const changedFields = (["name", "description", "startsAt", "endsAt"] as const)
+      .filter((key) => event[key] !== fields[key]);
+    if (changedFields.length === 0) return { ok: true as const, changed: false };
 
     const now = Date.now();
-    patch.updatedAt = now;
-    await ctx.db.patch(eventId, patch);
+    await ctx.db.patch(eventId, {
+      name: fields.name,
+      description: fields.description,
+      startsAt: fields.startsAt,
+      endsAt: fields.endsAt,
+      updatedAt: now,
+    });
     await ctx.db.insert("staffConfigLogs", {
       actorAdminId: actor._id,
       action: "event_updated",
       targetEventId: eventId,
       details: buildStaffConfigDetails({
         changedFields,
-        ...(patch.startsAt !== undefined ? { startsAt: patch.startsAt } : {}),
-        ...(patch.endsAt !== undefined ? { endsAt: patch.endsAt } : {}),
+        before: { startsAt: event.startsAt, endsAt: event.endsAt },
+        after: { startsAt: fields.startsAt, endsAt: fields.endsAt },
       }),
       createdAt: now,
     });
-
-    return { ok: true as const, updated: true as const };
+    return { ok: true as const, changed: true };
   },
 });
 
-export const setEventActive = mutation({
-  args: {
-    ...sessionTokenArgs,
-    eventId: v.id("events"),
-    active: v.boolean(),
-  },
-  handler: async (ctx, { sessionToken, eventId, active }) => {
-    const actor = await requireAdminRole(ctx, sessionToken);
-    const event = await ctx.db.get(eventId);
-    if (!event) throw adminError("EVENT_NOT_FOUND");
-    if (event.active === active) return { ok: true as const, updated: false as const };
-    const now = Date.now();
-    await ctx.db.patch(eventId, { active, updatedAt: now });
-    await ctx.db.insert("staffConfigLogs", {
-      actorAdminId: actor._id,
-      action: "event_active_changed",
-      targetEventId: eventId,
-      details: buildStaffConfigDetails({
-        active,
-        before: { active: event.active },
-        after: { active },
-      }),
-      createdAt: now,
-    });
-    return { ok: true as const, updated: true as const };
-  },
-});
-
+/** Rejects with `EVENT_POINTS_LOCKED` once any participant has the event's award. */
 export const setEventPoints = mutation({
-  args: {
-    ...sessionTokenArgs,
-    eventId: v.id("events"),
-    pointsAwarded: v.number(),
-  },
+  args: { ...eventArgs, pointsAwarded: v.number() },
+  returns: changedResult,
   handler: async (ctx, { sessionToken, eventId, pointsAwarded }) => {
     const actor = await requireAdminRole(ctx, sessionToken);
     const event = await ctx.db.get(eventId);
     if (!event) throw adminError("EVENT_NOT_FOUND");
-
-    const normalized = validateEventInputWithLimits({
-      name: event.name,
-      description: event.description ?? null,
-      pointsAwarded,
-      startsAt: event.startsAt,
-      endsAt: event.endsAt,
-    });
-    if (normalized.pointsAwarded === event.pointsAwarded) {
-      return { ok: true as const, updated: false as const };
-    }
-
-    const existingAward = await ctx.db
-      .query("participantEventAwards")
-      .withIndex("by_event", (q) => q.eq("eventId", eventId))
-      .take(1);
-    if (existingAward.length > 0) {
-      throw adminError("EVENT_POINTS_LOCKED");
-    }
+    assertEventPoints(pointsAwarded);
+    if (event.pointsAwarded === pointsAwarded) return { ok: true as const, changed: false };
+    if (await eventHasAwards(ctx, eventId)) throw adminError("EVENT_POINTS_LOCKED");
 
     const now = Date.now();
-    await ctx.db.patch(eventId, { pointsAwarded: normalized.pointsAwarded, updatedAt: now });
+    await ctx.db.patch(eventId, { pointsAwarded, updatedAt: now });
     await ctx.db.insert("staffConfigLogs", {
       actorAdminId: actor._id,
       action: "event_updated",
       targetEventId: eventId,
       details: buildStaffConfigDetails({
         changedFields: ["pointsAwarded"],
-        pointsAwarded: normalized.pointsAwarded,
+        before: { pointsAwarded: event.pointsAwarded },
+        after: { pointsAwarded },
       }),
       createdAt: now,
     });
-    return { ok: true as const, updated: true as const };
+    return { ok: true as const, changed: true };
   },
 });
 
+/** Switched-off events keep their assignments but reject scans (`event_inactive`). */
+export const setEventActive = mutation({
+  args: { ...eventArgs, active: v.boolean() },
+  returns: changedResult,
+  handler: async (ctx, { sessionToken, eventId, active }) => {
+    const actor = await requireAdminRole(ctx, sessionToken);
+    const event = await ctx.db.get(eventId);
+    if (!event) throw adminError("EVENT_NOT_FOUND");
+    if (event.active === active) return { ok: true as const, changed: false };
+    const now = Date.now();
+    await ctx.db.patch(eventId, { active, updatedAt: now });
+    await ctx.db.insert("staffConfigLogs", {
+      actorAdminId: actor._id,
+      action: "event_active_changed",
+      targetEventId: eventId,
+      details: buildStaffConfigDetails({ before: { active: event.active }, after: { active } }),
+      createdAt: now,
+    });
+    return { ok: true as const, changed: true };
+  },
+});

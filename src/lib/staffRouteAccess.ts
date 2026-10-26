@@ -15,7 +15,8 @@ export function canAccessStaffRoute(
 ): boolean | undefined {
   pathname = pathname.replace(/\/+$/, "");
   if (pathname === "/admin") return true;
-  if (pathname === ADMIN_ROUTES.participants || pathname === ADMIN_ROUTES.volunteers) {
+  if (pathname === ADMIN_ROUTES.participants || pathname === ADMIN_ROUTES.volunteers ||
+    pathname === ADMIN_ROUTES.events || /^\/admin\/volunteers\/[^/]+$/.test(pathname)) {
     return staff.role === "admin";
   }
   if (pathname === ADMIN_ROUTES.applications || pathname === ADMIN_ROUTES.decisionEmails ||

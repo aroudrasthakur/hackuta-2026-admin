@@ -23,8 +23,6 @@
   .admin-topbar__logo { display: block; width: auto; height: 1.5rem; max-width: 100%; }
   .admin-topbar--compact {
     top: 3.75rem;
-    left: 30%;
-    right: 30%;
     width: auto;
   }
   .admin-topbar__inner--compact {

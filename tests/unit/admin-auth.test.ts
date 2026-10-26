@@ -28,7 +28,7 @@ const ref = {
       adminId: string;
       email: string;
       name: string;
-      role: "reviewer" | "admin" | "volunteer";
+      role: "reviewer" | "admin";
       expiresAt: number;
     } | null
   >("admin/auth:getCurrentStaff"),
@@ -65,7 +65,7 @@ const ref = {
       sessionToken: string;
       email: string;
       name: string;
-      role: "reviewer" | "admin" | "volunteer";
+      role: "reviewer" | "admin";
       password: string;
     },
     { adminId: string; email: string; ok: true }
@@ -96,9 +96,7 @@ async function expectSignInFailure(
   expect(result).toEqual({ ok: false, code, error: ADMIN_ERROR_MESSAGES[code] });
 }
 
-async function createAuthorizationFixture(
-  role: "reviewer" | "admin" | "volunteer" = "reviewer",
-) {
+async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer") {
   const t = createTest();
   const fixture = await createStaffAuthorizationFixture(t, role);
   return { t, ...fixture };
@@ -457,11 +455,7 @@ describe("organizer auth boundary", () => {
   });
 });
 
-async function signInAs(
-  t: TestInstance,
-  email: string,
-  role: "reviewer" | "admin" | "volunteer" = "reviewer",
-) {
+async function signInAs(t: TestInstance, email: string, role: "reviewer" | "admin" = "reviewer") {
   const adminId = await seedAdminAccount(t, { email, role, active: true });
   const { sessionToken } = await signInOrganizer(t, email);
   return { adminId, sessionToken };

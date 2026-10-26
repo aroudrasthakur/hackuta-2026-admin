@@ -9,6 +9,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
 | [staffAuth.ts](staffAuth.ts) | Session resolution and role guards (see [VOLUNTEER_AUTHORIZATION.md](VOLUNTEER_AUTHORIZATION.md)) |
 | [volunteers.ts](volunteers.ts) | Admin-only volunteer management: creation, resets, revoke/restore, capabilities, event assignments, and audit log queries |
+| [events.ts](events.ts) | Admin-only event list, creation, edits, and activation, each audited in `staffConfigLogs` |
 | [participantsAdmin.ts](participantsAdmin.ts) | Admin-only participant roster, details, point corrections, adjustment history, and participant-to-volunteer promotion |
 | [volunteerProvisioning.ts](volunteerProvisioning.ts) | Shared volunteer account provisioning (validation, hashing, audit) used by both modules above |
 | [adminQueryHelpers.ts](adminQueryHelpers.ts) | Display-name lookups and date-range bounds for admin list queries |
@@ -44,7 +45,7 @@ Protected queries and mutations accept `sessionToken`. The helpers take `(ctx, s
 - `requireAdminRole` allows only active admins; historical review log queries use it.
 - `requireVolunteerAccess` allows only active volunteers; admins and reviewers cannot act as volunteers.
 - `requireVolunteerCapability` checks an explicit `true` for `canCheckIn` or `canFoodCheckIn` on each request.
-- `requireVolunteerEventAccess` checks the caller's own assignment and an active event. Schedule times are reference only. Removing an assignment takes effect on the next request.
+- `requireVolunteerEventAccess` checks the caller's own assignment and that the event is switched on and inside its `startsAt`/`endsAt` window. Removing an assignment takes effect on the next request.
 
 Each protected request resolves the current stored role and active status. Acting identity always comes from the returned `admin._id`, including `applicationReviews.reviewedBy`, `applicationReviewLogs.adminId`, and `participants.acceptedBy`; public operations never accept an acting admin ID or role. Applicant authentication cannot satisfy these guards.
 
@@ -65,6 +66,7 @@ Every export in `volunteers.ts` calls `requireAdminRole` first. Reviewers get `A
 - `createVolunteer` makes a standalone volunteer (not a participant). The role is always `volunteer`, the account is active, and `canCheckIn` / `canFoodCheckIn` are required booleans (only an explicit `true` grants access). The email is normalized like staff sign-in, and any existing staff row with that email (any role, active or not) is rejected. The password is validated and hashed with the shared staff credential helper.
 - `promoteParticipantToVolunteer` (in `participantsAdmin.ts`, built on `volunteerProvisioning.ts`) creates a **separate** staff account linked through `admins.participantId`. The participant must still be accepted. The email and name default to the registration values and can be overridden. It rejects a second link for the same participant and any email already used by staff, and never converts an admin or reviewer. The participant row (points, QR token), application, `users`, and `authAccounts` are not modified. It is audited as `volunteer_promoted` (with `targetParticipantId`); standalone creation is `volunteer_created`.
 - `listVolunteers` is paginated over `admins.by_role` and returns name, email, active status, linked participant, capabilities, assigned events, and created/updated times. No credentials, sessions, QR tokens, or points.
+- `getVolunteer` returns one volunteer in the same shape, or `null` when the id is missing or not a volunteer.
 - `resetVolunteerPassword` validates the new password and deletes all sessions. No password retrieval API exists.
 - `revokeVolunteer` sets `active: false` and deletes every session, which stops all scanning on the next request. Assignments, capabilities, and history are kept. `restoreVolunteer` reactivates the account and deletes sessions again, so a fresh login is always required.
 - `setVolunteerCapabilities` takes both booleans explicitly. Unchanged values are a no-op; otherwise the log records `changedFields`, `before`, and `after`.
@@ -73,6 +75,19 @@ Every export in `volunteers.ts` calls `requireAdminRole` first. Reviewers get `A
 - `listStaffConfigLogs` lists configuration changes newest first, filterable by target staff account, action, and date range, with names and parsed details.
 
 Every configuration change writes a `staffConfigLogs` row with the acting admin and timestamp in the same transaction. Details go through `buildStaffConfigDetails`, which only stores allowlisted booleans, numbers, and ids. Generic organizer provisioning still rejects volunteer targets.
+
+### Events (#63)
+
+Every export in `events.ts` calls `requireAdminRole` first; reviewers get `ADMIN_ONLY`, volunteers `NOT_AUTHORIZED`. Input goes through `normalizeEventInput`: a trimmed name of 1–120 characters, an optional description up to 2,000 characters, whole points from 1 to 100,000, and finite whole-millisecond `startsAt` before `endsAt`; anything else is `INVALID_EVENT`. `createdAt` and `updatedAt` are always set by the server.
+
+- `listEvents` is paginated over every event (switched on or off, past or future), newest first. Each row has `active`, `startsAt`, `endsAt`, and `pointsLocked` (true once `participantEventAwards.by_event` has a row), so the client can label it with `eventStatus`: `inactive`, `upcoming`, `active`, or `ended`. The status is not computed in the query because cached query results would not refresh when the clock crosses a boundary.
+- `getEvent` returns one event in the same shape, or `null`.
+- `createEvent` inserts a switched-on event and logs `event_created` with the new values.
+- `updateEvent` changes name, description, and schedule. A missing event is `EVENT_NOT_FOUND`; an unchanged submission is a no-op; otherwise `event_updated` records `changedFields` and the previous and new schedule. A blank description clears it. A new schedule applies to the next scan.
+- `setEventPoints` changes `pointsAwarded` until the first award, then throws `EVENT_POINTS_LOCKED`. Existing awards and balances are never rewritten. `event_updated` records the previous and new value.
+- `setEventActive` is a no-op when unchanged; otherwise `event_active_changed` records before and after.
+
+Points can be awarded only while `eventStatus(event, now)` is `active`; the award mutation, the ledger helper, and the scan preview all check it on the server. Switching an event off or letting it end keeps its volunteer assignments, and `listMyScanOptions` keeps showing it, so scanning resumes without reassignment if it is switched back on or rescheduled. No export here awards points.
 
 ## Participant administration (#64)
 

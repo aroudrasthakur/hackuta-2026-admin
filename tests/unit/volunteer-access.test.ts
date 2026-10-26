@@ -168,15 +168,19 @@ describe("volunteer event authorization", () => {
     await expectAdminErrorCode(check(), "EVENT_ACCESS_DENIED");
   });
 
-  it("permits assigned active events before, during, and after their reference schedule", async () => {
+  it("permits an assigned event only from startsAt up to, but not including, endsAt", async () => {
     const { t, adminId, eventId, startsAt, endsAt, check } = await fixture();
     await t.run((ctx) => ctx.db.insert("volunteerEventAccess", {
       volunteerAdminId: adminId, eventId, grantedBy: adminId, createdAt: 1,
     }));
     vi.useFakeTimers();
-    for (const now of [startsAt - 1, startsAt, endsAt, endsAt + 1]) {
+    for (const now of [startsAt, endsAt - 1]) {
       vi.setSystemTime(now);
       expect((await check()).event._id).toBe(eventId);
+    }
+    for (const now of [startsAt - 1, endsAt, endsAt + 1]) {
+      vi.setSystemTime(now);
+      await expectAdminErrorCode(check(), "EVENT_INACTIVE");
     }
   });
 
