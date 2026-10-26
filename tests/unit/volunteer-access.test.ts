@@ -20,19 +20,22 @@ afterEach(() => vi.useRealTimers());
 
 describe("volunteer capabilities", () => {
   it("treats a missing or false flag as denied", () => {
-    expect(volunteerCapabilities({})).toEqual({ canCheckIn: false, canFoodCheckIn: false });
+    expect(volunteerCapabilities({})).toEqual({ canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false });
     expect(newVolunteerFields()).toEqual({
       role: "volunteer",
       canCheckIn: false,
       canFoodCheckIn: false,
+      canRedeemShop: false,
     });
     expect(volunteerCapabilities(newVolunteerFields())).toEqual({
       canCheckIn: false,
       canFoodCheckIn: false,
+      canRedeemShop: false,
     });
-    expect(volunteerCapabilities({ canCheckIn: true, canFoodCheckIn: false })).toEqual({
+    expect(volunteerCapabilities({ canCheckIn: true, canFoodCheckIn: false, canRedeemShop: true })).toEqual({
       canCheckIn: true,
       canFoodCheckIn: false,
+      canRedeemShop: true,
     });
   });
 
@@ -55,6 +58,7 @@ describe("volunteer capabilities", () => {
     expect(volunteerCapabilities(admin ?? {})).toEqual({
       canCheckIn: false,
       canFoodCheckIn: false,
+      canRedeemShop: false,
     });
   });
 });

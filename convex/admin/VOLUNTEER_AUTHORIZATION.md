@@ -58,6 +58,10 @@ If you add a new public mutation that imports `pointsLedger`, add a row to the e
 | `participantsAdmin.ts` | all exports (`listParticipants`, `getParticipantDetails`, `setParticipantPoints`, `listPointAdjustments`, `promoteParticipantToVolunteer`) | `requireAdminRole` |
 | `volunteerProvisioning.ts`, `adminQueryHelpers.ts` | — | **Helpers only** (callers must guard first) |
 | `volunteerScan.ts` | `listMyScanOptions`, `resolveQrForScan` | `requireVolunteerAccess`, then per-purpose capability / assignment checks |
+| `shopAdmin.ts`, `shopFlashSales.ts` | all exports (items, stock, history, refunds, shop access, flash sales) | `requireAdminRole` |
+| `shopRedemption.ts` | `listShopCatalogForVolunteer`, `getShopCustomer`, `previewShopPurchase`, `purchaseShopItem` | `requireVolunteerCapability(..., "canRedeemShop")` |
+| `participantShop.ts` | `listShop`, `getMyShopHistory`, `listMyAnnouncements` | Signed-in applicant (`getAuthUser`); own data only |
+| `shopLedger.ts`, `shopPricing.ts` | — | **Helpers only** (callers must guard first) |
 | `volunteerOperations.ts` | `checkInParticipant`, `foodCheckInParticipant`, `awardEventPoints` | `requireVolunteerAccess`, then capability / assignment checks |
 | `volunteerScanRateLimit.ts` | `pruneVolunteerScanRateLimits` | **Internal only** (`internalMutation`) |
 | `participants.ts` | — | **Internal only** (`internalMutation`) |
@@ -105,6 +109,19 @@ These mutations do the real work. Each one re-checks everything itself and share
 - Other results: `qr_not_found`, `not_authorized` (missing capability), `event_denied` (unassigned or missing event), `event_inactive`, `participant_not_checked_in`, `participant_not_eligible`, `rate_limited`.
 - One award per participant and event comes from the `by_participant_event` lookup inside the mutation's transaction. If two scans race, Convex retries one of them, and the retry sees the first award. The index alone does not enforce uniqueness.
 - Logs never contain QR tokens, session tokens, or dietary data.
+
+## Shop sales (`shopRedemption.ts`)
+
+Selling needs `canRedeemShop === true`. A missing flag means denied, and admins turn it on with `setVolunteerShopAccess`.
+
+- `resolveQrForScan` with `purpose: "shop"` returns the participant's id, name, and balance.
+- `purchaseShopItem` needs the scanned QR token again, so a participant id alone cannot be charged.
+- The server works out the price. If it differs from `expectedUnitPointsCost`, the result is `price_changed` and nothing is written.
+- Quantity is 1 to 10 per purchase.
+- A volunteer cannot sell to their own participant record (`self_purchase_denied`).
+- The same `idempotencyKey` returns the first receipt (`duplicate`) and charges nothing.
+- A success writes the balance, stock, a `shopRedemptions` row, a `purchase` inventory row, and a `shop_purchase` log in one transaction.
+- Purchases share the scan rate limits.
 
 ### Rate limits
 

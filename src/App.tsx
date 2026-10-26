@@ -12,6 +12,8 @@ import { VolunteerScanPage } from "./pages/admin/VolunteerScanPage";
 import { VolunteersPage } from "./pages/admin/VolunteersPage";
 import { VolunteerDetailPage } from "./pages/admin/VolunteerDetailPage";
 import { EventsPage } from "./pages/admin/EventsPage";
+import { ShopPage } from "./pages/admin/ShopPage";
+import { VolunteerShopPage } from "./pages/admin/VolunteerShopPage";
 
 export default function App() {
   return (
@@ -34,10 +36,12 @@ export default function App() {
         <Route path="scan/check-in" element={<VolunteerScanPage workflow="check-in" />} />
         <Route path="scan/food" element={<VolunteerScanPage workflow="food" />} />
         <Route path="scan/points" element={<VolunteerScanPage workflow="points" />} />
+        <Route path="scan/shop" element={<VolunteerShopPage />} />
         <Route path="participants" element={<ParticipantsPage />} />
         <Route path="volunteers" element={<VolunteersPage />} />
         <Route path="volunteers/:volunteerAdminId" element={<VolunteerDetailPage />} />
         <Route path="events" element={<EventsPage />} />
+        <Route path="shop" element={<ShopPage />} />
       </Route>
       <Route path="*" element={<AdminProtectedRoute />} />
     </Routes>

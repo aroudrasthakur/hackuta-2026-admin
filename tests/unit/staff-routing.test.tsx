@@ -18,12 +18,14 @@ vi.mock("../../src/pages/admin/DecisionEmailQueuePage", () => ({ DecisionEmailQu
 vi.mock("../../src/pages/admin/VolunteersPage", () => ({ VolunteersPage: () => <h1>Volunteers</h1> }));
 vi.mock("../../src/pages/admin/VolunteerDetailPage", () => ({ VolunteerDetailPage: () => <h1>Volunteer detail</h1> }));
 vi.mock("../../src/pages/admin/EventsPage", () => ({ EventsPage: () => <h1>Events</h1> }));
+vi.mock("../../src/pages/admin/ShopPage", () => ({ ShopPage: () => <h1>Shop</h1> }));
+vi.mock("../../src/pages/admin/VolunteerShopPage", () => ({ VolunteerShopPage: () => <h1>Shop redemption</h1> }));
 const query = vi.hoisted(() => vi.fn());
 vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query, useMutation: () => vi.fn() }));
 
 const staff: StaffProfile = { adminId: "staff", email: "staff@example.com", name: "Avery", role: "volunteer", canCheckIn: true, canFoodCheckIn: true, expiresAt: Date.now() + 60_000 };
 const event = { eventId: "event-1" as GenericId<"events">, name: "Opening workshop", pointsAwarded: 20, startsAt: Date.now() - 1000, endsAt: Date.now() + 60_000 };
-const allOptions: VolunteerScanOptions = { canCheckIn: true, canFoodCheckIn: true, events: [event] };
+const allOptions: VolunteerScanOptions = { canCheckIn: true, canFoodCheckIn: true, canRedeemShop: false, events: [event] };
 let options: VolunteerScanOptions | undefined;
 let container: HTMLDivElement;
 let root: Root;
@@ -75,7 +77,7 @@ describe("staff route policy", () => {
     for (const route of [ADMIN_ROUTES.applications, ADMIN_ROUTES.decisionEmails, ADMIN_ROUTES.applicationReview("abc")]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role !== "volunteer");
     }
-    for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.events]) {
+    for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.events, ADMIN_ROUTES.shop]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role === "admin");
     }
     for (const route of [ADMIN_ROUTES.scan, ADMIN_ROUTES.volunteer, ADMIN_ROUTES.scanCheckIn, ADMIN_ROUTES.scanFood, ADMIN_ROUTES.scanPoints]) {
@@ -91,6 +93,16 @@ describe("staff route policy", () => {
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanCheckIn, { ...staff, canCheckIn: undefined }, allOptions)).toBe(false);
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanFood, { ...staff, canFoodCheckIn: false }, allOptions)).toBe(false);
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanPoints, staff, { ...allOptions, events: [] })).toBe(false);
+  });
+
+  it("limits the shop to admins and shop redemption to volunteers with shop access", () => {
+    for (const role of ["admin", "reviewer", "volunteer"] as const) {
+      expect(canAccessStaffRoute(ADMIN_ROUTES.shop, { ...staff, role }, allOptions)).toBe(role === "admin");
+      expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, { ...staff, role, canRedeemShop: true }, { ...allOptions, canRedeemShop: true })).toBe(role === "volunteer");
+    }
+    expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, { ...staff, canRedeemShop: true }, undefined)).toBeUndefined();
+    expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, staff, { ...allOptions, canRedeemShop: true })).toBe(false);
+    expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, { ...staff, canRedeemShop: true }, { ...allOptions, canRedeemShop: false })).toBe(false);
   });
 
   it("restores only known authorized internal destinations", () => {
@@ -118,8 +130,21 @@ describe("protected staff screens", () => {
   it.each(["admin", "reviewer"] as const)("shows the correct %s navigation and management routes", async (role) => {
     await render(ADMIN_ROUTES.participants, auth({ staff: { ...staff, role } }));
     expect(path()).toBe(role === "admin" ? ADMIN_ROUTES.participants : ADMIN_ROUTES.applications);
-    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers", "Events"] : ["Applications", "Decision emails"]);
+    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Shop"] : ["Applications", "Decision emails"]);
     expect(query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
+  });
+
+  it("opens the shop for administrators and shop redemption for shop volunteers", async () => {
+    query.mockImplementation((ref) => ref === listMyScanOptionsRef ? options : undefined);
+    await render(ADMIN_ROUTES.shop, auth({ staff: { ...staff, role: "admin" } }));
+    expect(container.querySelector("h1")?.textContent).toBe("Shop");
+    options = { ...allOptions, canRedeemShop: true };
+    await render(ADMIN_ROUTES.scan, auth({ staff: { ...staff, canRedeemShop: true } }));
+    expect(links()).toEqual(["Dashboard", "Check-in", "Food", "Points", "Shop"]);
+    expect(container.textContent).toContain("Shop redemption");
+    await click('nav a[href="/admin/scan/shop"]');
+    expect(path()).toBe(ADMIN_ROUTES.scanShop);
+    expect(container.querySelector("h1")?.textContent).toBe("Shop redemption");
   });
 
   it.each([
@@ -138,7 +163,7 @@ describe("protected staff screens", () => {
     expect(current?.textContent).toBe("Volunteers");
   });
 
-  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1")])("sends reviewers away from %s", async (route) => {
+  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop])("sends reviewers away from %s", async (route) => {
     await render(route, auth({ staff: { ...staff, role: "reviewer" } }));
     expect(path()).toBe(ADMIN_ROUTES.applications);
   });

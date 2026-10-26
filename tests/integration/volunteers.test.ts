@@ -230,7 +230,7 @@ describe("listVolunteers", () => {
     const first = await t.query(volunteers.listVolunteers, { sessionToken: actor.sessionToken, paginationOpts: { numItems: 1, cursor: null } });
     expect(first.page).toEqual([{
       adminId: target.volunteerAdminId, name: "Volunteer", email: "volunteer@hackuta.org", active: true,
-      participant: null, canCheckIn: false, canFoodCheckIn: false,
+      participant: null, canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false,
       events: [{ eventId, name: "Workshop", active: true }],
       createdAt: expect.any(Number), updatedAt: expect.any(Number),
     }]);

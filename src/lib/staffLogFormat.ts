@@ -5,6 +5,8 @@ export const VOLUNTEER_ACTION_LABELS: Record<VolunteerActionLogRow["action"], st
   food_check_in: "Food redeemed",
   point_scan: "Points awarded",
   admin_adjust: "Points adjusted",
+  shop_purchase: "Shop purchase",
+  shop_refund: "Shop refund",
 };
 
 export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = {
@@ -18,6 +20,11 @@ export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = 
   event_updated: "Event updated",
   event_active_changed: "Event status changed",
   volunteer_event_access_updated: "Event assignments changed",
+  shop_item_created: "Shop item created",
+  shop_item_updated: "Shop item updated",
+  flash_sale_created: "Flash sale created",
+  flash_sale_updated: "Flash sale updated",
+  flash_sale_cancelled: "Flash sale cancelled",
 };
 
 export function volunteerPermissions(volunteer: { canCheckIn: boolean; canFoodCheckIn: boolean }) {

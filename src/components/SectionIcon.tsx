@@ -8,6 +8,7 @@ const paths = {
   food: "M4 3v6a3 3 0 0 0 6 0V3M7 3v18M20 21V3c-5 3-5 9 0 9",
   points: "M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9z",
   events: "M4 5h16v16H4zM4 10h16M8 3v4m8-4v4",
+  shop: "M4 9h16l-1.2 11H5.2zM8.5 9V7a3.5 3.5 0 0 1 7 0v2",
 } as const;
 
 export type SectionIconName = keyof typeof paths;

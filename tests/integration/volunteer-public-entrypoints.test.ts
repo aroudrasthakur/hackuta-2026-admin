@@ -52,6 +52,17 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "volunteerOperations.ts", exportName: "checkInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "foodCheckInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "awardEventPoints", guard: "requireVolunteerAccess" },
+  ...[
+    "generateShopImageUploadUrl", "createShopItem", "updateShopItem", "setShopItemStatus", "adjustShopStock",
+    "listShopItemsAdmin", "listInventoryAdjustments", "listShopRedemptions", "refundShopRedemption",
+    "listShopVolunteers", "setVolunteerShopAccess",
+  ].map((exportName) => ({ file: "shopAdmin.ts", exportName, guard: "requireAdminRole" })),
+  ...["createFlashSale", "updateFlashSale", "cancelFlashSale", "listFlashSales"].map((exportName) => ({
+    file: "shopFlashSales.ts", exportName, guard: "requireAdminRole",
+  })),
+  ...["listShopCatalogForVolunteer", "getShopCustomer", "previewShopPurchase", "purchaseShopItem"].map((exportName) => ({
+    file: "shopRedemption.ts", exportName, guard: "requireShopVolunteer",
+  })),
 ] as const;
 
 function exportSection(source: string, exportName: string) {

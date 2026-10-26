@@ -12,11 +12,13 @@
 | [`VolunteersPage.tsx`](VolunteersPage.tsx) | `/admin/volunteers` — volunteer roster and everyone's scan activity log |
 | [`VolunteerDetailPage.tsx`](VolunteerDetailPage.tsx) | `/admin/volunteers/:volunteerAdminId` — one volunteer's activity, event assignments, scan permissions, access, and account history |
 | [`EventsPage.tsx`](EventsPage.tsx) | `/admin/events` — create events, edit their schedule and (until the first award) points, switch them on or off, and see each one's status |
+| [`ShopPage.tsx`](ShopPage.tsx) | `/admin/shop` (admins): items, flash sales, history |
+| [`VolunteerShopPage.tsx`](VolunteerShopPage.tsx) | `/admin/scan/shop` (volunteers with shop access) |
 
 Admins and reviewers land on applications; volunteers land on `/admin/scan`.
 Login restores authorized internal destinations; unknown routes return home.
 
-Scan access follows `listMyScanOptions`: check-in and food need explicit grants,
+Scan access follows `listMyScanOptions`: check-in, food, and shop need explicit grants,
 and points need an assigned active event. Revoked access hides actions and
 redirects stale routes. Event times are advisory. Volunteer and event
 management require an admin. Every backend operation enforces authorization

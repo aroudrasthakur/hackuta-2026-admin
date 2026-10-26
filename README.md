@@ -16,7 +16,9 @@ Vite, React 19, TypeScript, React Router, Convex, Tailwind CSS v4.
 | `/volunteer` | Redirects volunteers to `/admin/scan` |
 | `/admin/scan` | Volunteer dashboard, responsibilities, and assigned events |
 | `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points` | Capability-protected scanner entry pages |
+| `/admin/scan/shop` | Shop sales for volunteers with shop access |
 | `/admin/participants`, `/admin/volunteers` | Administrator-only management entry pages |
+| `/admin/shop` | Admin shop: items and stock, flash sales (`?tab=sales`), purchase history (`?tab=history`) |
 | `/admin/applications` | Submitted application queue |
 | `/admin/decision-emails` | Decision email queue for admins and reviewers |
 | `/admin/applications/:id` | Application review, decisions, history (admin) |

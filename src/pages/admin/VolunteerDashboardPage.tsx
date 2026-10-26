@@ -21,6 +21,7 @@ export function VolunteerDashboardPage() {
     { to: ADMIN_ROUTES.scanCheckIn, title: "Participant check-in", icon: "checkIn" as const, description: "Welcome participants and check their arrival status." },
     { to: ADMIN_ROUTES.scanFood, title: "Food", icon: "food" as const, description: "Check meal redemption and dietary information." },
     { to: ADMIN_ROUTES.scanPoints, title: "Points", icon: "points" as const, description: "View your assigned events for point scans." },
+    { to: ADMIN_ROUTES.scanShop, title: "Shop redemption", icon: "shop" as const, description: "Scan a participant, then sell shop items for their points." },
   ].filter(({ to }) => canAccessStaffRoute(to, staff, options) === true);
 
   return (
@@ -38,7 +39,7 @@ export function VolunteerDashboardPage() {
           ))}
         </section>
       ) : (
-        <EmptyState title="No responsibilities assigned yet" description="Ask an administrator to grant check-in, food, or event access. Your assignments will appear here automatically." />
+        <EmptyState title="No responsibilities assigned yet" description="Ask an administrator to grant check-in, food, shop, or event access. Your assignments will appear here automatically." />
       )}
       <section aria-labelledby="assigned-events">
         <h2 id="assigned-events" className="admin-card__title mb-3">Assigned events</h2>

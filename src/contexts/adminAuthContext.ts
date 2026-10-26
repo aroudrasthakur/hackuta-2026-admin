@@ -7,6 +7,7 @@ export type StaffProfile = {
   role: "reviewer" | "admin" | "volunteer";
   canCheckIn?: boolean;
   canFoodCheckIn?: boolean;
+  canRedeemShop?: boolean;
   expiresAt: number;
 };
 
