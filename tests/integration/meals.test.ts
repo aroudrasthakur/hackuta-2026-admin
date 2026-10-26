@@ -25,7 +25,9 @@ async function serve(t: ConvexTestInstance, mealPeriodId: GenericId<"mealPeriods
       applicationId: applicant.applicationId, authUserId: applicant.userId, acceptedAt: 1, acceptedBy: adminId,
       qrCodeToken: "ab".repeat(32), foodRestriction: "Private dietary information", foodCheckedInAt: 42, createdAt: 1, updatedAt: 1,
     });
-    for (const redeemedAt of times) await ctx.db.insert("mealRedemptions", { mealPeriodId, participantId, scannedBy: adminId, redeemedAt });
+    for (const redeemedAt of times) await ctx.db.insert("mealRedemptions", { mealPeriodId, participantId, scannedBy: adminId, redeemedAt, countedInServedCount: true });
+    const meal = await ctx.db.get(mealPeriodId);
+    await ctx.db.patch(mealPeriodId, { servedCount: meal!.servedCount! + times.length });
     return participantId;
   });
 }

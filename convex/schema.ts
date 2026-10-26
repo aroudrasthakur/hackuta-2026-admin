@@ -177,6 +177,10 @@ export default defineSchema({
     endsAt: v.number(),
     active: v.boolean(),
     createdBy: v.id("admins"),
+    /** Cached count, maintained atomically with redemptions; absent on legacy meals. */
+    servedCount: v.optional(v.number()),
+    /** Present until the bounded legacy-redemption backfill finishes. */
+    servedCountBackfillCursor: v.optional(v.union(v.string(), v.null())),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -193,6 +197,8 @@ export default defineSchema({
     mealPeriodId: v.id("mealPeriods"),
     scannedBy: v.id("admins"),
     redeemedAt: v.number(),
+    /** Legacy rows are counted once by the resumable served-count backfill. */
+    countedInServedCount: v.optional(v.boolean()),
   })
     .index("by_participant_meal", ["participantId", "mealPeriodId"])
     .index("by_meal", ["mealPeriodId", "redeemedAt"])

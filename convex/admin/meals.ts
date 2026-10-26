@@ -39,11 +39,12 @@ export const listMealPeriods = query({
   handler: async (ctx, { sessionToken }) => {
     await requireAdminRole(ctx, sessionToken);
     const meals = await ctx.db.query("mealPeriods").withIndex("by_startsAt").collect();
-    return Promise.all(meals.map(async (meal) => ({
+    return meals.map((meal) => ({
       ...meal,
-      served: (await ctx.db.query("mealRedemptions")
-        .withIndex("by_meal", (q) => q.eq("mealPeriodId", meal._id)).collect()).length,
-    })));
+      // A partial backfill must never appear as an authoritative count.
+      served: meal.servedCount === undefined || meal.servedCountBackfillCursor !== undefined
+        ? null : meal.servedCount,
+    }));
   },
 });
 
@@ -56,7 +57,7 @@ export const createMealPeriod = mutation({
     const now = Date.now();
     const { description, ...required } = fields;
     const mealPeriodId = await ctx.db.insert("mealPeriods", {
-      ...required, ...(description ? { description } : {}), createdBy: actor._id, createdAt: now, updatedAt: now,
+      ...required, ...(description ? { description } : {}), createdBy: actor._id, servedCount: 0, createdAt: now, updatedAt: now,
     });
     await ctx.db.insert("staffConfigLogs", {
       actorAdminId: actor._id, action: "meal_created", targetMealPeriodId: mealPeriodId,

@@ -5,6 +5,20 @@ their interaction with the existing meal management APIs and scanner workflows.
 
 ## Findings fixed
 
+### Medium: live served counts read all redemption history
+
+The meal list previously collected every redemption for every meal just to count
+the rows. Each collection repeated that growing read and enough preserved history
+could exceed Convex's transaction limits, making meal management unavailable.
+
+Counts now live on each meal and increment in the same transaction as its
+redemption and audit log. A regression test reproduces the old read-limit failure
+and verifies the list stays within a fixed document-read budget with retained
+history. Existing history has an internal backfill of at most 100 rows per call,
+with stored progress and row markers to prevent double counting during concurrent
+serving or retries. Partial totals are hidden until complete. The deployment
+procedure is documented in `convex/admin/README.md`.
+
 ### Medium: availability updates could hide a confirmed collection result
 
 If a volunteer confirmed distribution and the meal ended or was disabled before
@@ -71,18 +85,23 @@ deployed version or exploitability of this registration path was verified here.
 
 ## Validation and limits
 
-Validation includes the full Vitest coverage suite; TypeScript checks for the app
-and Convex; lint; production build; register schema lock verification; and meal,
-check-in, points, offline retry, and camera Playwright scenarios. The audit fixes
-are covered by targeted regression tests as well as the full suite.
+The served-count follow-up passes the full Vitest coverage suite (1,824 tests),
+TypeScript checks for the app and Convex, lint, the production build, whitespace
+checks, and register schema lock verification. Coverage is 96.84% statements,
+92.61% branches, 98.05% functions, and 97.28% lines, above the 90% gate.
 
-The full suite passes 1,817 tests with coverage above the repository's 90% gate.
-All 14 meal redemption and existing scanner Playwright scenarios pass, including
-camera permission, decoding, and cleanup checks.
+All nine meal management/redemption Playwright scenarios pass using installed
+Chrome. The original scanner audit also covered camera permission, decoding,
+cleanup, check-in, and point-award scenarios; those browser scenarios were not
+rerun for this served-count follow-up.
+
+The profile backend and schema locks were refreshed in a local companion checkout.
+Its 751 tests, backend TypeScript check, and both schema lock verifiers pass.
 Validation used the current workspace installation; dependency advisory results
 describe the committed lockfile, whose versions can differ from installed tools.
 
 Browser tests use the repository's mock backend. Mutation authorization and
 transaction behavior are exercised with `convex-test`; no deployed environment
-was smoke-tested or changed. Profile schema synchronization and deployment remain
-separate release steps.
+was smoke-tested or changed. Publishing the profile changes, deploying from
+profile, and running the bounded backfill for any existing meals remain release
+steps. New meals need no backfill.

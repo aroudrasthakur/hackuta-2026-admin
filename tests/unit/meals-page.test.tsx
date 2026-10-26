@@ -91,6 +91,16 @@ describe("admin meals page", () => {
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ name: "Midnight snacks", active: true, startsAt: new Date("2026-10-26T00:00").getTime() }));
     expect(ui().queryByRole("dialog")).toBeNull(); expect(ui().getByRole("status").textContent).toBe("Meal created.");
   });
+  it("keeps legacy counts pending and removal disabled until their count is complete", async () => {
+    mocks.query.mockReturnValue([meal({ served: null })]);
+    await render();
+    expect(container.textContent).toContain("Updating count…");
+    expect(ui().getByRole<HTMLButtonElement>("button", { name: "Remove Lunch" }).disabled).toBe(true);
+    mocks.query.mockReturnValue([meal({ served: 0 })]);
+    await render();
+    expect(container.textContent).not.toContain("Updating count…");
+    expect(ui().getByRole<HTMLButtonElement>("button", { name: "Remove Lunch" }).disabled).toBe(false);
+  });
   it("rejects an invalid time range before sending a mutation", async () => {
     await render(); await click("Create meal"); await fillForm(); await change("Ends at", "2026-10-25T01:00"); await submit();
     expect(ui().getByRole("alert").textContent).toContain("end time after"); expect(mocks.create).not.toHaveBeenCalled();

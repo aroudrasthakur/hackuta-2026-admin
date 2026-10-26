@@ -88,6 +88,16 @@ All register-owned blocks must remain identical to [`schema.reference.ts`](../sc
 
 `mealRedemptions` stores `participantId` (`Id<"participants">`), `mealPeriodId` (`Id<"mealPeriods">`), `scannedBy` (`Id<"admins">`), and `redeemedAt`. `by_participant_meal` supports duplicate checks. `by_meal` indexes `[mealPeriodId, redeemedAt]`, and `by_participant` indexes `[participantId, redeemedAt]`, allowing chronological history queries for either entity.
 
+`mealPeriods.servedCount` is an optional cached total, initialized to zero for new
+meals and incremented atomically on successful redemption. Optional
+`servedCountBackfillCursor` and `mealRedemptions.countedInServedCount` support a
+bounded, resumable backfill for existing history without double counting live
+collections. An absent count or a present cursor means the total is incomplete;
+the admin query returns `served: null` until the backfill finishes. Run
+`admin/mealCountsBackfill:backfillMealServedCount` for each existing meal until
+`isDone` after deploying the synchronized backend from profile. These fields stay
+optional so the schema accepts existing meals and historical redemption rows.
+
 Meal management in `admin/meals.ts` enforces schedule validation, overlap prevention, and removal protection. Food scanning in `admin/volunteerScan.ts` uses meal redemptions and preserves legacy timestamps. The meal system enforces these rules:
 
 - Require `startsAt < endsAt` and reject overlapping active serving windows.

@@ -7,6 +7,6 @@ export function seedMealPeriod(t: ConvexTestInstance, createdBy: GenericId<"admi
   const now = Date.now();
   return t.run((ctx) => ctx.db.insert("mealPeriods", {
     name: "Lunch", startsAt: now - 60_000, endsAt: now + 60_000,
-    active: true, createdBy, createdAt: now, updatedAt: now, ...fields,
+    active: true, createdBy, servedCount: 0, createdAt: now, updatedAt: now, ...fields,
   }));
 }

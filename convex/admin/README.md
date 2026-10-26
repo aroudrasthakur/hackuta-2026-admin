@@ -11,6 +11,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [volunteers.ts](volunteers.ts) | Admin-only volunteer management: creation, resets, revoke/restore, capabilities, event assignments, and audit log queries |
 | [participantsAdmin.ts](participantsAdmin.ts) | Admin-only participant roster, details, point corrections, adjustment history, and participant-to-volunteer promotion |
 | [meals.ts](meals.ts) | Admin-only meal create/edit/activate/remove, reactive served counts, and paginated collection history |
+| [mealCountsBackfill.ts](mealCountsBackfill.ts) | Internal, bounded, resumable backfill of served counts for existing meals |
 | [volunteerProvisioning.ts](volunteerProvisioning.ts) | Shared volunteer account provisioning (validation, hashing, audit) used by both modules above |
 | [adminQueryHelpers.ts](adminQueryHelpers.ts) | Display-name lookups and date-range bounds for admin list queries |
 | [staffCredentials.ts](staffCredentials.ts) | Shared password validation, hashing, credential storage, and session invalidation |
@@ -39,8 +40,11 @@ history, including collections recorded since the UI loaded; deactivate these me
 instead. Configuration changes write `staffConfigLogs` entries with the actor,
 meal ID, and schedule/name details, preserving the name even after removal.
 
-`listMealPeriods` returns schedules ordered by start and live counts from
-`mealRedemptions.by_meal`. `listMealRedemptions` requires a meal ID and pagination
+`listMealPeriods` returns schedules ordered by start and cached `servedCount`
+values without reading redemption history. Each successful collection increments
+its meal's count in the same transaction as the redemption and audit log; duplicates
+leave it unchanged. Count updates do not change `updatedAt`, so they do not reset
+scanner previews. `listMealRedemptions` requires a meal ID and pagination
 options and accepts inclusive `from`/`to` collection timestamps. History is newest
 first and exposes participant/staff display names and collection times only.
 The food scanner uses `listActiveMealPeriods`, `resolveQrForMeal`, and `redeemMeal`
@@ -50,6 +54,16 @@ and the indexed per-meal duplicate record in one transaction. Legacy food endpoi
 delegate to the same checks and require a selected meal. Existing
 `participants.foodCheckedInAt` values remain historical data. Deploy backend changes
 through profile after refreshing its admin schema lock.
+
+New meals start with a complete count of zero. For meals created before cached
+counts were introduced, run the internal mutation
+`admin/mealCountsBackfill:backfillMealServedCount` with `{ "mealPeriodId": "<id>" }`
+from profile, repeating until `isDone` is true for each existing meal. Each call
+reads at most 100 redemptions and stores its cursor on the meal. The operation is
+safe to resume or repeat, including while volunteers are serving food: new
+redemptions are marked `countedInServedCount`, and the backfill counts each legacy
+row once. Until complete, the admin page shows “Updating count…” and disables
+removal rather than displaying a partial total. History remains available.
 
 ## Authentication
 

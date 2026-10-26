@@ -171,6 +171,12 @@ export async function redeemMealForVolunteer(ctx: MutationCtx, volunteer: AdminD
   if (redemption) return { status: "already_redeemed" as const, redeemedAt: redemption.redeemedAt, meal: selectedMeal };
   await ctx.db.insert("mealRedemptions", {
     participantId: participant._id, mealPeriodId: meal._id, scannedBy: volunteer._id, redeemedAt: now,
+    countedInServedCount: true,
+  });
+  await ctx.db.patch(meal._id, {
+    servedCount: (meal.servedCount ?? 0) + 1,
+    // New collections are already counted even if legacy history is still being backfilled.
+    ...(meal.servedCount === undefined ? { servedCountBackfillCursor: null } : {}),
   });
   await ctx.db.insert("volunteerActionLogs", {
     actorAdminId: volunteer._id, participantId: participant._id, mealPeriodId: meal._id,

@@ -100,6 +100,7 @@ describe("meal redemption", () => {
     expect(results.filter((result) => result.status === "success")).toHaveLength(1);
     expect(results.filter((result) => result.status === "already_redeemed")).toHaveLength(4);
     const state = await s.data(); expect(state.redemptions).toHaveLength(1); expect(state.logs).toHaveLength(1);
+    expect((await s.t.query(listMealPeriodsRef, { sessionToken: s.admin.sessionToken }))[0]!.served).toBe(1);
   });
 
   it.each([

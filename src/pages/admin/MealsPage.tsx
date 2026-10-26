@@ -71,13 +71,13 @@ function MealManagement({ sessionToken }: { sessionToken: string }) {
                 <th scope="row"><span className="font-semibold">{meal.name}</span>{meal.description && <p className="mt-1 font-normal text-muted">{meal.description}</p>}</th>
                 <td><time dateTime={new Date(meal.startsAt).toISOString()}>{new Date(meal.startsAt).toLocaleString()}</time><span className="block text-muted">to <time dateTime={new Date(meal.endsAt).toISOString()}>{new Date(meal.endsAt).toLocaleString()}</time></span></td>
                 <td><AdminStatusBadge tone={tones[status]}>{status}</AdminStatusBadge></td>
-                <td className="tabular-nums">{meal.served.toLocaleString()}</td>
+                <td className="tabular-nums">{meal.served === null ? "Updating count…" : meal.served.toLocaleString()}</td>
                 <td><div className="flex flex-wrap gap-2">
                   <button className={reviewSecondaryButtonClass} aria-label={`Edit ${meal.name}`} onClick={() => setForm(meal)}>Edit</button>
                   <button className={reviewSecondaryButtonClass} aria-label={`${meal.active ? "Deactivate" : "Activate"} ${meal.name}`} onClick={() => { setError(""); setAction({ meal, kind: meal.active ? "deactivate" : "activate" }); }}>{meal.active ? "Deactivate" : "Activate"}</button>
                   <button className={reviewSecondaryButtonClass} aria-label={`History for ${meal.name}`} onClick={() => setHistoryId(meal._id)}>History</button>
-                  <button className={reviewDangerButtonClass} disabled={meal.served > 0} title={meal.served > 0 ? "Deactivate this meal to preserve collection history." : undefined} aria-label={`Remove ${meal.name}`} onClick={() => { setError(""); setAction({ meal, kind: "remove" }); }}>Remove</button>
-                </div>{meal.served > 0 && <p className="mt-2 text-sm text-muted">Collection history is preserved. Deactivate to stop serving.</p>}</td>
+                  <button className={reviewDangerButtonClass} disabled={meal.served === null || meal.served > 0} title={meal.served === null ? "Wait for the collection count to finish updating." : meal.served > 0 ? "Deactivate this meal to preserve collection history." : undefined} aria-label={`Remove ${meal.name}`} onClick={() => { setError(""); setAction({ meal, kind: "remove" }); }}>Remove</button>
+                </div>{meal.served !== null && meal.served > 0 && <p className="mt-2 text-sm text-muted">Collection history is preserved. Deactivate to stop serving.</p>}</td>
               </tr>;
             })}</tbody>
           </table>
