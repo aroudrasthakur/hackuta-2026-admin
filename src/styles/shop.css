@@ -139,7 +139,7 @@
   .shop-thumb svg { width: 55%; height: 55%; }
   .shop-thumb--lg { width: 6rem; height: 6rem; }
   .shop-price { color: var(--color-night); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .shop-price s { margin-left: 0.35rem; color: var(--color-muted); font-weight: 400; }
+  .shop-price__was { margin-left: 0.35rem; color: var(--color-muted); font-weight: 400; text-decoration: line-through; }
   .admin-badge--sale { color: var(--color-night); background: #e8862a; border-color: #e8862a; }
 
   .shop-stepper { display: inline-flex; align-items: center; border: 1.5px solid rgb(26 58 82 / 0.28); background: #fffaf2; }

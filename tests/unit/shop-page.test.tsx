@@ -218,7 +218,7 @@ describe("Items tab", () => {
     expect(stats).toContain("Out of stock1");
     expect(text()).toContain("4 of 5 items");
     expect(text()).toContain("On sale");
-    expect(container.querySelector("s")?.textContent).toBe("400");
+    expect(container.querySelector(".shop-price__was")?.textContent).toBe("400");
     expect(container.querySelector("img[src='https://img.test/tee.png']")).not.toBeNull();
 
     await type("Search items", "sticker");

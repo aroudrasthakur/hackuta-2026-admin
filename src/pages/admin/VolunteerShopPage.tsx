@@ -100,7 +100,7 @@ function ItemPicker({ items, maxQuantity, selection, onSelect }: {
                   <span className="shop-pick__stock">{soldOut ? "Sold out" : `${formatPoints(item.stockQuantity)} left`}{item.stockStatus === "low" ? " · Low" : ""}</span>
                 </span>
                 <span className="text-right">
-                  <span className="shop-price block">{formatPoints(item.unitPointsCost)}{onSale ? <s>{formatPoints(item.basePointsCost)}</s> : null}</span>
+                  <span className="shop-price block"><span>{formatPoints(item.unitPointsCost)}</span>{onSale ? <span className="shop-price__was">{formatPoints(item.basePointsCost)}</span> : null}</span>
                   {onSale ? <span className="admin-badge admin-badge--sale mt-1">Sale</span> : null}
                 </span>
               </button>

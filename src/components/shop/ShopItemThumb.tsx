@@ -1,3 +1,5 @@
+import { formatPoints } from "../../lib/shopFormat";
+
 /** Item image, or a black-figure amphora when the item has none. */
 function toSafeImageUrl(imageUrl: string | null): string | null {
   if (!imageUrl) return null;
@@ -29,10 +31,12 @@ export function ShopItemThumb({ imageUrl, large = false }: { imageUrl: string | 
 
 export function ShopPrice({ pointsCost, effectivePointsCost }: { pointsCost: number; effectivePointsCost: number }) {
   const onSale = effectivePointsCost < pointsCost;
+  const current = formatPoints(effectivePointsCost);
+  const previous = formatPoints(pointsCost);
   return (
     <span className="shop-price">
-      {effectivePointsCost.toLocaleString("en-US")}
-      {onSale ? <s aria-label={`was ${pointsCost.toLocaleString("en-US")}`}>{pointsCost.toLocaleString("en-US")}</s> : null}
+      <span>{current}</span>
+      {onSale ? <span className="shop-price__was" aria-label={`was ${previous}`}>{previous}</span> : null}
     </span>
   );
 }
