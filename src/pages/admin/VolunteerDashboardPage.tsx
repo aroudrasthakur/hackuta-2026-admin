@@ -42,7 +42,7 @@ export function VolunteerDashboardPage() {
       )}
       <section aria-labelledby="assigned-events">
         <h2 id="assigned-events" className="admin-card__title mb-3">Assigned events</h2>
-        <p className="mb-4 text-sm text-mist">You can award an event’s points only while it is Active, from its start time until its end time.</p>
+        <p className="mb-4 text-sm text-mist">Listed events are switched on and available for point scans. Scheduled times are for reference.</p>
         {options.events.length ? (
           <ul className="grid gap-4 sm:grid-cols-2">
             {options.events.map((event) => (

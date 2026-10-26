@@ -64,7 +64,7 @@ async function seedEvent(
       name: fields.name ?? "Workshop",
       pointsAwarded: 10,
       startsAt: fields.startsAt ?? 1,
-      endsAt: fields.endsAt ?? Number.MAX_SAFE_INTEGER,
+      endsAt: fields.endsAt ?? 2,
       active: fields.active ?? true,
       createdAt: 1,
       updatedAt: 1,
@@ -194,7 +194,7 @@ describe("resolveQrForScan", () => {
     expect(await t.mutation(resolveQrForScanRef, args)).toMatchObject({ status: "ok", alreadyAwarded: true });
   });
 
-  it("refuses a point scan preview for an assigned event outside its time window", async () => {
+  it("previews a point scan for an assigned event outside its reference schedule", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t);
     const { adminId } = await seedParticipant(t);
@@ -204,7 +204,7 @@ describe("resolveQrForScan", () => {
       await assign(t, volunteer.adminId, eventId, adminId);
       expect(await t.mutation(resolveQrForScanRef, {
         sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "point_scan", eventId,
-      })).toEqual({ status: "not_authorized" });
+      })).toMatchObject({ status: "ok", purpose: "point_scan" });
     }
   });
 

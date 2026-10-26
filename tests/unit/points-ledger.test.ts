@@ -163,24 +163,17 @@ describe("event point awards", () => {
     expect(await logsFor(t, participantId)).toHaveLength(3);
   });
 
-  it("awards from startsAt up to, but not including, endsAt", async () => {
+  it("awards points regardless of the event's startsAt and endsAt", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
     const eventId = await insertEvent(t, { pointsAwarded: 3 });
 
-    for (const now of [START, END - 1]) {
+    for (const now of [START - 1, END, END + 1]) {
       const participantId = await insertParticipant(t, adminId, "accepted", 0);
       const result = await t.run((ctx) =>
         awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now }),
       );
       expect(result.newPoints).toBe(3);
-    }
-    for (const now of [START - 1, END, END + 1]) {
-      const participantId = await insertParticipant(t, adminId, "accepted", 0);
-      await expectAdminErrorCode(
-        t.run((ctx) => awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now })),
-        "EVENT_INACTIVE",
-      );
     }
   });
 

@@ -1,7 +1,7 @@
 import { eventStatus, type EventStatus } from "../../../shared/admin/volunteerRules";
 import { AdminStatusBadge, type StatusTone } from "../AdminStatusBadge";
 
-/** `active` is the only status in which volunteers can award points. */
+/** Schedule labels are reference only. Only `inactive` (switched off) blocks awards. */
 const BADGES: Record<EventStatus, { label: string; tone: StatusTone }> = {
   active: { label: "Active", tone: "positive" },
   upcoming: { label: "Upcoming", tone: "info" },

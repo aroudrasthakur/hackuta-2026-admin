@@ -45,7 +45,7 @@ async function seedParticipant(t: ConvexTestInstance, acceptedBy: GenericId<"adm
 
 function seedEvent(t: ConvexTestInstance, name = "Workshop") {
   return t.run((ctx) => ctx.db.insert("events", {
-    name, pointsAwarded: 10, active: true, startsAt: 1, endsAt: Number.MAX_SAFE_INTEGER, createdAt: 1, updatedAt: 1,
+    name, pointsAwarded: 10, active: true, startsAt: 1, endsAt: 2, createdAt: 1, updatedAt: 1,
   }));
 }
 

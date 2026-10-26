@@ -557,7 +557,7 @@ describe("EventsPage", () => {
     expect(text()).toContain("“Workshop” is switched off. Volunteers can no longer award its points.");
     await click("Switch on Panel");
     expect(setActive).toHaveBeenLastCalledWith({ sessionToken: "session-token", eventId: panelId, active: true });
-    expect(text()).toContain("“Panel” is switched on. Points can be awarded during its scheduled time.");
+    expect(text()).toContain("“Panel” is switched on. Volunteers can award its points.");
 
     setActive.mockRejectedValueOnce(new Error("offline"));
     await click("Switch off Workshop");

@@ -94,7 +94,7 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
     <form aria-labelledby="volunteer-events-heading" className="admin-card admin-card__body space-y-4" onSubmit={(event) => void submit(event)}>
       <div>
         <h2 id="volunteer-events-heading" className="admin-card__title">Event assignments</h2>
-        <p className="admin-page-lead">The volunteer can award points only for the events checked here, and only while an event is active.</p>
+        <p className="admin-page-lead">The volunteer can award points only for the events checked here, and only while an event is switched on. Start and end times are for reference.</p>
       </div>
       <FeedbackMessage feedback={feedback} />
       {status === "LoadingFirstPage" ? <LoadingState message="Loading events…" /> : events.length === 0 ? (

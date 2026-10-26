@@ -16,7 +16,7 @@ Applicant Convex Auth (`convex/auth.ts`) never satisfies staff guards.
 | `requireAdminRole` | Active admin | Review history, sample apps, organizer provisioning, decision-email hold/retry/release, all of `volunteers.ts` |
 | `requireVolunteerAccess` | Active volunteer only | Any volunteer-only participant/event operation (check-in, food, point scan UI) |
 | `requireVolunteerCapability` | Volunteer with explicit `true` on `canCheckIn` or `canFoodCheckIn` | Door check-in or food scan mutations (missing flag = denied) |
-| `requireVolunteerEventAccess` | Volunteer with a **current** `volunteerEventAccess` row and an event that is switched on and inside its time window | Point scan mutations that award event-fixed points |
+| `requireVolunteerEventAccess` | Volunteer with a **current** `volunteerEventAccess` row and an **active** event | Point scan mutations that award event-fixed points |
 
 Admins and reviewers **cannot** call volunteer guards: they receive `VOLUNTEER_ONLY`. Volunteers **cannot** call review guards: they receive `NOT_AUTHORIZED`.
 
@@ -26,8 +26,8 @@ Acting identity always comes from the guard return value (`admin._id`). Never tr
 
 - Permission to award an event's points is **only** the presence of a `volunteerEventAccess` row for `(volunteerAdminId, eventId)` at the time of the request.
 - **Removing** an assignment (leaving the event out of the `setVolunteerEventAccess` list) deletes the row in that transaction. The volunteer loses access on the **next** scan request; there is no caching of assignments in sessions.
-- An event can award points only when `eventStatus(event, now)` is `active`: `active` is true and `startsAt <= now < endsAt`. The server clock is authoritative; upcoming, ended, and switched-off events reject even when an assignment row still exists (`EVENT_INACTIVE`). Missing events reject with `EVENT_NOT_FOUND`.
-- Assignments are not removed when an event ends or is switched off, so re-opening the window or switching the event back on restores scanning without reassigning.
+- `events.startsAt` / `events.endsAt` are **reference only** and do not gate point awards.
+- Inactive or missing events reject even when an assignment row still exists (`EVENT_INACTIVE`, `EVENT_NOT_FOUND`). Assignments are not removed when an event is switched off, so switching it back on restores scanning without reassigning.
 
 ## Ledger helpers are not auth boundaries
 
@@ -35,7 +35,7 @@ Acting identity always comes from the guard return value (`admin._id`). Never tr
 
 - `applyEventAward` is the non-throwing award core used by the scan mutation. It returns `already_awarded` instead of throwing.
 - `eventHasAwards` reads `participantEventAwards.by_event`. `events.setEventPoints` uses it to throw `EVENT_POINTS_LOCKED` once an event has one award; fix balances with `adjustPoints` instead.
-- `awardEventPoints` writes awards, balances, and `point_scan` logs, and rejects an event outside its window with `EVENT_INACTIVE`. It does **not** verify volunteer session, capability, or event assignment. A public point-scan mutation **must** call `requireVolunteerEventAccess` (and any capability guard) first, then pass `actorAdminId` from the returned volunteer and `now` from the server.
+- `awardEventPoints` writes awards, balances, and `point_scan` logs. It rejects a switched-off event with `EVENT_INACTIVE` and does **not** check the schedule. It also does **not** verify volunteer session, capability, or event assignment. A public point-scan mutation **must** call `requireVolunteerEventAccess` (and any capability guard) first, then pass `actorAdminId` from the returned volunteer and `now` from the server.
 - `adjustPoints` enforces admin role on the **stored** `actorAdminId` argument only. Public admin-adjust APIs must call `requireAdminRole` first and pass that admin's id.
 
 If you add a new public mutation that imports `pointsLedger`, add a row to the entry-point audit in [volunteer-public-entrypoints.test.ts](../../tests/integration/volunteer-public-entrypoints.test.ts) and call the appropriate guard before any ledger or participant read/write.
@@ -74,7 +74,7 @@ Order inside the handler:
 1. `requireVolunteerAccess`. Session failures throw `NOT_AUTHENTICATED` or `VOLUNTEER_ONLY`; nothing has been written yet.
 2. Throttle check. A full bucket returns `rate_limited` and writes nothing.
 3. Record one attempt row.
-4. Purpose check: `check_in` needs `canCheckIn === true`, `food_check_in` needs `canFoodCheckIn === true`, and `point_scan` needs an `eventId` with a current assignment on an event that is switched on and inside its time window. Missing, unassigned, switched-off, upcoming, and ended events all return `not_authorized`, and the token is not looked up.
+4. Purpose check: `check_in` needs `canCheckIn === true`, `food_check_in` needs `canFoodCheckIn === true`, and `point_scan` needs an `eventId` with a current assignment on an active event. Missing, unassigned, and inactive events all return `not_authorized`, and the token is not looked up.
 5. Token check: 64-char lowercase hex (256-bit), then `participants.by_qr_token`. Malformed and unknown tokens both return `qr_not_found`.
 6. Eligibility: the linked `applicationReviews` row must be `accepted`, otherwise `participant_not_eligible` with no participant data.
 
@@ -88,7 +88,7 @@ Response fields by purpose. Point totals, emails, applications, and QR tokens ar
 | `food_check_in` | name, `foodCheckedIn`, `foodCheckedInAt`, `dietaryInfo` (the only response with dietary data) |
 | `point_scan` | name, event name, event `pointsAwarded`, `alreadyAwarded` |
 
-`listMyScanOptions` lists every assigned, switched-on event without checking the clock, because a cached query result would not refresh when a window opens. The preview and the award mutation both check the window at request time.
+Event `startsAt` / `endsAt` are not checked for point-scan previews or awards. They are stored for reference only.
 
 ## Scan operations (`volunteerOperations.ts`)
 
@@ -98,7 +98,7 @@ These mutations do the real work. Each one re-checks everything itself and share
 | --- | --- | --- |
 | `checkInParticipant` | `canCheckIn === true`, accepted participant | `checkedInAt`, `updatedAt`, one `check_in` log |
 | `foodCheckInParticipant` | `canFoodCheckIn === true`, accepted participant (door check-in not needed) | `foodCheckedInAt`, `updatedAt`, one `food_check_in` log |
-| `awardEventPoints` | Current assignment, switched-on event inside its time window, accepted participant who is door checked in | Award row, `points`, one `point_scan` log with delta and previous/new balance |
+| `awardEventPoints` | Current assignment, active event, accepted participant who is door checked in | Award row, `points`, one `point_scan` log with delta and previous/new balance |
 
 - Points always come from the stored event. There is no points argument.
 - Repeat scans change nothing and return `already_checked_in` (with `checkedInAt`), `already_food_checked_in` (with `foodCheckedInAt`), or `already_awarded`.

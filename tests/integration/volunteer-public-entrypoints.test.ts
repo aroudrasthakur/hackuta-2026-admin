@@ -213,7 +213,7 @@ describe("volunteer unsafe-path invariants", () => {
         name: "Workshop",
         pointsAwarded: 5,
         startsAt: 1,
-        endsAt: Date.now() + 60_000,
+        endsAt: 2,
         active: true,
         createdAt: 1,
         updatedAt: 1,

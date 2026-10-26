@@ -197,7 +197,7 @@ function EventsList({ sessionToken }: { sessionToken: string }) {
       await setEventActive({ sessionToken, eventId: event.eventId, active: !event.active });
       setFeedback({ tone: "success", message: event.active
         ? `“${event.name}” is switched off. Volunteers can no longer award its points.`
-        : `“${event.name}” is switched on. Points can be awarded during its scheduled time.` });
+        : `“${event.name}” is switched on. Volunteers can award its points.` });
     } catch (caught) {
       setFeedback({ tone: "error", message: reportUserFacingError(
         "Unable to change event status", caught, "The event status was not changed. Please try again.",
@@ -296,7 +296,7 @@ export function EventsPage() {
       <AdminPageHeader
         id="events-heading"
         title="Events"
-        description="Create the events volunteers award points for. Points can be awarded only while an event is switched on and within its start and end time. Assign events to volunteers from the Volunteers page."
+        description="Create the events volunteers award points for. Points can be awarded while an event is switched on; start and end times are for reference. Assign events to volunteers from the Volunteers page."
       />
       {staff?.role === "admin" && sessionToken ? <EventsList sessionToken={sessionToken} /> : (
         <LoadingState message="Verifying administrator access…" />

@@ -45,7 +45,7 @@ Protected queries and mutations accept `sessionToken`. The helpers take `(ctx, s
 - `requireAdminRole` allows only active admins; historical review log queries use it.
 - `requireVolunteerAccess` allows only active volunteers; admins and reviewers cannot act as volunteers.
 - `requireVolunteerCapability` checks an explicit `true` for `canCheckIn` or `canFoodCheckIn` on each request.
-- `requireVolunteerEventAccess` checks the caller's own assignment and that the event is switched on and inside its `startsAt`/`endsAt` window. Removing an assignment takes effect on the next request.
+- `requireVolunteerEventAccess` checks the caller's own assignment and an active event. Schedule times are reference only. Removing an assignment takes effect on the next request.
 
 Each protected request resolves the current stored role and active status. Acting identity always comes from the returned `admin._id`, including `applicationReviews.reviewedBy`, `applicationReviewLogs.adminId`, and `participants.acceptedBy`; public operations never accept an acting admin ID or role. Applicant authentication cannot satisfy these guards.
 
@@ -80,14 +80,14 @@ Every configuration change writes a `staffConfigLogs` row with the acting admin 
 
 Every export in `events.ts` calls `requireAdminRole` first; reviewers get `ADMIN_ONLY`, volunteers `NOT_AUTHORIZED`. Input goes through `normalizeEventInput`: a trimmed name of 1–120 characters, an optional description up to 2,000 characters, whole points from 1 to 100,000, and finite whole-millisecond `startsAt` before `endsAt`; anything else is `INVALID_EVENT`. `createdAt` and `updatedAt` are always set by the server.
 
-- `listEvents` is paginated over every event (switched on or off, past or future), newest first. Each row has `active`, `startsAt`, `endsAt`, and `pointsLocked` (true once `participantEventAwards.by_event` has a row), so the client can label it with `eventStatus`: `inactive`, `upcoming`, `active`, or `ended`. The status is not computed in the query because cached query results would not refresh when the clock crosses a boundary.
+- `listEvents` is paginated over every event (switched on or off, past or future), newest first. Each row has `active`, `startsAt`, `endsAt`, and `pointsLocked` (true once `participantEventAwards.by_event` has a row), so the client can label it with `eventStatus`: `inactive`, `upcoming`, `active`, or `ended`. Those labels are display only; the query does not compute status because cached results would not refresh when the clock crosses a boundary.
 - `getEvent` returns one event in the same shape, or `null`.
 - `createEvent` inserts a switched-on event and logs `event_created` with the new values.
-- `updateEvent` changes name, description, and schedule. A missing event is `EVENT_NOT_FOUND`; an unchanged submission is a no-op; otherwise `event_updated` records `changedFields` and the previous and new schedule. A blank description clears it. A new schedule applies to the next scan.
+- `updateEvent` changes name, description, and schedule. A missing event is `EVENT_NOT_FOUND`; an unchanged submission is a no-op; otherwise `event_updated` records `changedFields` and the previous and new schedule. A blank description clears it. Schedule times are stored for reference and do not change who can scan.
 - `setEventPoints` changes `pointsAwarded` until the first award, then throws `EVENT_POINTS_LOCKED`. Existing awards and balances are never rewritten. `event_updated` records the previous and new value.
 - `setEventActive` is a no-op when unchanged; otherwise `event_active_changed` records before and after.
 
-Points can be awarded only while `eventStatus(event, now)` is `active`; the award mutation, the ledger helper, and the scan preview all check it on the server. Switching an event off or letting it end keeps its volunteer assignments, and `listMyScanOptions` keeps showing it, so scanning resumes without reassignment if it is switched back on or rescheduled. No export here awards points.
+Points can be awarded while the event is switched on. `startsAt` / `endsAt` are reference only and are not checked by the award mutation, the ledger helper, or the scan preview. Switching an event off keeps its volunteer assignments, and `listMyScanOptions` lists every assigned switched-on event, so scanning resumes without reassignment when it is switched back on. No export here awards points.
 
 ## Participant administration (#64)
 

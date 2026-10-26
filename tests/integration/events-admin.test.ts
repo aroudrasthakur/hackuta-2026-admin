@@ -216,29 +216,22 @@ describe("setEventActive", () => {
 });
 
 describe("award availability", () => {
-  it("awards only while switched on and from startsAt up to, not including, endsAt", async () => {
+  it("awards a switched-on event before its start time, then rejects after it is switched off", async () => {
     const { t, actor, sessionToken, create } = await fixture();
     const eventId = await create({ startsAt: NOW + HOUR, endsAt: NOW + 2 * HOUR });
     const { award } = await scanSetup(t, actor.adminId, eventId);
 
     vi.setSystemTime(NOW + HOUR - 1);
-    expect(await award()).toEqual({ status: "event_inactive" });
-    vi.setSystemTime(NOW + 2 * HOUR);
-    expect(await award()).toEqual({ status: "event_inactive" });
-    vi.setSystemTime(NOW + HOUR);
+    expect(await award()).toEqual({ status: "success", pointsAwarded: 25 });
     await t.mutation(events.setEventActive, { sessionToken, eventId, active: false });
     expect(await award()).toEqual({ status: "event_inactive" });
-    await t.mutation(events.setEventActive, { sessionToken, eventId, active: true });
-    expect(await award()).toEqual({ status: "success", pointsAwarded: 25 });
   });
 
-  it("applies a schedule change on the next scan", async () => {
+  it("still awards after the scheduled end, and after a schedule change", async () => {
     const { t, actor, sessionToken, create } = await fixture();
     const eventId = await create();
     const { award } = await scanSetup(t, actor.adminId, eventId);
     await t.mutation(events.updateEvent, { sessionToken, eventId, ...schedule, startsAt: NOW - 2 * HOUR, endsAt: NOW - HOUR });
-    expect(await award()).toEqual({ status: "event_inactive" });
-    await t.mutation(events.updateEvent, { sessionToken, eventId, ...schedule });
     expect(await award()).toEqual({ status: "success", pointsAwarded: 25 });
   });
 });

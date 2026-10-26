@@ -305,7 +305,7 @@ describe("protected staff screens", () => {
     expect(path()).toBe(ADMIN_ROUTES.scanCheckIn);
   });
 
-  it("labels each assigned event's time window and keeps its points link", async () => {
+  it("labels each assigned event's reference schedule and keeps its points link", async () => {
     options = { ...allOptions, events: [
       { ...event, startsAt: Date.now() + 60_000, endsAt: Date.now() + 120_000 },
       { ...event, eventId: "past" as GenericId<"events">, name: "Past workshop", startsAt: Date.now() - 120_000, endsAt: Date.now() - 60_000 },
