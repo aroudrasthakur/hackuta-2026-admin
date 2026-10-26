@@ -250,7 +250,6 @@ export const setEventPointsRef = adminModuleRef<
   FunctionArgs<EventAdmin["setEventPoints"]>,
   FunctionReturnType<EventAdmin["setEventPoints"]>
 >("admin/events:setEventPoints");
-
 type ParticipantsAdmin = ApiFromModules<{
   participants: {
     getParticipantDetails: typeof getParticipantDetails;
