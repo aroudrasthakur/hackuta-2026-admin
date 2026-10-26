@@ -1,0 +1,123 @@
+/* Dashboard patterns extend the HackUTA palette without affecting sign-in. */
+@layer components {
+  .admin-workspace {
+    --color-mist: var(--color-muted);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .admin-workspace :where(h1, h2, h3, p, dd) { overflow-wrap: anywhere; }
+  .admin-workspace :where(a, button, input, select, textarea, summary, [tabindex]),
+  .resume-dialog :where(a, button, input, [tabindex]) { scroll-margin-top: 2rem; }
+  .resume-dialog :focus-visible {
+    outline: 2px solid var(--color-ocean);
+    outline-offset: 3px;
+  }
+
+  .admin-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .admin-page-header__copy { min-width: 0; flex: 1 1 16rem; }
+  .admin-page-header__description {
+    max-width: 48rem;
+    margin-top: 0.5rem;
+    color: var(--color-muted);
+    font-size: 0.9375rem;
+  }
+  .admin-page-header__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+  .admin-btn {
+    min-height: var(--spacing-control);
+    border-radius: var(--radius-control);
+    box-shadow: none;
+  }
+  .admin-btn:active:not(:disabled) { transform: translateY(1px); }
+  .admin-btn:disabled { pointer-events: none; }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    text-align: left;
+  }
+  .admin-table :is(th, td) {
+    padding: var(--spacing-cell-y) var(--spacing-cell-x);
+    vertical-align: middle;
+  }
+  .admin-table thead {
+    background: var(--color-surface-muted);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .admin-table thead th { font-weight: 600; }
+  .admin-table tbody tr + tr { border-top: 1px solid var(--color-border); }
+  .admin-table tbody tr:is(:hover, :focus-within) { background: #f7f9fa; }
+  .admin-table-scroll { max-width: 100%; overflow-x: auto; border-radius: var(--radius-panel); }
+
+  .admin-badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .admin-badge--neutral { color: var(--color-muted); background: #f1f4f5; border-color: #d5dde2; }
+  .admin-badge--positive { color: var(--color-positive); background: #edf7f0; border-color: #bddbc9; }
+  .admin-badge--negative { color: var(--color-negative); background: #fff1f1; border-color: #efc9cc; }
+  .admin-badge--warning { color: var(--color-warning); background: #fff8e7; border-color: #e6d5a7; }
+  .admin-badge--info { color: var(--color-info); background: #edf5fc; border-color: #c2d9ed; }
+
+  .admin-state { padding: clamp(1.5rem, 4vw, 3rem); text-align: center; }
+  .admin-state__icon {
+    display: inline-grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+    background: var(--color-surface-muted);
+    color: var(--color-ocean);
+  }
+  .admin-skeleton {
+    height: 0.75rem;
+    border-radius: 0.25rem;
+    background: #e5eaed;
+    animation: admin-loading 1.8s ease-in-out infinite alternate;
+  }
+  .admin-skeleton-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 1.5rem;
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .admin-skeleton-row:last-child { border: 0; }
+  .admin-skeleton-row > :first-child { width: 75%; }
+  .admin-notice { display: grid; gap: 0.5rem; }
+  .admin-notice > button { justify-self: start; }
+
+  @keyframes admin-loading { to { opacity: 0.4; } }
+  @media (prefers-reduced-motion: reduce) {
+    .admin-workspace *, .admin-workspace *::before, .admin-workspace *::after,
+    .resume-dialog *, .resume-dialog *::before, .resume-dialog *::after {
+      animation: none !important;
+      transition: none !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
