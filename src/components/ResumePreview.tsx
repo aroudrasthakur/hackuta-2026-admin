@@ -54,7 +54,7 @@ export function ResumePreview({ resume }: { resume: ApplicationDetail["resume"] 
         ) : <p className="text-sm text-ocean">{unsupported ? "Preview is only available for PDF resumes. This file format is not supported." : resume.status === "missing" ? "The attached resume is no longer available." : "No resume was attached."}</p>}
       </div>
       <dialog ref={dialog} aria-labelledby={titleId} aria-modal="true" aria-label="Resume preview" className="resume-dialog" onCancel={(event) => { event.preventDefault(); close(); }} onClose={() => { setOpen(false); trigger.current?.focus(); }}>
-        <header className="border-b border-sand bg-light px-4 py-3">
+        <header className="border-b border-border bg-surface px-5 py-4">
           <h2 id={titleId} className="break-all text-base font-semibold text-night">{resume.filename || "Applicant resume"}</h2>
         </header>
         {open && resume.url && (

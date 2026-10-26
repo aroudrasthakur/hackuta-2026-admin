@@ -6,6 +6,7 @@ import { reviewActionLabels } from "../lib/reviewActionLabels";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { EmptyState } from "./states/EmptyState";
 import { LoadingState } from "./states/LoadingState";
+import { reviewSecondaryButtonClass } from "../lib/reviewButtonClasses";
 
 const PAGE_SIZE = 50;
 
@@ -165,7 +166,7 @@ function ReviewHistoryEvents({ applicationId, sessionToken }: ReviewHistoryProps
           type="button"
           disabled={status === "LoadingMore"}
           onClick={() => loadMore(PAGE_SIZE)}
-          className="admin-btn inline-flex min-h-11 items-center justify-center rounded-lg border border-ocean px-4 py-2 text-sm font-semibold text-ocean transition hover:bg-ocean hover:text-light disabled:opacity-60"
+          className={reviewSecondaryButtonClass}
         >
           {status === "LoadingMore" ? "Loading…" : "Show older activity"}
         </button>
