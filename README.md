@@ -13,11 +13,15 @@ Vite, React 19, TypeScript, React Router, Convex, Tailwind CSS v4.
 | Path | Purpose |
 | --- | --- |
 | `/admin/login` | Organizer sign-in |
-| `/volunteer` | Volunteer access and account controls |
+| `/volunteer` | Redirects volunteers to `/admin/scan` |
+| `/admin/scan` | Volunteer dashboard, responsibilities, and assigned events |
+| `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points` | Capability-protected scanner entry pages |
+| `/admin/participants`, `/admin/volunteers` | Administrator-only management entry pages |
 | `/admin/applications` | Submitted application queue |
+| `/admin/decision-emails` | Decision email queue for admins and reviewers |
 | `/admin/applications/:id` | Application review, decisions, history (admin) |
 
-`/admin` redirects to the applications queue.
+`/admin` redirects admins and reviewers to applications and volunteers to the scanner dashboard. Scanner and management workflows currently show protected placeholders; their full interfaces are delivered separately.
 
 ## Commands
 

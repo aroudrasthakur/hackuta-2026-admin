@@ -5,6 +5,15 @@
 | [`AdminLoginPage.tsx`](AdminLoginPage.tsx) | `/admin/login` — email + password with the same show/hide control as register sign-in |
 | [`ApplicationsPage.tsx`](ApplicationsPage.tsx) | `/admin/applications` |
 | [`ApplicationReviewPage.tsx`](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` |
+| [`DecisionEmailQueuePage.tsx`](DecisionEmailQueuePage.tsx) | `/admin/decision-emails` |
+| [`VolunteerDashboardPage.tsx`](VolunteerDashboardPage.tsx) | `/admin/scan` |
+| [`StaffWorkflowPage.tsx`](StaffWorkflowPage.tsx) | `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points`, `/admin/participants`, `/admin/volunteers` |
+
+Admins and reviewers land on applications; volunteers land on the scanner dashboard. `/volunteer` redirects to `/admin/scan`. Login restores a known internal destination only if the current account can access it. Unknown routes resolve to the account's home.
+
+The scan dashboard and navigation share a reactive `listMyScanOptions` subscription. Check-in and food require explicit grants; points require an assigned active event. Selected event URLs are checked against current assignments. Removing access hides actions immediately and redirects stale routes with a notice. Event times are advisory, matching the backend scan contract.
+
+The scanner and management routes currently show protected entry pages. Camera scanning, participant mutations, and management forms belong to their separate workflow issues; these entry pages do not perform those operations. Participant and volunteer management routes require the administrator role. Backend authorization remains mandatory for every operation.
 
 Review page: applicant identity and responses first, background/education/resume, review controls beside the evidence on desktop, and expandable secondary applicant information. Confirmation identifies the applicant and manages keyboard focus; completion remains visible after the live query updates. Admin-only history remains below the review.
 

@@ -11,6 +11,7 @@ import { AdminAuthProvider } from "../../src/contexts/AdminAuthProvider";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
   getCurrentStaffRef,
+  listMyScanOptionsRef,
   listSubmittedApplicationsRef,
   logApplicationReviewActionRef,
   type ApplicationDetail,
@@ -71,7 +72,8 @@ let root: Root;
 beforeEach(() => {
   staff.expiresAt = Date.now() + 60_000;
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  mocks.query.mockReset().mockReturnValue([]);
+  mocks.query.mockReset().mockImplementation((ref) => ref === listMyScanOptionsRef
+    ? { canCheckIn: true, canFoodCheckIn: true, events: [] } : []);
   mocks.paginatedQuery.mockReset().mockReturnValue({ results: [], status: "Exhausted", loadMore: vi.fn() });
   mocks.mutation.mockReset().mockResolvedValue(null);
   mocks.mutationHook.mockReset().mockReturnValue(mocks.mutation);
@@ -150,11 +152,11 @@ describe("app routes", () => {
   it.each(["/admin/login", "/admin/applications", "/admin/applications/app-1", "/admin/decision-emails", "/"])(
     "sends volunteers from %s to their own landing page without review queries", async (path) => {
       await renderApp(path, authContext({ staff: { ...staff, role: "volunteer" } }));
-      expect(currentPath()).toBe("/volunteer");
-      expect(container.querySelector("h1")?.textContent).toBe("Volunteer access");
-      expect(container.textContent).toContain("Not assigned");
+      expect(currentPath()).toBe("/admin/scan");
+      expect(container.querySelector("h1")?.textContent).toBe("Volunteer dashboard");
+      expect(container.textContent).toContain("No responsibilities assigned yet");
       expect(container.querySelector('nav[aria-label="Admin"]')).toBeNull();
-      expect(mocks.query).not.toHaveBeenCalled();
+      expect(mocks.query.mock.calls.every(([ref]) => ref === listMyScanOptionsRef)).toBe(true);
       expect(mocks.paginatedQuery).not.toHaveBeenCalled();
     },
   );
@@ -162,7 +164,8 @@ describe("app routes", () => {
   it("shows volunteer capabilities and permits signing out", async () => {
     const context = authContext({ staff: { ...staff, role: "volunteer", canCheckIn: true, canFoodCheckIn: true } });
     await renderApp("/volunteer", context);
-    expect(Array.from(container.querySelectorAll("dd"), (node) => node.textContent)).toEqual(["Enabled", "Enabled"]);
+    expect(container.querySelector('a[href="/admin/scan/check-in"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/admin/scan/food"]')).not.toBeNull();
     await act(async () => button("Sign out")!.click());
     expect(currentPath()).toBe("/admin/login");
     expect(context.signOut).toHaveBeenCalledOnce();
@@ -195,7 +198,7 @@ describe("app routes", () => {
   it("waits while the session is checked", async () => {
     await renderApp("/admin/applications", authContext({ sessionReady: false, isLoading: true }));
     expect(container.textContent).toContain("Verifying organizer session…");
-    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.query.mock.calls.every(([ref, args]) => ref === listMyScanOptionsRef && args === "skip")).toBe(true);
   });
 
   it("signs out and returns to sign-in", async () => {
@@ -310,7 +313,8 @@ describe("applications dashboard", () => {
 
   it("contains a query failure in the dashboard", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    mocks.query.mockImplementation(() => {
+    mocks.query.mockImplementation((_ref, args) => {
+      if (args === "skip") return undefined;
       throw new Error("Not authenticated");
     });
     await renderApp("/admin/applications", authContext());
@@ -327,7 +331,7 @@ describe("applications dashboard", () => {
       </AdminAuthContext.Provider>,
     );
     expect(container.textContent).toContain("Verifying organizer session…");
-    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
   });
 });
 
@@ -540,13 +544,15 @@ describe("AdminAuthProvider", () => {
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     const volunteer = { ...staff, role: "volunteer", expiresAt: Date.now() + 1000 };
     stubApi({ "/api/admin/session-token": () => new Response(token) });
-    mocks.query.mockImplementation((_ref, args) => args === "skip" ? undefined : volunteer);
+    mocks.query.mockImplementation((ref, args) => ref === listMyScanOptionsRef
+      ? { canCheckIn: false, canFoodCheckIn: false, events: [] }
+      : args === "skip" ? undefined : volunteer);
     await render(<AdminAuthProvider><MemoryRouter initialEntries={["/volunteer"]}><App /><CurrentPath /></MemoryRouter></AdminAuthProvider>);
-    expect(currentPath()).toBe("/volunteer");
+    expect(currentPath()).toBe("/admin/scan");
     await act(async () => { vi.advanceTimersByTime(1000); });
     expect(currentPath()).toBe("/admin/login");
     expect(container.textContent).toContain(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
-    expect(mocks.query).toHaveBeenLastCalledWith(getCurrentStaffRef, "skip");
+    expect(mocks.query.mock.calls.filter(([ref]) => ref === getCurrentStaffRef).at(-1)?.[1]).toBe("skip");
   });
 
   it.each(["focus", "visibilitychange"])("checks expiry on %s when returning from a suspended tab", async (event) => {
@@ -567,10 +573,12 @@ describe("AdminAuthProvider", () => {
 
   it("returns a volunteer to login after server revocation", async () => {
     stubApi({ "/api/admin/session-token": () => new Response(token) });
-    mocks.query.mockReturnValue({ ...staff, role: "volunteer" });
+    mocks.query.mockImplementation((ref) => ref === listMyScanOptionsRef
+      ? { canCheckIn: false, canFoodCheckIn: false, events: [] }
+      : { ...staff, role: "volunteer" });
     const app = <AdminAuthProvider><MemoryRouter initialEntries={["/volunteer"]}><App /><CurrentPath /></MemoryRouter></AdminAuthProvider>;
     await render(app);
-    expect(currentPath()).toBe("/volunteer");
+    expect(currentPath()).toBe("/admin/scan");
     mocks.query.mockReturnValue(null);
     // Re-render the existing provider so it observes the reactive server update.
     await render(<AdminAuthProvider><MemoryRouter initialEntries={["/volunteer"]}><App /><CurrentPath /></MemoryRouter></AdminAuthProvider>);
