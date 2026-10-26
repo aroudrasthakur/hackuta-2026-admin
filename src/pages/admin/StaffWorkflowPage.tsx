@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { EmptyState } from "../../components/states/EmptyState";
 import { ADMIN_ROUTES } from "../../types/routes";
+import { AdminPageHeader } from "../../components/AdminPageHeader";
+import { reviewGhostButtonClass } from "../../lib/reviewButtonClasses";
 
 const workflows = {
   "check-in": { title: "Participant check-in", description: "The check-in scanner is being prepared. Follow your event lead’s instructions for participant arrivals." },
@@ -16,9 +18,9 @@ export function StaffWorkflowPage({ workflow }: { workflow: keyof typeof workflo
   const scanning = workflow === "check-in" || workflow === "food" || workflow === "points";
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-3xl text-ink">{title}</h1>
+      <AdminPageHeader id={`${workflow}-heading`} title={title} />
       <EmptyState title="Coming soon" description={description} />
-      {scanning ? <Link className="inline-block py-3 font-semibold" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link> : null}
+      {scanning ? <Link className={reviewGhostButtonClass} to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link> : null}
     </div>
   );
 }

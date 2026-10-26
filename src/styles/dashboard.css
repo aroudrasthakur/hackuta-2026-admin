@@ -204,6 +204,8 @@
     background: var(--color-surface-muted);
     color: var(--color-ocean);
   }
+  .admin-action-card { text-decoration: none; transition: border-color 160ms, box-shadow 160ms; }
+  .admin-action-card:hover { border-color: var(--color-ocean); box-shadow: 0 4px 12px rgb(16 47 70 / 0.08); }
   .admin-skeleton {
     height: 0.75rem;
     border-radius: 0.25rem;
