@@ -113,10 +113,6 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
     min-height: 2.75rem;
   }
 
-  .admin-workspace :where(p, h1, h2, h3) {
-    overflow-wrap: anywhere;
-  }
-
   .admin-card {
     min-width: 0;
     border: 1px solid var(--color-border);

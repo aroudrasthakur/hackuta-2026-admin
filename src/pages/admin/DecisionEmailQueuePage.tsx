@@ -30,8 +30,6 @@ const RECENTLY_SENT_DISPLAY_LIMIT = 5;
 const deliveryTones: Record<QueueRow["status"], StatusTone> = {
   queued: "info", held: "warning", sending: "info", failed: "negative", sent: "positive",
 };
-const queueTableCellClass = "align-middle";
-const queueTableHeadClass = "font-semibold";
 
 function QueueTable({
   rows,
@@ -58,19 +56,19 @@ function QueueTable({
         <caption className="sr-only">Decision email queue</caption>
         <thead>
           <tr>
-            {isAdmin ? <th scope="col" className={`${queueTableHeadClass} w-12`}>Send</th> : null}
-            <th scope="col" className={queueTableHeadClass}>Applicant</th>
-            <th scope="col" className={queueTableHeadClass}>Decision</th>
-            <th scope="col" className={queueTableHeadClass}>Status</th>
-            <th scope="col" className={queueTableHeadClass}>Queued</th>
-            {isAdmin ? <th scope="col" className={queueTableHeadClass}>Hold</th> : null}
+            {isAdmin ? <th scope="col" className="w-12">Send</th> : null}
+            <th scope="col">Applicant</th>
+            <th scope="col">Decision</th>
+            <th scope="col">Status</th>
+            <th scope="col">Queued</th>
+            {isAdmin ? <th scope="col">Hold</th> : null}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.itemId}>
               {isAdmin ? (
-                <td className={`${queueTableCellClass} w-12`}>
+                <td className="w-12">
                   {row.status === "queued" || row.status === "held" ? (
                     <input
                       type="checkbox"
@@ -83,18 +81,18 @@ function QueueTable({
                   ) : null}
                 </td>
               ) : null}
-              <th scope="row" className={`${queueTableCellClass} font-normal`}>
+              <th scope="row" className="font-normal">
                 <Link className="font-semibold text-night underline" to={ADMIN_ROUTES.applicationReview(row.applicationId)}>
                   {row.applicantName}
                 </Link>
                 <p className="break-all text-muted">{row.recipientEmail}</p>
                 {row.errorMessage ? <p className="text-red-700">{row.errorMessage}</p> : null}
               </th>
-              <td className={queueTableCellClass}><ApplicationDecisionBadge status={row.decision} /></td>
-              <td className={queueTableCellClass}><AdminStatusBadge tone={deliveryTones[row.status]} label={`Delivery: ${row.status}`}>{row.status.charAt(0).toUpperCase() + row.status.slice(1)}</AdminStatusBadge></td>
-              <td className={queueTableCellClass}>{new Date(row.queuedAt).toLocaleString()}</td>
+              <td><ApplicationDecisionBadge status={row.decision} /></td>
+              <td><AdminStatusBadge tone={deliveryTones[row.status]} label={`Delivery: ${row.status}`}>{row.status.charAt(0).toUpperCase() + row.status.slice(1)}</AdminStatusBadge></td>
+              <td>{new Date(row.queuedAt).toLocaleString()}</td>
               {isAdmin ? (
-                <td className={`${queueTableCellClass} whitespace-nowrap`}>
+                <td className="whitespace-nowrap">
                   {row.status === "queued" || row.status === "held" ? (
                     <button
                       type="button"

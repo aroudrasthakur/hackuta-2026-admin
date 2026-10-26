@@ -40,7 +40,6 @@
   .admin-topbar__identity { min-width: 0; font-size: 0.8125rem; text-align: right; }
   .admin-topbar__identity-name { display: block; font-weight: 600; }
   .admin-topbar__identity-role { color: var(--color-muted); }
-  .admin-topbar__divider { display: none; }
   .admin-topbar__chip, .admin-topbar__sign-out, .admin-topbar__menu-item {
     display: inline-flex;
     min-height: var(--spacing-control);

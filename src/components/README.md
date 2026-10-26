@@ -17,7 +17,5 @@
 | [`SignInPasswordInput.tsx`](SignInPasswordInput.tsx) | Password field with show/hide toggle (matches register sign-in) |
 | [`states/`](states/README.md) | Loading, empty, error |
 
-Dashboard controls share [`reviewButtonClasses.ts`](../lib/reviewButtonClasses.ts).
-Tables use the `admin-table` pattern; the application list keeps mobile cards,
-while the decision-email table uses a focusable scroll region on small screens.
-Keep domain-specific labels and actions in their existing components.
+Buttons share [`reviewButtonClasses.ts`](../lib/reviewButtonClasses.ts).
+See [styles](../styles/README.md) for table and interaction patterns.

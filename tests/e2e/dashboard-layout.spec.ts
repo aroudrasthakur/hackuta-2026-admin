@@ -83,6 +83,7 @@ test("keeps status and primary-action text above a 4.5 to 1 contrast ratio", asy
   await setDecisionQueue(page, "mixed");
   const contrast = (foreground: string, background: string) => {
     const luminance = (color: string) => {
+      expect(color, "Expected an opaque computed RGB color").toMatch(/^rgb\(\d+, \d+, \d+\)$/);
       const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map((value) => {
         const channel = value / 255;
         return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
@@ -94,8 +95,15 @@ test("keeps status and primary-action text above a 4.5 to 1 contrast ratio", asy
   };
   for (const name of ["Applications", "Decision emails"]) {
     await page.getByRole("navigation", { name: "Admin", exact: true }).getByRole("link", { name, exact: true }).click();
-    for (const badge of await page.locator(".admin-badge:visible").all()) {
-      const colors = await badge.evaluate((element) => ({ foreground: getComputedStyle(element).color, background: getComputedStyle(element).backgroundColor }));
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
+    const badges = page.locator(".admin-badge:visible");
+    await expect(badges).toHaveCount(name === "Applications" ? 4 : 7);
+    // Read together so navigation cannot detach a badge between lookups.
+    const badgeColors = await badges.evaluateAll((elements) => elements.map((element) => ({
+      foreground: getComputedStyle(element).color,
+      background: getComputedStyle(element).backgroundColor,
+    })));
+    for (const colors of badgeColors) {
       expect(contrast(colors.foreground, colors.background)).toBeGreaterThanOrEqual(4.5);
     }
   }

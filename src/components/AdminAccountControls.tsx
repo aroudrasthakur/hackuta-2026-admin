@@ -96,17 +96,12 @@ export function AdminAccountControls() {
   return (
     <div className="admin-topbar__account">
       {staff && !compact ? (
-        <>
-          <p className="admin-topbar__identity" title={`${staff.name} · ${roleLabel}`}>
-            <span className="admin-topbar__identity-name">{staff.name}</span>
-            {roleLabel ? (
-              <span className="admin-topbar__identity-role">{roleLabel}</span>
-            ) : null}
-          </p>
-          <span className="admin-topbar__divider" aria-hidden="true">
-            |
-          </span>
-        </>
+        <p className="admin-topbar__identity" title={`${staff.name} · ${roleLabel}`}>
+          <span className="admin-topbar__identity-name">{staff.name}</span>
+          {roleLabel ? (
+            <span className="admin-topbar__identity-role">{roleLabel}</span>
+          ) : null}
+        </p>
       ) : null}
 
       {staff && compact ? (
