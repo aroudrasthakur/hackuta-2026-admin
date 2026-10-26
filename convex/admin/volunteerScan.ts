@@ -45,7 +45,10 @@ export async function findParticipantByQrToken(ctx: MutationCtx, qrCodeToken: st
     .first();
 }
 
-/** Lists the caller's own scan permissions and assigned active events. No participant data. */
+/**
+ * Lists the caller's own scan permissions and assigned switched-on events with
+ * their schedule (reference only). No participant data.
+ */
 export const listMyScanOptions = query({
   args: sessionTokenArgs,
   handler: async (ctx, { sessionToken }) => {
@@ -72,9 +75,9 @@ export const listMyScanOptions = query({
 });
 
 /**
- * Event for a point-scan preview, or null. Missing, unassigned, and inactive
+ * Event for a point-scan preview, or null. Missing, unassigned, and switched-off
  * events look the same so volunteers learn nothing about events outside their
- * assignments. Schedule fields are reference only and are not checked.
+ * assignments. Schedule times are not checked.
  */
 async function assignedActiveEvent(
   ctx: MutationCtx,

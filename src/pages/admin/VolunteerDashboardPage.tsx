@@ -7,7 +7,7 @@ import { useNow } from "../../hooks/useNow";
 import { canAccessStaffRoute } from "../../lib/staffRouteAccess";
 import { ADMIN_ROUTES } from "../../types/routes";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
-import { AdminStatusBadge } from "../../components/AdminStatusBadge";
+import { EventStatusBadge } from "../../components/admin/EventStatusBadge";
 import { SectionIcon } from "../../components/SectionIcon";
 import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 
@@ -42,13 +42,13 @@ export function VolunteerDashboardPage() {
       )}
       <section aria-labelledby="assigned-events">
         <h2 id="assigned-events" className="admin-card__title mb-3">Assigned events</h2>
-        <p className="mb-4 text-sm text-mist">Listed events are active and available for point scans. Scheduled times are for reference; follow your event lead’s instructions.</p>
+        <p className="mb-4 text-sm text-mist">Listed events are switched on and available for point scans. Scheduled times are for reference.</p>
         {options.events.length ? (
           <ul className="grid gap-4 sm:grid-cols-2">
             {options.events.map((event) => (
               <li key={event.eventId} className="admin-card space-y-2 p-5">
                 <h3 className="font-semibold text-ink">{event.name}</h3>
-                <div className="flex flex-wrap items-center gap-2 text-sm"><span>{event.pointsAwarded} points</span><AdminStatusBadge tone="info">{now < event.startsAt ? "Scheduled" : now > event.endsAt ? "Scheduled time ended" : "Within scheduled time"}</AdminStatusBadge></div>
+                <div className="flex flex-wrap items-center gap-2 text-sm"><span>{event.pointsAwarded} points</span><EventStatusBadge event={{ ...event, active: true }} now={now} /></div>
                 <p className="text-sm text-mist"><time dateTime={new Date(event.startsAt).toISOString()}>{new Date(event.startsAt).toLocaleString()}</time> – <time dateTime={new Date(event.endsAt).toISOString()}>{new Date(event.endsAt).toLocaleString()}</time></p>
                 <Link className={reviewSecondaryButtonClass} to={`${ADMIN_ROUTES.scanPoints}?event=${encodeURIComponent(event.eventId)}`}>Open points for {event.name} →</Link>
               </li>

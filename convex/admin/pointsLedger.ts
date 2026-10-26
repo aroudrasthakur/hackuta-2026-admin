@@ -66,8 +66,8 @@ export async function requireEligibleParticipant(ctx: MutationCtx, participantId
  * Public scan mutations must call `requireVolunteerEventAccess` (and capability
  * guards) first, then pass `actorAdminId` from the guard result.
  *
- * `startsAt` / `endsAt` are reference only. Award row, balance, and log are
- * written in the caller's mutation transaction.
+ * The event must be switched on. Schedule times are not checked. Award row,
+ * balance, and log are written in the caller's mutation transaction.
  */
 export async function awardEventPoints(
   ctx: MutationCtx,
@@ -160,30 +160,16 @@ export async function applyEventAward(
 }
 
 /**
- * Call before any write that changes `events.pointsAwarded`. Once one award
- * exists the value is locked, so every participant gets the same amount.
- * Past award rows keep their own `pointsAwarded` either way; corrections go
- * through `adjustPoints`. Unchanged values always pass.
+ * Once one award exists `events.pointsAwarded` is locked, so every participant
+ * gets the same amount. Past award rows keep their own `pointsAwarded` either
+ * way; corrections go through `adjustPoints`.
  */
-export async function assertEventPointsEditable(
-  ctx: MutationCtx,
-  eventId: EventId,
-  pointsAwarded: number,
-) {
-  const event = await ctx.db.get(eventId);
-  if (!event) {
-    throw adminError("EVENT_NOT_FOUND");
-  }
-  if (event.pointsAwarded === pointsAwarded) {
-    return;
-  }
+export async function eventHasAwards(ctx: QueryCtx | MutationCtx, eventId: EventId) {
   const award = await ctx.db
     .query("participantEventAwards")
     .withIndex("by_event", (q) => q.eq("eventId", eventId))
     .first();
-  if (award) {
-    throw adminError("EVENT_POINTS_LOCKED");
-  }
+  return award !== null;
 }
 
 /**

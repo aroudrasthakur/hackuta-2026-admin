@@ -5,6 +5,10 @@ import {
   assertAdjustmentDelta,
   assertPointBalance,
   buildStaffConfigDetails,
+  EVENT_DESCRIPTION_MAX_LENGTH,
+  EVENT_NAME_MAX_LENGTH,
+  EVENT_POINTS_MAX,
+  eventStatus,
   normalizeAdjustmentReason,
   normalizeEventInput,
 } from "../../shared/admin/volunteerRules";
@@ -79,14 +83,31 @@ describe("event input", () => {
       normalizeEventInput({
         name: "Workshop",
         description: "  Bring a laptop  ",
-        pointsAwarded: MAX_SAFE,
+        pointsAwarded: EVENT_POINTS_MAX,
         startsAt: 0,
         endsAt: 1,
       }).description,
     ).toBe("Bring a laptop");
   });
 
+  it("accepts a name and description at their length limits", () => {
+    const event = normalizeEventInput({
+      name: "n".repeat(EVENT_NAME_MAX_LENGTH),
+      description: "d".repeat(EVENT_DESCRIPTION_MAX_LENGTH),
+      pointsAwarded: 1,
+      startsAt: 1,
+      endsAt: 2,
+    });
+    expect(event.name).toHaveLength(EVENT_NAME_MAX_LENGTH);
+    expect(event.description).toHaveLength(EVENT_DESCRIPTION_MAX_LENGTH);
+  });
+
   it.each([
+    { name: "n".repeat(EVENT_NAME_MAX_LENGTH + 1), pointsAwarded: 10, startsAt: 1, endsAt: 2 },
+    { name: "Workshop", description: "d".repeat(EVENT_DESCRIPTION_MAX_LENGTH + 1), pointsAwarded: 10, startsAt: 1, endsAt: 2 },
+    { name: "Workshop", pointsAwarded: EVENT_POINTS_MAX + 1, startsAt: 1, endsAt: 2 },
+    { name: "Workshop", pointsAwarded: 10, startsAt: Number.NaN, endsAt: 2 },
+    { name: "Workshop", pointsAwarded: 10, startsAt: 1, endsAt: Number.POSITIVE_INFINITY },
     { name: "   ", pointsAwarded: 10, startsAt: 1, endsAt: 2 },
     { name: 4 as unknown as string, pointsAwarded: 10, startsAt: 1, endsAt: 2 },
     { name: "Workshop", description: 4 as unknown as string, pointsAwarded: 10, startsAt: 1, endsAt: 2 },
@@ -101,36 +122,47 @@ describe("event input", () => {
   });
 });
 
+describe("event status", () => {
+  const event = { active: true, startsAt: 100, endsAt: 200 };
+
+  it.each([
+    [99, "upcoming"],
+    [100, "active"],
+    [199, "active"],
+    [200, "ended"],
+  ] as const)("at %s is %s", (now, status) => {
+    expect(eventStatus(event, now)).toBe(status);
+  });
+
+  it("is inactive whenever the event is switched off", () => {
+    for (const now of [99, 150, 200]) {
+      expect(eventStatus({ ...event, active: false }, now)).toBe("inactive");
+    }
+  });
+});
+
 describe("staff config details", () => {
   it("serializes allowlisted values in a stable order", () => {
     expect(
       buildStaffConfigDetails({
         eventIds: ["evt1"],
-        active: false,
-        endsAt: 20,
-        startsAt: 10,
-        pointsAwarded: 4,
-        canFoodCheckIn: true,
-        canCheckIn: false,
-        changedFields: ["active", "description"],
+        after: { pointsAwarded: 4 },
+        before: { pointsAwarded: 2 },
+        changedFields: ["pointsAwarded"],
       }),
     ).toBe(
       JSON.stringify({
-        changedFields: ["active", "description"],
-        canCheckIn: false,
-        canFoodCheckIn: true,
-        active: false,
-        pointsAwarded: 4,
-        startsAt: 10,
-        endsAt: 20,
+        changedFields: ["pointsAwarded"],
         eventIds: ["evt1"],
+        before: { pointsAwarded: 2 },
+        after: { pointsAwarded: 4 },
       }),
     );
   });
 
   it("omits keys that were not provided", () => {
-    expect(buildStaffConfigDetails({ active: true, canCheckIn: undefined })).toBe(
-      JSON.stringify({ active: true }),
+    expect(buildStaffConfigDetails({ eventIds: [], changedFields: undefined })).toBe(
+      JSON.stringify({ eventIds: [] }),
     );
     expect(buildStaffConfigDetails({})).toBe("{}");
   });
@@ -140,11 +172,13 @@ describe("staff config details", () => {
     { password: "secret" },
     { foodRestriction: "peanuts" },
     { note: "free text" },
-    { canCheckIn: "yes" },
-    { active: 1 },
-    { pointsAwarded: 1.5 },
-    { startsAt: Number.NaN },
-    { endsAt: "20" },
+    { canCheckIn: true },
+    { active: false },
+    { pointsAwarded: 4 },
+    { before: { pointsAwarded: 1.5 } },
+    { before: { startsAt: Number.NaN } },
+    { after: { endsAt: "20" } },
+    { after: { active: 1 } },
     { eventIds: ["has space"] },
     { eventIds: [""] },
     { eventIds: ["a".repeat(41)] },

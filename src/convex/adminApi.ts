@@ -24,14 +24,28 @@ import type {
   foodCheckInParticipant,
 } from "../../convex/admin/volunteerOperations";
 import type {
+  createEvent,
+  getEvent,
+  listEvents,
+  setEventActive,
+  setEventPoints,
+  updateEvent,
+} from "../../convex/admin/events";
+import type {
   getParticipantDetails,
   listParticipants,
   promoteParticipantToVolunteer,
   setParticipantPoints,
 } from "../../convex/admin/participantsAdmin";
 import type {
+  getVolunteer,
+  listStaffConfigLogs,
+  listVolunteerActionLogs,
+  listVolunteers,
   restoreVolunteer,
   revokeVolunteer,
+  setVolunteerCapabilities,
+  setVolunteerEventAccess,
 } from "../../convex/admin/volunteers";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
@@ -192,6 +206,55 @@ export const awardEventPointsRef = adminModuleRef<
   AwardEventPointsResult
 >("admin/volunteerOperations:awardEventPoints");
 
+type EventAdmin = ApiFromModules<{
+  events: {
+    listEvents: typeof listEvents;
+    getEvent: typeof getEvent;
+    createEvent: typeof createEvent;
+    updateEvent: typeof updateEvent;
+    setEventActive: typeof setEventActive;
+    setEventPoints: typeof setEventPoints;
+  };
+}>["events"];
+
+export type AdminEventRow = FunctionReturnType<EventAdmin["listEvents"]>["page"][number];
+
+export const listEventsRef = adminModuleRef<
+  "query",
+  FunctionArgs<EventAdmin["listEvents"]>,
+  FunctionReturnType<EventAdmin["listEvents"]>
+>("admin/events:listEvents");
+
+export const getEventRef = adminModuleRef<
+  "query",
+  FunctionArgs<EventAdmin["getEvent"]>,
+  FunctionReturnType<EventAdmin["getEvent"]>
+>("admin/events:getEvent");
+
+export const createEventRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["createEvent"]>,
+  FunctionReturnType<EventAdmin["createEvent"]>
+>("admin/events:createEvent");
+
+export const updateEventRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["updateEvent"]>,
+  FunctionReturnType<EventAdmin["updateEvent"]>
+>("admin/events:updateEvent");
+
+export const setEventActiveRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["setEventActive"]>,
+  FunctionReturnType<EventAdmin["setEventActive"]>
+>("admin/events:setEventActive");
+
+export const setEventPointsRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["setEventPoints"]>,
+  FunctionReturnType<EventAdmin["setEventPoints"]>
+>("admin/events:setEventPoints");
+
 type ParticipantsAdmin = ApiFromModules<{
   participants: {
     getParticipantDetails: typeof getParticipantDetails;
@@ -230,10 +293,56 @@ export const promoteParticipantToVolunteerRef = adminModuleRef<
 
 type VolunteerManagement = ApiFromModules<{
   volunteers: {
+    getVolunteer: typeof getVolunteer;
+    listStaffConfigLogs: typeof listStaffConfigLogs;
+    listVolunteerActionLogs: typeof listVolunteerActionLogs;
+    listVolunteers: typeof listVolunteers;
     revokeVolunteer: typeof revokeVolunteer;
     restoreVolunteer: typeof restoreVolunteer;
+    setVolunteerCapabilities: typeof setVolunteerCapabilities;
+    setVolunteerEventAccess: typeof setVolunteerEventAccess;
   };
 }>["volunteers"];
+
+export type VolunteerRow = FunctionReturnType<VolunteerManagement["listVolunteers"]>["page"][number];
+export type VolunteerActionLogRow = FunctionReturnType<VolunteerManagement["listVolunteerActionLogs"]>["page"][number];
+export type StaffConfigLogRow = FunctionReturnType<VolunteerManagement["listStaffConfigLogs"]>["page"][number];
+
+export const listVolunteersRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listVolunteers"]>,
+  FunctionReturnType<VolunteerManagement["listVolunteers"]>
+>("admin/volunteers:listVolunteers");
+
+export const getVolunteerRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["getVolunteer"]>,
+  FunctionReturnType<VolunteerManagement["getVolunteer"]>
+>("admin/volunteers:getVolunteer");
+
+export const listVolunteerActionLogsRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listVolunteerActionLogs"]>,
+  FunctionReturnType<VolunteerManagement["listVolunteerActionLogs"]>
+>("admin/volunteers:listVolunteerActionLogs");
+
+export const listStaffConfigLogsRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listStaffConfigLogs"]>,
+  FunctionReturnType<VolunteerManagement["listStaffConfigLogs"]>
+>("admin/volunteers:listStaffConfigLogs");
+
+export const setVolunteerCapabilitiesRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["setVolunteerCapabilities"]>,
+  FunctionReturnType<VolunteerManagement["setVolunteerCapabilities"]>
+>("admin/volunteers:setVolunteerCapabilities");
+
+export const setVolunteerEventAccessRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["setVolunteerEventAccess"]>,
+  FunctionReturnType<VolunteerManagement["setVolunteerEventAccess"]>
+>("admin/volunteers:setVolunteerEventAccess");
 
 export const revokeVolunteerRef = adminModuleRef<
   "mutation",

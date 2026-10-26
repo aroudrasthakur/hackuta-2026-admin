@@ -9,7 +9,7 @@
  *
  * Same throttle rules as the preview: session failures throw before any
  * write, and every outcome after the attempt row is returned, not thrown.
- * Event `startsAt` / `endsAt` are reference only and do not gate awards.
+ * Point awards need a switched-on event; schedule times are reference only.
  */
 import { v } from "convex/values";
 import type { GenericId } from "convex/values";

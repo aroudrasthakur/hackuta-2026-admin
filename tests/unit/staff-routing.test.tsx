@@ -15,6 +15,9 @@ vi.mock("../../src/components/StormPageFrame", () => ({ StormPageFrame: ({ child
 vi.mock("../../src/pages/admin/ApplicationsPage", () => ({ ApplicationsPage: () => <h1>Applications queue</h1> }));
 vi.mock("../../src/pages/admin/ApplicationReviewPage", () => ({ ApplicationReviewPage: () => <h1>Application review</h1> }));
 vi.mock("../../src/pages/admin/DecisionEmailQueuePage", () => ({ DecisionEmailQueuePage: () => <h1>Decision email queue</h1> }));
+vi.mock("../../src/pages/admin/VolunteersPage", () => ({ VolunteersPage: () => <h1>Volunteers</h1> }));
+vi.mock("../../src/pages/admin/VolunteerDetailPage", () => ({ VolunteerDetailPage: () => <h1>Volunteer detail</h1> }));
+vi.mock("../../src/pages/admin/EventsPage", () => ({ EventsPage: () => <h1>Events</h1> }));
 const query = vi.hoisted(() => vi.fn());
 vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query, useMutation: () => vi.fn() }));
 
@@ -72,7 +75,7 @@ describe("staff route policy", () => {
     for (const route of [ADMIN_ROUTES.applications, ADMIN_ROUTES.decisionEmails, ADMIN_ROUTES.applicationReview("abc")]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role !== "volunteer");
     }
-    for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers]) {
+    for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.events]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role === "admin");
     }
     for (const route of [ADMIN_ROUTES.scan, ADMIN_ROUTES.volunteer, ADMIN_ROUTES.scanCheckIn, ADMIN_ROUTES.scanFood, ADMIN_ROUTES.scanPoints]) {
@@ -115,13 +118,29 @@ describe("protected staff screens", () => {
   it.each(["admin", "reviewer"] as const)("shows the correct %s navigation and management routes", async (role) => {
     await render(ADMIN_ROUTES.participants, auth({ staff: { ...staff, role } }));
     expect(path()).toBe(role === "admin" ? ADMIN_ROUTES.participants : ADMIN_ROUTES.applications);
-    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers"] : ["Applications", "Decision emails"]);
+    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers", "Events"] : ["Applications", "Decision emails"]);
     expect(query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
   });
 
-  it("opens the volunteer management entry point for administrators", async () => {
-    await render(ADMIN_ROUTES.volunteers, auth({ staff: { ...staff, role: "admin" } }));
-    expect(container.querySelector("h1")?.textContent).toBe("Volunteers");
+  it.each([
+    [ADMIN_ROUTES.volunteers, "Volunteers"],
+    [ADMIN_ROUTES.volunteerDetail("volunteer-1"), "Volunteer detail"],
+    [ADMIN_ROUTES.events, "Events"],
+  ])("opens %s for administrators", async (route, heading) => {
+    await render(route, auth({ staff: { ...staff, role: "admin" } }));
+    expect(path()).toBe(route);
+    expect(container.querySelector("h1")?.textContent).toBe(heading);
+  });
+
+  it("keeps the Volunteers tab current on a volunteer's page", async () => {
+    await render(ADMIN_ROUTES.volunteerDetail("volunteer-1"), auth({ staff: { ...staff, role: "admin" } }));
+    const current = container.querySelector('nav a[aria-current="page"]');
+    expect(current?.textContent).toBe("Volunteers");
+  });
+
+  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1")])("sends reviewers away from %s", async (route) => {
+    await render(route, auth({ staff: { ...staff, role: "reviewer" } }));
+    expect(path()).toBe(ADMIN_ROUTES.applications);
   });
 
   it.each(["/unknown", "/", "/admin", "/volunteer"])("resolves %s to the volunteer home", async (route) => {
@@ -286,14 +305,14 @@ describe("protected staff screens", () => {
     expect(path()).toBe(ADMIN_ROUTES.scanCheckIn);
   });
 
-  it("shows reference schedule status without blocking assigned active events", async () => {
+  it("labels each assigned event's reference schedule and keeps its points link", async () => {
     options = { ...allOptions, events: [
       { ...event, startsAt: Date.now() + 60_000, endsAt: Date.now() + 120_000 },
       { ...event, eventId: "past" as GenericId<"events">, name: "Past workshop", startsAt: Date.now() - 120_000, endsAt: Date.now() - 60_000 },
     ] };
     await render(ADMIN_ROUTES.scan);
-    expect(container.textContent).toContain("Scheduled time ended");
-    expect(container.textContent).toContain("Scheduled");
+    expect(container.textContent).toContain("Upcoming");
+    expect(container.textContent).toContain("Ended");
     expect(container.querySelector('a[href="/admin/scan/points?event=past"]')).not.toBeNull();
   });
 });

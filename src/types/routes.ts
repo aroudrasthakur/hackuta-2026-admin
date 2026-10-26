@@ -7,10 +7,13 @@ export const ADMIN_ROUTES = {
   scanPoints: "/admin/scan/points",
   participants: "/admin/participants",
   volunteers: "/admin/volunteers",
+  events: "/admin/events",
   applications: "/admin/applications",
   decisionEmails: "/admin/decision-emails",
   applicationReview: (applicationId: string) =>
     `/admin/applications/${applicationId}`,
+  volunteerDetail: (volunteerAdminId: string) =>
+    `/admin/volunteers/${volunteerAdminId}`,
 } as const;
 
-export type AdminRoutePath = (typeof ADMIN_ROUTES)[keyof Omit<typeof ADMIN_ROUTES, "applicationReview">];
+export type AdminRoutePath = (typeof ADMIN_ROUTES)[keyof Omit<typeof ADMIN_ROUTES, "applicationReview" | "volunteerDetail">];

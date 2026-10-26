@@ -20,6 +20,17 @@ import {
   restoreVolunteerRef,
   revokeVolunteerRef,
   setParticipantPointsRef,
+  createEventRef,
+  getVolunteerRef,
+  listEventsRef,
+  listStaffConfigLogsRef,
+  listVolunteerActionLogsRef,
+  listVolunteersRef,
+  setEventActiveRef,
+  setEventPointsRef,
+  setVolunteerCapabilitiesRef,
+  setVolunteerEventAccessRef,
+  updateEventRef,
 } from "../convex/adminApi";
 
 const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
@@ -44,6 +55,17 @@ const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
   [promoteParticipantToVolunteerRef, "admin/participantsAdmin:promoteParticipantToVolunteer"],
   [revokeVolunteerRef, "admin/volunteers:revokeVolunteer"],
   [restoreVolunteerRef, "admin/volunteers:restoreVolunteer"],
+  [listVolunteersRef, "admin/volunteers:listVolunteers"],
+  [getVolunteerRef, "admin/volunteers:getVolunteer"],
+  [listVolunteerActionLogsRef, "admin/volunteers:listVolunteerActionLogs"],
+  [listStaffConfigLogsRef, "admin/volunteers:listStaffConfigLogs"],
+  [setVolunteerCapabilitiesRef, "admin/volunteers:setVolunteerCapabilities"],
+  [setVolunteerEventAccessRef, "admin/volunteers:setVolunteerEventAccess"],
+  [listEventsRef, "admin/events:listEvents"],
+  [createEventRef, "admin/events:createEvent"],
+  [updateEventRef, "admin/events:updateEvent"],
+  [setEventActiveRef, "admin/events:setEventActive"],
+  [setEventPointsRef, "admin/events:setEventPoints"],
 ];
 
 export function convexRefPath(ref: unknown): string {
