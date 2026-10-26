@@ -85,10 +85,10 @@ deployed version or exploitability of this registration path was verified here.
 
 ## Validation and limits
 
-The served-count follow-up passes the full Vitest coverage suite (1,824 tests),
+The served-count follow-up, integrated with current main, passes the full Vitest coverage suite (1,836 tests),
 TypeScript checks for the app and Convex, lint, the production build, whitespace
-checks, and register schema lock verification. Coverage is 96.84% statements,
-92.61% branches, 98.05% functions, and 97.28% lines, above the 90% gate.
+checks, and register schema lock verification. Coverage is 96.67% statements,
+92.16% branches, 97.59% functions, and 97.24% lines, above the 90% gate.
 
 All nine meal management/redemption Playwright scenarios pass using installed
 Chrome. The original scanner audit also covered camera permission, decoding,
