@@ -270,50 +270,6 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
     font-weight: 650;
   }
 
-  .admin-nav-tabs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-    gap: 0.25rem;
-    padding: 0.25rem;
-    border: 1px solid var(--color-sand);
-    border-radius: 0.75rem;
-    background: rgb(255 255 255 / 0.72);
-    box-shadow: 0 4px 16px rgb(16 47 70 / 0.04);
-  }
-
-  .admin-nav-tab {
-    display: inline-flex;
-    min-height: 2.75rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.55rem;
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    font-weight: 600;
-    line-height: 1.25;
-    text-decoration: none;
-    color: var(--color-ocean);
-    transition:
-      background-color 160ms var(--ease-out),
-      box-shadow 160ms var(--ease-out),
-      color 160ms var(--ease-out);
-  }
-
-  .admin-nav-tab:hover {
-    color: var(--color-night);
-    background: rgb(238 227 210 / 0.45);
-  }
-
-  .admin-nav-tab--active {
-    color: var(--color-night);
-    background: #fff;
-    box-shadow: 0 1px 4px rgb(16 47 70 / 0.1);
-  }
-
-  .admin-nav-tab--active:hover {
-    background: #fff;
-  }
-
   .admin-meta {
     display: grid;
     gap: 0.75rem 1.25rem;

@@ -1,5 +1,109 @@
 /* Dashboard patterns extend the HackUTA palette without affecting sign-in. */
 @layer components {
+  .admin-topbar {
+    position: relative;
+    z-index: 40;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+  .admin-topbar__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    max-width: 72rem;
+    margin: auto;
+    padding: 0.875rem 1rem;
+  }
+  .admin-topbar__brand { min-width: 0; }
+  .admin-topbar__logo { display: block; width: auto; height: 1.75rem; max-width: 100%; }
+  .admin-topbar .weather-mood-toggle {
+    position: static;
+    grid-row: 2;
+    justify-self: start;
+    width: max-content;
+    box-shadow: none;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-muted);
+  }
+  .admin-topbar__account {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    min-width: 0;
+    max-width: min(52vw, 30rem);
+  }
+  .admin-topbar__identity { min-width: 0; font-size: 0.8125rem; text-align: right; }
+  .admin-topbar__identity-name { display: block; font-weight: 600; }
+  .admin-topbar__identity-role { color: var(--color-muted); }
+  .admin-topbar__divider { display: none; }
+  .admin-topbar__chip, .admin-topbar__sign-out, .admin-topbar__menu-item {
+    display: inline-flex;
+    min-height: var(--spacing-control);
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-control);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-ocean);
+    cursor: pointer;
+  }
+  .admin-topbar__chip { max-width: min(45vw, 12rem); border: 1px solid var(--color-border); }
+  .admin-topbar__chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-topbar__chip:hover, .admin-topbar__sign-out:hover, .admin-topbar__menu-item:hover { background: var(--color-surface-muted); }
+  .admin-topbar__account button:disabled { opacity: 0.6; cursor: wait; }
+  .admin-topbar__menu {
+    position: absolute;
+    right: 0;
+    z-index: 50;
+    width: min(18rem, calc(100vw - 2rem));
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    background: var(--color-surface);
+    box-shadow: 0 12px 32px rgb(16 47 70 / 0.14);
+  }
+  .admin-topbar__menu-header { padding: 0.5rem 0.5rem 0.75rem; border-bottom: 1px solid var(--color-border); }
+  .admin-topbar__menu-name { font-size: 0.875rem; font-weight: 600; }
+  .admin-topbar__menu-role { font-size: 0.8125rem; color: var(--color-muted); }
+  .admin-topbar__menu-item { width: 100%; justify-content: flex-start; margin-top: 0.25rem; }
+  .admin-topbar__sign-out-error { flex-basis: 100%; font-size: 0.8125rem; color: var(--color-negative); }
+  .admin-section-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .admin-section-list > li { flex: 1 1 8rem; }
+  .admin-section-link {
+    display: flex;
+    min-height: var(--spacing-control);
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    background: rgb(255 255 255 / 0.72);
+    color: var(--color-ocean);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 160ms, color 160ms;
+  }
+  .admin-section-link svg { flex-shrink: 0; }
+  .admin-section-link:hover { background: var(--color-surface-muted); border-color: var(--color-border); }
+  .admin-section-link[aria-current="page"] { background: var(--color-night); color: white; border-color: var(--color-night); }
+  @media (min-width: 640px) {
+    .admin-topbar__inner { grid-template-columns: auto 1fr auto; gap: 1.5rem; }
+    .admin-topbar .weather-mood-toggle { grid-row: 1; grid-column: 2; }
+    .admin-topbar__account { grid-column: 3; }
+    .admin-section-list > li { flex: 0 1 auto; }
+    .admin-section-link { padding-inline: 1.25rem; }
+  }
+
   .admin-workspace {
     --color-mist: var(--color-muted);
     font-size: 1rem;
