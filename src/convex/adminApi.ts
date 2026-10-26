@@ -30,9 +30,21 @@ import type {
   setParticipantPoints,
 } from "../../convex/admin/participantsAdmin";
 import type {
+  getVolunteer,
+  listStaffConfigLogs,
+  listVolunteerActionLogs,
+  listVolunteers,
   restoreVolunteer,
   revokeVolunteer,
+  setVolunteerCapabilities,
+  setVolunteerEventAccess,
 } from "../../convex/admin/volunteers";
+import type {
+  createEvent,
+  listEvents,
+  setEventActive,
+  updateEvent,
+} from "../../convex/admin/events";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -230,10 +242,91 @@ export const promoteParticipantToVolunteerRef = adminModuleRef<
 
 type VolunteerManagement = ApiFromModules<{
   volunteers: {
+    getVolunteer: typeof getVolunteer;
+    listStaffConfigLogs: typeof listStaffConfigLogs;
+    listVolunteerActionLogs: typeof listVolunteerActionLogs;
+    listVolunteers: typeof listVolunteers;
     revokeVolunteer: typeof revokeVolunteer;
     restoreVolunteer: typeof restoreVolunteer;
+    setVolunteerCapabilities: typeof setVolunteerCapabilities;
+    setVolunteerEventAccess: typeof setVolunteerEventAccess;
   };
 }>["volunteers"];
+
+export type VolunteerRow = FunctionReturnType<VolunteerManagement["listVolunteers"]>["page"][number];
+export type VolunteerActionLogRow = FunctionReturnType<VolunteerManagement["listVolunteerActionLogs"]>["page"][number];
+export type StaffConfigLogRow = FunctionReturnType<VolunteerManagement["listStaffConfigLogs"]>["page"][number];
+
+export const listVolunteersRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listVolunteers"]>,
+  FunctionReturnType<VolunteerManagement["listVolunteers"]>
+>("admin/volunteers:listVolunteers");
+
+export const getVolunteerRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["getVolunteer"]>,
+  FunctionReturnType<VolunteerManagement["getVolunteer"]>
+>("admin/volunteers:getVolunteer");
+
+export const listVolunteerActionLogsRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listVolunteerActionLogs"]>,
+  FunctionReturnType<VolunteerManagement["listVolunteerActionLogs"]>
+>("admin/volunteers:listVolunteerActionLogs");
+
+export const listStaffConfigLogsRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listStaffConfigLogs"]>,
+  FunctionReturnType<VolunteerManagement["listStaffConfigLogs"]>
+>("admin/volunteers:listStaffConfigLogs");
+
+export const setVolunteerCapabilitiesRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["setVolunteerCapabilities"]>,
+  FunctionReturnType<VolunteerManagement["setVolunteerCapabilities"]>
+>("admin/volunteers:setVolunteerCapabilities");
+
+export const setVolunteerEventAccessRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["setVolunteerEventAccess"]>,
+  FunctionReturnType<VolunteerManagement["setVolunteerEventAccess"]>
+>("admin/volunteers:setVolunteerEventAccess");
+
+type EventManagement = ApiFromModules<{
+  events: {
+    createEvent: typeof createEvent;
+    listEvents: typeof listEvents;
+    setEventActive: typeof setEventActive;
+    updateEvent: typeof updateEvent;
+  };
+}>["events"];
+
+export type AdminEventRow = FunctionReturnType<EventManagement["listEvents"]>[number];
+
+export const listEventsRef = adminModuleRef<
+  "query",
+  FunctionArgs<EventManagement["listEvents"]>,
+  FunctionReturnType<EventManagement["listEvents"]>
+>("admin/events:listEvents");
+
+export const createEventRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventManagement["createEvent"]>,
+  FunctionReturnType<EventManagement["createEvent"]>
+>("admin/events:createEvent");
+
+export const updateEventRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventManagement["updateEvent"]>,
+  FunctionReturnType<EventManagement["updateEvent"]>
+>("admin/events:updateEvent");
+
+export const setEventActiveRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventManagement["setEventActive"]>,
+  FunctionReturnType<EventManagement["setEventActive"]>
+>("admin/events:setEventActive");
 
 export const revokeVolunteerRef = adminModuleRef<
   "mutation",

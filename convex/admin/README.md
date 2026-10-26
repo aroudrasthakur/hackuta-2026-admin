@@ -9,6 +9,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [auth.ts](auth.ts) | Organizer sign-in, sign-out, session lookup, credential provisioning |
 | [staffAuth.ts](staffAuth.ts) | Session resolution and role guards (see [VOLUNTEER_AUTHORIZATION.md](VOLUNTEER_AUTHORIZATION.md)) |
 | [volunteers.ts](volunteers.ts) | Admin-only volunteer management: creation, resets, revoke/restore, capabilities, event assignments, and audit log queries |
+| [events.ts](events.ts) | Admin-only event list, creation, edits, and activation, each audited in `staffConfigLogs` |
 | [participantsAdmin.ts](participantsAdmin.ts) | Admin-only participant roster, details, point corrections, adjustment history, and participant-to-volunteer promotion |
 | [volunteerProvisioning.ts](volunteerProvisioning.ts) | Shared volunteer account provisioning (validation, hashing, audit) used by both modules above |
 | [adminQueryHelpers.ts](adminQueryHelpers.ts) | Display-name lookups and date-range bounds for admin list queries |
@@ -65,6 +66,7 @@ Every export in `volunteers.ts` calls `requireAdminRole` first. Reviewers get `A
 - `createVolunteer` makes a standalone volunteer (not a participant). The role is always `volunteer`, the account is active, and `canCheckIn` / `canFoodCheckIn` are required booleans (only an explicit `true` grants access). The email is normalized like staff sign-in, and any existing staff row with that email (any role, active or not) is rejected. The password is validated and hashed with the shared staff credential helper.
 - `promoteParticipantToVolunteer` (in `participantsAdmin.ts`, built on `volunteerProvisioning.ts`) creates a **separate** staff account linked through `admins.participantId`. The participant must still be accepted. The email and name default to the registration values and can be overridden. It rejects a second link for the same participant and any email already used by staff, and never converts an admin or reviewer. The participant row (points, QR token), application, `users`, and `authAccounts` are not modified. It is audited as `volunteer_promoted` (with `targetParticipantId`); standalone creation is `volunteer_created`.
 - `listVolunteers` is paginated over `admins.by_role` and returns name, email, active status, linked participant, capabilities, assigned events, and created/updated times. No credentials, sessions, QR tokens, or points.
+- `getVolunteer` returns one volunteer in the same shape, or `null` when the id is missing or not a volunteer.
 - `resetVolunteerPassword` validates the new password and deletes all sessions. No password retrieval API exists.
 - `revokeVolunteer` sets `active: false` and deletes every session, which stops all scanning on the next request. Assignments, capabilities, and history are kept. `restoreVolunteer` reactivates the account and deletes sessions again, so a fresh login is always required.
 - `setVolunteerCapabilities` takes both booleans explicitly. Unchanged values are a no-op; otherwise the log records `changedFields`, `before`, and `after`.
@@ -73,6 +75,15 @@ Every export in `volunteers.ts` calls `requireAdminRole` first. Reviewers get `A
 - `listStaffConfigLogs` lists configuration changes newest first, filterable by target staff account, action, and date range, with names and parsed details.
 
 Every configuration change writes a `staffConfigLogs` row with the acting admin and timestamp in the same transaction. Details go through `buildStaffConfigDetails`, which only stores allowlisted booleans, numbers, and ids. Generic organizer provisioning still rejects volunteer targets.
+
+### Events
+
+Every export in `events.ts` calls `requireAdminRole` first. Input goes through `normalizeEventInput` (trimmed name, positive whole points, `startsAt` before `endsAt`; otherwise `INVALID_EVENT`). Schedule times are reference only.
+
+- `listEvents` returns up to 200 events ordered by start time, each with `pointsLocked` (true once any `participantEventAwards` row exists).
+- `createEvent` inserts an active event and logs `event_created`.
+- `updateEvent` returns `EVENT_NOT_FOUND` for a missing event and `EVENT_POINTS_LOCKED` for a point change after any award. An unchanged submission is a no-op; otherwise `event_updated` records the changed fields. A blank description clears it.
+- `setEventActive` is a no-op when unchanged; otherwise `event_active_changed` records before and after. Inactive events keep their assignments but cannot be scanned. No export here awards points.
 
 ## Participant administration (#64)
 

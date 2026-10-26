@@ -9,18 +9,29 @@
 | [`ParticipantsPage.tsx`](ParticipantsPage.tsx) | `/admin/participants` — paginated accepted-participant roster and administration |
 | [`VolunteerDashboardPage.tsx`](VolunteerDashboardPage.tsx) | `/admin/scan` |
 | [`VolunteerScanPage.tsx`](VolunteerScanPage.tsx) | `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points` — QR scan, confirm, result |
-| [`StaffWorkflowPage.tsx`](StaffWorkflowPage.tsx) | `/admin/volunteers` |
+| [`VolunteersPage.tsx`](VolunteersPage.tsx) | `/admin/volunteers` — volunteer roster and everyone's scan activity log |
+| [`VolunteerDetailPage.tsx`](VolunteerDetailPage.tsx) | `/admin/volunteers/:volunteerAdminId` — one volunteer's activity, event assignments, scan permissions, access, and account history |
+| [`EventsPage.tsx`](EventsPage.tsx) | `/admin/events` — create, edit, and activate/deactivate point events |
 
 Admins and reviewers land on applications; volunteers land on `/admin/scan`.
 Login restores authorized internal destinations; unknown routes return home.
 
 Scan access follows `listMyScanOptions`: check-in and food need explicit grants,
 and points need an assigned active event. Revoked access hides actions and
-redirects stale routes. Event times are advisory. Volunteer management is a
-placeholder and requires an admin. Every backend operation enforces
-authorization separately.
+redirects stale routes. Event times are advisory. Volunteer and event
+management require an admin. Every backend operation enforces authorization
+separately.
 
-The participant roster uses administrator-only cursor-paginated APIs for search and filters. Details omit QR and dietary data; point changes append audited adjustments, and volunteer promotion creates separate staff credentials. Volunteer-management forms belong to their separate workflow issue. Backend authorization remains mandatory for every operation.
+The participant roster uses administrator-only cursor-paginated APIs for search and filters. Details omit QR and dietary data; point changes append audited adjustments, and volunteer promotion creates separate staff credentials. Backend authorization remains mandatory for every operation.
+
+Volunteers are created by promoting a participant. The Volunteers page lists
+every volunteer and the shared scan log (filterable by action); each name opens
+that volunteer's page with only their own log. There, admins check the events
+the volunteer may award points for, change scan permissions, and revoke or
+restore access; every change appears in the account history. The Events page
+creates events (active immediately) and edits them. Points cannot change once
+any participant has received them, and deactivating an event stops point scans
+without removing assignments.
 
 The application queue defaults to all applications, oldest first. URL parameters
 preserve search, status, sort and assignment through review navigation. “Mine”
