@@ -1,61 +1,142 @@
 import { Link } from "react-router-dom";
-import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
+import { VolunteerActionCard } from "../../components/volunteer/VolunteerActionCard";
+import { EventStatusBadge } from "../../components/admin/EventStatusBadge";
+import { SectionIcon } from "../../components/SectionIcon";
 import { useVolunteerAccess } from "../../hooks/useVolunteerAccess";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { useNow } from "../../hooks/useNow";
 import { canAccessStaffRoute } from "../../lib/staffRouteAccess";
 import { ADMIN_ROUTES } from "../../types/routes";
-import { AdminPageHeader } from "../../components/AdminPageHeader";
-import { EventStatusBadge } from "../../components/admin/EventStatusBadge";
-import { SectionIcon } from "../../components/SectionIcon";
-import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
+
+function greetingFor(now = new Date()) {
+  const hour = now.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 export function VolunteerDashboardPage() {
   const { staff } = useAdminAuth();
   const options = useVolunteerAccess();
   const now = useNow();
-  const header = <AdminPageHeader id="volunteer-dashboard-heading" title="Volunteer dashboard" description={`${staff ? `Welcome, ${staff.name}. ` : ""}Your assigned responsibilities and scan actions appear here as access changes.`} />;
-  if (!staff || !options) return <div className="space-y-6">{header}<LoadingState layout="rows" message="Loading your responsibilities…" /></div>;
+  const firstName = staff?.name?.trim().split(/\s+/)[0] || "Volunteer";
+
+  if (!staff || !options) {
+    return (
+      <div className="volunteer-ops space-y-6">
+        <header>
+          <h1 className="volunteer-dashboard__greeting">Volunteer dashboard</h1>
+          <p className="volunteer-dashboard__lead">Loading your responsibilities…</p>
+        </header>
+        <LoadingState layout="rows" message="Loading your responsibilities…" />
+      </div>
+    );
+  }
+
   const actions = [
-    { to: ADMIN_ROUTES.scanCheckIn, title: "Participant check-in", icon: "checkIn" as const, description: "Welcome participants and check their arrival status." },
-    { to: ADMIN_ROUTES.scanFood, title: "Food", icon: "food" as const, description: "Check meal redemption and dietary information." },
-    { to: ADMIN_ROUTES.scanPoints, title: "Points", icon: "points" as const, description: "View your assigned events for point scans." },
-    { to: ADMIN_ROUTES.scanShop, title: "Shop redemption", icon: "shop" as const, description: "Scan a participant, then sell shop items for their points." },
+    {
+      to: ADMIN_ROUTES.scanCheckIn,
+      title: "Participant Check-in",
+      icon: "checkIn" as const,
+      description: "Confirm arrival and mark general event check-in.",
+    },
+    {
+      to: ADMIN_ROUTES.scanFood,
+      title: "Food Distribution",
+      icon: "food" as const,
+      description: "Verify dietary notes and record meal redemption.",
+    },
+    {
+      to: ADMIN_ROUTES.scanPoints,
+      title: "Event Points",
+      icon: "points" as const,
+      description: "Award configured points for your assigned events.",
+    },
+    {
+      to: ADMIN_ROUTES.scanShop,
+      title: "Shop Redemption",
+      icon: "shop" as const,
+      description: "Scan a participant, then sell shop items for their points.",
+    },
   ].filter(({ to }) => canAccessStaffRoute(to, staff, options) === true);
 
   return (
-    <div className="space-y-8">
-      {header}
+    <div className="volunteer-ops space-y-8">
+      <header>
+        <h1 className="volunteer-dashboard__greeting">
+          {greetingFor()}, {firstName}
+        </h1>
+        <p className="volunteer-dashboard__lead">
+          Choose a responsibility to start scanning. Large controls stay thumb-friendly on phones.
+        </p>
+      </header>
+
       {actions.length ? (
-        <section aria-label="Available scan actions" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {actions.map(({ to, title, icon, description }) => (
-            <Link key={to} to={to} className="admin-card admin-action-card block space-y-2 p-6">
-              <span className="admin-state__icon"><SectionIcon name={icon} /></span>
-              <h2 className="text-lg font-semibold text-ink">{title}</h2>
-              <p className="text-sm text-mist">{description}</p>
-              <span className="inline-block py-2 text-sm font-semibold">Open {title.toLowerCase()} →</span>
-            </Link>
-          ))}
-        </section>
-      ) : (
-        <EmptyState title="No responsibilities assigned yet" description="Ask an administrator to grant check-in, food, shop, or event access. Your assignments will appear here automatically." />
-      )}
-      <section aria-labelledby="assigned-events">
-        <h2 id="assigned-events" className="admin-card__title mb-3">Assigned events</h2>
-        <p className="mb-4 text-sm text-mist">Listed events are switched on and available for point scans. Scheduled times are for reference.</p>
-        {options.events.length ? (
-          <ul className="grid gap-4 sm:grid-cols-2">
-            {options.events.map((event) => (
-              <li key={event.eventId} className="admin-card space-y-2 p-5">
-                <h3 className="font-semibold text-ink">{event.name}</h3>
-                <div className="flex flex-wrap items-center gap-2 text-sm"><span>{event.pointsAwarded} points</span><EventStatusBadge event={{ ...event, active: true }} now={now} /></div>
-                <p className="text-sm text-mist"><time dateTime={new Date(event.startsAt).toISOString()}>{new Date(event.startsAt).toLocaleString()}</time> – <time dateTime={new Date(event.endsAt).toISOString()}>{new Date(event.endsAt).toLocaleString()}</time></p>
-                <Link className={reviewSecondaryButtonClass} to={`${ADMIN_ROUTES.scanPoints}?event=${encodeURIComponent(event.eventId)}`}>Open points for {event.name} →</Link>
+        <section aria-label="Available scan actions">
+          <h2 className="volunteer-section-label">Your responsibilities</h2>
+          <ul className="volunteer-action-grid">
+            {actions.map(({ to, title, icon, description }) => (
+              <li key={to}>
+                <VolunteerActionCard
+                  to={to}
+                  title={title}
+                  description={description}
+                  icon={<SectionIcon name={icon} />}
+                />
               </li>
             ))}
           </ul>
-        ) : <p className="text-sm text-mist">No active events assigned. Contact an administrator if you need event access.</p>}
+        </section>
+      ) : (
+        <div className="volunteer-callout" role="status">
+          <h2 className="volunteer-callout__title">No responsibilities assigned yet</h2>
+          <p>
+            Your account does not currently include check-in, food, shop, or points access. Ask an
+            organizer to assign responsibilities — they will appear here automatically.
+          </p>
+        </div>
+      )}
+
+      <section aria-labelledby="assigned-events-heading">
+        <h2 id="assigned-events-heading" className="volunteer-section-label">
+          Assigned events
+        </h2>
+        <p className="volunteer-dashboard__hint">
+          Listed events are switched on for point scans. Schedule labels are for reference only.
+        </p>
+        {options.events.length ? (
+          <>
+            <ul className="volunteer-event-summary mt-3">
+              {options.events.map((event) => (
+                <li key={event.eventId} className="volunteer-event-summary__item">
+                  <span className="volunteer-event-summary__name">{event.name}</span>
+                  <span className="volunteer-event-summary__meta">
+                    <span>{event.pointsAwarded} pts</span>
+                    <EventStatusBadge event={{ ...event, active: true }} now={now} />
+                    <Link
+                      className="volunteer-inline-link"
+                      to={`${ADMIN_ROUTES.scanPoints}?event=${encodeURIComponent(event.eventId)}`}
+                    >
+                      Open →
+                    </Link>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="volunteer-dashboard__hint">
+              Open{" "}
+              <Link className="volunteer-inline-link" to={ADMIN_ROUTES.scanPoints}>
+                Event Points
+              </Link>{" "}
+              to select an event before scanning.
+            </p>
+          </>
+        ) : (
+          <p className="volunteer-dashboard__hint">
+            No active events assigned. Contact an administrator if you need event access.
+          </p>
+        )}
       </section>
     </div>
   );

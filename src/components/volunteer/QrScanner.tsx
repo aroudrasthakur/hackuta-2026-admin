@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { useQrCamera, type CameraStatus } from "../../hooks/useQrCamera";
 import { normalizeQrToken } from "../../lib/scanResults";
 import { scanPrimaryButtonClass, scanSecondaryButtonClass } from "../../lib/scanButtonClasses";
+import { CameraIcon } from "./VolunteerIcons";
 
 export type ScanSource = "camera" | "manual";
 
@@ -17,7 +18,18 @@ const CAMERA_MESSAGES: Partial<Record<CameraStatus, string>> = {
   error: "The camera or QR reader couldn't start. Try again, or enter the code below.",
 };
 
-const PROBLEM_STATUSES = new Set<CameraStatus>(["denied", "no_camera", "in_use", "interrupted", "unsupported", "error"]);
+const PROBLEM_STATUSES = new Set<CameraStatus>(["denied", "no_camera", "in_use", "interrupted", "unsupported", "error", "paused"]);
+
+const OVERLAY_TITLE: Partial<Record<CameraStatus, string>> = {
+  starting: "Preparing camera",
+  denied: "Camera permission needed",
+  no_camera: "Camera unavailable",
+  in_use: "Camera in use",
+  interrupted: "Camera stopped",
+  unsupported: "Camera unavailable",
+  error: "Camera unavailable",
+  paused: "Camera paused",
+};
 
 const INVALID_ENTRY = "That isn't a valid participant code. Codes are 64 letters (a–f) and numbers.";
 
@@ -40,6 +52,7 @@ export function QrScanner({
   const hintId = useId();
   const errorId = useId();
   const cameraActive = status === "starting" || status === "scanning";
+  const showViewport = cameraActive || PROBLEM_STATUSES.has(status);
   const canPaste = typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function";
 
   useEffect(() => {
@@ -77,20 +90,54 @@ export function QrScanner({
   };
 
   const message = CAMERA_MESSAGES[status];
+  const focusManual = () => {
+    stop();
+    document.getElementById(inputId)?.focus();
+  };
+
   return (
     <div className="space-y-5">
-      <section aria-label="Camera scanner" className="space-y-3">
-        <div className={cameraActive ? "relative overflow-hidden rounded-2xl bg-night" : "hidden"}>
+      <section aria-label="Camera scanner" className="volunteer-camera">
+        <div
+          className={`volunteer-camera__viewport${showViewport ? "" : " volunteer-camera__viewport--idle"}`}
+        >
           <video
             ref={videoRef}
-            className="aspect-square w-full object-cover sm:aspect-video"
+            className="volunteer-camera__video"
             muted
             playsInline
             aria-label="Camera preview"
           />
-          <div aria-hidden="true" className="pointer-events-none absolute inset-[18%] rounded-xl border-4 border-white/80" />
+          <div className="volunteer-camera__frame" aria-hidden="true">
+            <span className="volunteer-camera__corner volunteer-camera__corner--tl" />
+            <span className="volunteer-camera__corner volunteer-camera__corner--tr" />
+            <span className="volunteer-camera__corner volunteer-camera__corner--bl" />
+            <span className="volunteer-camera__corner volunteer-camera__corner--br" />
+          </div>
+          {status !== "scanning" && showViewport ? (
+            <div className="volunteer-camera__overlay" role={PROBLEM_STATUSES.has(status) ? "alert" : "status"}>
+              <CameraIcon className="h-8 w-8" />
+              <p className="volunteer-camera__overlay-title">
+                {OVERLAY_TITLE[status] ?? "Camera ready when enabled"}
+              </p>
+              {message ? <p className="volunteer-camera__overlay-copy">{message}</p> : null}
+              {PROBLEM_STATUSES.has(status) ? (
+                <>
+                  <p className="volunteer-camera__hint">
+                    Tip: close other apps using the camera, then retry, or continue with manual entry below.
+                  </p>
+                  <button type="button" className={scanSecondaryButtonClass} onClick={focusManual}>
+                    Use manual entry
+                  </button>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        {message ? (
+        {status === "scanning" && message ? (
+          <p role="status" className="volunteer-camera__caption">{message}</p>
+        ) : null}
+        {!showViewport && message ? (
           <p
             role={PROBLEM_STATUSES.has(status) ? "alert" : "status"}
             className={PROBLEM_STATUSES.has(status) ? "admin-callout admin-callout--alert text-base" : "admin-callout text-base"}
@@ -109,7 +156,7 @@ export function QrScanner({
         ) : null}
       </section>
 
-      <form onSubmit={onSubmit} className="admin-card space-y-3 p-4" noValidate>
+      <form onSubmit={onSubmit} className="volunteer-manual-entry" noValidate>
         <label htmlFor={inputId} className="block text-base font-semibold text-night">
           Or enter the participant's code
         </label>
@@ -131,7 +178,7 @@ export function QrScanner({
           aria-describedby={entryError ? `${hintId} ${errorId}` : hintId}
         />
         {entryError ? <p id={errorId} role="alert" className="text-sm font-semibold text-red-800">{entryError}</p> : null}
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="volunteer-manual-entry__actions">
           <button type="submit" className={scanPrimaryButtonClass}>Look up participant</button>
           {canPaste ? (
             <button type="button" className={scanSecondaryButtonClass} onClick={() => void paste()}>Paste code</button>

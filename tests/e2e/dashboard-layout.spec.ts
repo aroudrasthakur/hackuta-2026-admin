@@ -125,7 +125,7 @@ test("captures the volunteer dashboard at mobile and desktop widths", async ({ p
   await signInVolunteer(page);
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
-    await expect(page.getByRole("heading", { name: "Volunteer dashboard", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Admin", exact: true })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width === 375 || width === 1440) await reviewScreenshot(page, `volunteer-dashboard-${width}.png`, testInfo);

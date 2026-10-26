@@ -10,7 +10,7 @@ async function start(page: Page) {
   await page.getByLabel("Email").fill(E2E_SCAN_VOLUNTEER.email);
   await page.getByLabel("Password", { exact: true }).fill(E2E_SCAN_VOLUNTEER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
   await setMealScenario(page, "serving");
   await page.getByRole("navigation").getByRole("link", { name: "Food", exact: true }).click();
 }

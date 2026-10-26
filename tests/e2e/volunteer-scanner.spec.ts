@@ -16,7 +16,7 @@ async function signInScanVolunteer(page: Page) {
   await page.getByLabel("Email").fill(E2E_SCAN_VOLUNTEER.email);
   await page.getByLabel("Password", { exact: true }).fill(E2E_SCAN_VOLUNTEER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
   await setMealScenario(page, "serving");
 }
 
@@ -38,7 +38,7 @@ test.describe("volunteer QR scanner", () => {
   test("checks a participant in after confirmation and explains repeat scans", async ({ page }) => {
     await signInScanVolunteer(page);
     await openTab(page, "Check-in");
-    await expect(page.getByRole("heading", { name: "Participant check-in", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Participant Check-in", exact: true })).toBeVisible();
 
     await lookUp(page, "not-a-code");
     await expect(page.getByRole("alert")).toContainText("isn't a valid participant code");

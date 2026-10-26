@@ -29,73 +29,77 @@ export function ScanConfirmation({
   useEffect(() => headingRef.current?.focus(), []);
 
   return (
-    <section aria-labelledby="scan-confirm-heading" className="admin-card space-y-5 p-5">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-wide text-ocean">Confirm participant</p>
-        <h2 id="scan-confirm-heading" ref={headingRef} tabIndex={-1} className="text-3xl font-bold text-night">
+    <section aria-labelledby="scan-confirm-heading" className="volunteer-confirm">
+      <div className="volunteer-confirm__body">
+        <p className="volunteer-section-label">Confirm participant</p>
+        <h2 id="scan-confirm-heading" ref={headingRef} tabIndex={-1} className="volunteer-confirm__name">
           {preview.participant.name}
         </h2>
-      </div>
 
-      <dl className="grid gap-3 text-lg">
-        {preview.purpose === "check_in" ? (
-          <div>
-            <dt className="admin-meta__label">Check-in status</dt>
-            <dd className="font-semibold text-night">Not checked in yet</dd>
+        <dl className="volunteer-confirm__facts">
+          {preview.purpose === "check_in" ? (
+            <div>
+              <dt>Check-in status</dt>
+              <dd>Not checked in yet</dd>
+            </div>
+          ) : null}
+          {preview.purpose === "food_check_in" ? (
+            <>
+              <div>
+                <dt>Meal</dt>
+                <dd>{preview.meal.name}</dd>
+              </div>
+              <div>
+                <dt>Food status</dt>
+                <dd>Not redeemed yet</dd>
+              </div>
+              <div className={preview.participant.dietaryInfo ? "admin-callout border-amber-300 bg-amber-50 text-amber-950 rounded-xl p-3" : undefined}>
+                <dt>Dietary restrictions</dt>
+                <dd className={preview.participant.dietaryInfo ? "text-xl font-semibold" : undefined}>
+                  {preview.participant.dietaryInfo ?? "None listed"}
+                </dd>
+              </div>
+            </>
+          ) : null}
+          {preview.purpose === "point_scan" ? (
+            <>
+              <div>
+                <dt>Event</dt>
+                <dd>{preview.event.name}</dd>
+              </div>
+              <div>
+                <dt>Points to award</dt>
+                <dd>{preview.event.pointsAwarded} points</dd>
+              </div>
+              <div>
+                <dt>Award status</dt>
+                <dd>Not awarded yet</dd>
+              </div>
+            </>
+          ) : null}
+        </dl>
+
+        {error ? (
+          <div role="alert" className="admin-callout admin-callout--alert text-base">
+            <p className="font-semibold">{error.title}</p>
+            <p>{error.detail}</p>
           </div>
         ) : null}
-        {preview.purpose === "food_check_in" ? (
-          <>
-            <div>
-              <dt className="admin-meta__label">Meal</dt>
-              <dd className="text-2xl font-semibold text-night">{preview.meal.name}</dd>
-            </div>
-            <div>
-              <dt className="admin-meta__label">Food status</dt>
-              <dd className="font-semibold text-night">Not redeemed yet</dd>
-            </div>
-            <div className={preview.participant.dietaryInfo ? "admin-callout border-amber-300 bg-amber-50 text-amber-950" : ""}>
-              <dt className="admin-meta__label">Dietary restrictions</dt>
-              <dd className={preview.participant.dietaryInfo ? "text-xl font-semibold" : "text-night"}>
-                {preview.participant.dietaryInfo ?? "None listed"}
-              </dd>
-            </div>
-          </>
-        ) : null}
-        {preview.purpose === "point_scan" ? (
-          <>
-            <div>
-              <dt className="admin-meta__label">Event</dt>
-              <dd className="font-semibold text-night">{preview.event.name}</dd>
-            </div>
-            <div>
-              <dt className="admin-meta__label">Award</dt>
-              <dd className="text-2xl font-semibold text-night">{preview.event.pointsAwarded} points</dd>
-            </div>
-          </>
-        ) : null}
-      </dl>
 
-      {error ? (
-        <div role="alert" className="admin-callout admin-callout--alert text-base">
-          <p className="font-semibold">{error.title}</p>
-          <p>{error.detail}</p>
+        <div className="volunteer-confirm__actions">
+          <button
+            type="button"
+            className={scanConfirmButtonClass}
+            onClick={onConfirm}
+            disabled={submitting}
+            aria-busy={submitting || undefined}
+          >
+            {submitting ? "Saving…" : error ? `Try again: ${confirmLabel(preview).toLowerCase()}` : confirmLabel(preview)}
+          </button>
+          <button type="button" className={scanSecondaryButtonClass} onClick={onCancel} disabled={submitting}>
+            Cancel
+          </button>
         </div>
-      ) : null}
-
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          className={scanConfirmButtonClass}
-          onClick={onConfirm}
-          disabled={submitting}
-          aria-busy={submitting || undefined}
-        >
-          {submitting ? "Saving…" : error ? `Try again: ${confirmLabel(preview).toLowerCase()}` : confirmLabel(preview)}
-        </button>
-        <button type="button" className={scanSecondaryButtonClass} onClick={onCancel} disabled={submitting}>
-          Cancel
-        </button>
       </div>
     </section>
   );

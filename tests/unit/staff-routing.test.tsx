@@ -117,14 +117,14 @@ describe("staff route policy", () => {
 
 describe("protected staff screens", () => {
   it.each([
-    [ADMIN_ROUTES.scan, "Volunteer dashboard"],
-    [ADMIN_ROUTES.scanCheckIn, "Participant check-in"],
-    [ADMIN_ROUTES.scanFood, "Food"],
-    [ADMIN_ROUTES.scanPoints, "Points"],
+    [ADMIN_ROUTES.scan, /Good (morning|afternoon|evening),/],
+    [ADMIN_ROUTES.scanCheckIn, "Participant Check-in"],
+    [ADMIN_ROUTES.scanFood, "Food Distribution"],
+    [ADMIN_ROUTES.scanPoints, "Event Points"],
   ])("opens an authorized direct link to %s", async (route, heading) => {
     await render(route);
     expect(path()).toBe(route);
-    expect(container.querySelector("h1")?.textContent).toBe(heading);
+    expect(container.querySelector("h1")?.textContent).toMatch(heading);
     expect(links()).toEqual(["Dashboard", "Check-in", "Food", "Points"]);
   });
 
@@ -142,7 +142,7 @@ describe("protected staff screens", () => {
     options = { ...allOptions, canRedeemShop: true };
     await render(ADMIN_ROUTES.scan, auth({ staff: { ...staff, canRedeemShop: true } }));
     expect(links()).toEqual(["Dashboard", "Check-in", "Food", "Points", "Shop"]);
-    expect(container.textContent).toContain("Shop redemption");
+    expect(container.textContent).toContain("Shop Redemption");
     await click('nav a[href="/admin/scan/shop"]');
     expect(path()).toBe(ADMIN_ROUTES.scanShop);
     expect(container.querySelector("h1")?.textContent).toBe("Shop redemption");
@@ -182,7 +182,7 @@ describe("protected staff screens", () => {
     expect(container.querySelector("h1")).toBeNull();
     options = allOptions;
     await render(ADMIN_ROUTES.scanPoints);
-    expect(container.querySelector("h1")?.textContent).toBe("Points");
+    expect(container.querySelector("h1")?.textContent).toBe("Event Points");
   });
 
   it("waits on the dashboard for assignment loading", async () => {
@@ -302,7 +302,7 @@ describe("protected staff screens", () => {
 
     await render(ADMIN_ROUTES.login);
     expect(path()).toBe(route);
-    expect(container.querySelector("h1")?.textContent).toBe("Points");
+    expect(container.querySelector("h1")?.textContent).toBe("Event Points");
   });
 
   it("fails closed when a profile is missing despite an authenticated flag", async () => {
