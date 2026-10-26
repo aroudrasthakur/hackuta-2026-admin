@@ -386,6 +386,7 @@
   }
 
   .volunteer-event-card {
+    position: relative;
     display: flex;
     width: 100%;
     min-height: 3.75rem;
@@ -414,10 +415,14 @@
     box-shadow: 0 0 0 2px rgb(48 88 115 / 0.18);
   }
 
+  /* Invisible full-card hit target so mouse, touch, and Playwright can select. */
   .volunteer-event-card__radio {
     position: absolute;
+    inset: 0;
+    z-index: 1;
+    margin: 0;
+    cursor: pointer;
     opacity: 0;
-    pointer-events: none;
   }
 
   .volunteer-event-card__name {
