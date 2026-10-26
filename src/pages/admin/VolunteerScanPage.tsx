@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { GenericId } from "convex/values";
+import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { EventSelector } from "../../components/volunteer/EventSelector";
 import { QrScanner, type ScanSource } from "../../components/volunteer/QrScanner";
 import { ScanConfirmation } from "../../components/volunteer/ScanConfirmation";
@@ -108,11 +109,8 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
   const showPicker = points && (!selectedEvent || choosingEvent);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="font-display text-3xl text-ink">{page.title}</h1>
-        <p className="mt-1 text-base text-ocean">{page.lead}</p>
-      </div>
+    <section aria-labelledby={`${workflow}-scan-heading`} className="mx-auto max-w-2xl space-y-6">
+      <AdminPageHeader id={`${workflow}-scan-heading`} title={page.title} description={page.lead} />
 
       {showPicker ? (
         <EventSelector
@@ -150,6 +148,6 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
       )}
 
       <Link className="inline-block py-3 font-semibold" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link>
-    </div>
+    </section>
   );
 }

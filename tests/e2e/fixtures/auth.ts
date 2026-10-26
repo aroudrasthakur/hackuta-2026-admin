@@ -4,9 +4,19 @@ import {
   E2E_ADMIN,
   E2E_APPLICATION_IDS,
   E2E_REVIEWER,
+  E2E_VOLUNTEER,
 } from "../../../shared/admin/e2e/credentials";
 
 export { E2E_ADMIN, E2E_APPLICATION_IDS, E2E_REVIEWER };
+
+export async function signInVolunteer(page: Page) {
+  await page.goto("/admin/login");
+  await page.getByLabel("Email").fill(E2E_VOLUNTEER.email);
+  await page.getByLabel("Password", { exact: true }).fill(E2E_VOLUNTEER.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin\/scan$/);
+  await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+}
 
 async function submitOrganizerSignIn(
   page: Page,

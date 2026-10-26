@@ -1,4 +1,5 @@
 import { EmptyState } from "../../components/states/EmptyState";
+import { AdminPageHeader } from "../../components/AdminPageHeader";
 
 const workflows = {
   participants: { title: "Participants", description: "Participant management will be available when the participant administration workflow is ready." },
@@ -10,7 +11,7 @@ export function StaffWorkflowPage({ workflow }: { workflow: keyof typeof workflo
   const { title, description } = workflows[workflow];
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-3xl text-ink">{title}</h1>
+      <AdminPageHeader id={`${workflow}-heading`} title={title} />
       <EmptyState title="Coming soon" description={description} />
     </div>
   );

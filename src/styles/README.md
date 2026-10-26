@@ -1,5 +1,10 @@
 # Styles
 
-[`index.css`](index.css) — Tailwind v4 entry and HackUTA design tokens.
+| File | Purpose |
+| --- | --- |
+| [`index.css`](index.css) | Tailwind entry, brand tokens, forms and review layout |
+| [`dashboard.css`](dashboard.css) | Navigation, tables, badges, states and reduced motion |
+| [`storm.css`](storm.css) | Sign-in, weather backdrop and mood toggle |
 
-[`storm.css`](storm.css) — organizer sign-in storm backdrop and card styles, including `.sign-in-field__control` for the password reveal button (aligned with register sign-in).
+Use `.admin-table` for tables and `.admin-table-scroll` for horizontal scrolling.
+Keep controls at least 44px high and preserve visible keyboard focus.

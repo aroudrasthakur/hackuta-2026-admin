@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./storm.css";
+@import "./dashboard.css";
 
 @theme {
   --font-sans: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
@@ -12,6 +13,21 @@
   --color-light: #f6eddf;
   --color-ocean: #305873;
   --color-mist: #8ca1aa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f3ee;
+  --color-border: #d9e0e3;
+  --color-muted: #526778;
+  --color-positive: #176044;
+  --color-negative: #9b303b;
+  --color-warning: #795516;
+  --color-info: #245d86;
+  --radius-panel: 0.875rem;
+  --radius-control: 0.5rem;
+  --shadow-panel: 0 2px 8px rgb(16 47 70 / 0.035);
+  --spacing-control: 2.75rem;
+  --spacing-icon: 1.125rem;
+  --spacing-cell-x: 1rem;
+  --spacing-cell-y: 0.875rem;
 }
 
 @font-face {
@@ -73,10 +89,10 @@
   max-width: none;
   max-height: none;
   padding: 0;
-  border: 1px solid var(--color-sand);
-  border-radius: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
   color: var(--color-ink);
-  background: var(--color-light);
+  background: var(--color-surface);
   overflow: hidden;
 }
 .resume-dialog[open] { display: flex; flex-direction: column; }
@@ -97,16 +113,12 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
     min-height: 2.75rem;
   }
 
-  .admin-workspace :where(p, h3) {
-    overflow-wrap: anywhere;
-  }
-
   .admin-card {
     min-width: 0;
-    border: 1px solid var(--color-sand);
-    border-radius: 1rem;
-    background: rgb(255 255 255 / 0.86);
-    box-shadow: 0 8px 24px rgb(16 47 70 / 0.06);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-panel);
   }
 
   .admin-card--flush {
@@ -114,13 +126,13 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
   }
 
   .admin-card__body {
-    padding: 1.15rem 1.2rem;
+    padding: clamp(1rem, 2vw, 1.5rem);
   }
 
   .admin-page-title {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 1.75rem;
+    font-size: clamp(1.65rem, 3vw, 2rem);
     font-weight: 400;
     line-height: 1.15;
     letter-spacing: -0.01em;
@@ -182,10 +194,10 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
   }
 
   .admin-field__control {
-    min-height: 2.75rem;
+    min-height: var(--spacing-control);
     width: 100%;
     border: 1px solid rgb(48 88 115 / 0.28);
-    border-radius: 0.7rem;
+    border-radius: var(--radius-control);
     background: #fff;
     padding: 0.5rem 0.8rem;
     font-size: 0.875rem;
@@ -194,7 +206,7 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
   }
 
   .admin-field__control::placeholder {
-    color: var(--color-mist);
+    color: var(--color-muted);
   }
 
   .admin-field__control:focus {
@@ -252,50 +264,6 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
   .admin-stat strong {
     color: var(--color-night);
     font-weight: 650;
-  }
-
-  .admin-nav-tabs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-    gap: 0.25rem;
-    padding: 0.25rem;
-    border: 1px solid var(--color-sand);
-    border-radius: 0.75rem;
-    background: rgb(255 255 255 / 0.72);
-    box-shadow: 0 4px 16px rgb(16 47 70 / 0.04);
-  }
-
-  .admin-nav-tab {
-    display: inline-flex;
-    min-height: 2.75rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.55rem;
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    font-weight: 600;
-    line-height: 1.25;
-    text-decoration: none;
-    color: var(--color-ocean);
-    transition:
-      background-color 160ms var(--ease-out),
-      box-shadow 160ms var(--ease-out),
-      color 160ms var(--ease-out);
-  }
-
-  .admin-nav-tab:hover {
-    color: var(--color-night);
-    background: rgb(238 227 210 / 0.45);
-  }
-
-  .admin-nav-tab--active {
-    color: var(--color-night);
-    background: #fff;
-    box-shadow: 0 1px 4px rgb(16 47 70 / 0.1);
-  }
-
-  .admin-nav-tab--active:hover {
-    background: #fff;
   }
 
   .admin-meta {
@@ -369,15 +337,15 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
   }
 
   .admin-callout--alert {
-    border-color: rgb(185 28 28 / 0.22);
-    background: rgb(254 242 242 / 0.9);
-    color: #7f1d1d;
+    border-color: #efc9cc;
+    background: #fff1f1;
+    color: var(--color-negative);
   }
 
   .admin-callout--success {
-    border-color: rgb(4 120 87 / 0.22);
-    background: rgb(236 253 245 / 0.9);
-    color: #065f46;
+    border-color: #bddbc9;
+    background: #edf7f0;
+    color: var(--color-positive);
   }
 
   .applications-table-panel {
@@ -422,7 +390,7 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: rgb(48 88 115 / 0.72);
+    color: var(--color-muted);
   }
 
   .application-review-identity__facts dd {
@@ -444,8 +412,8 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
     }
 
     .application-review-identity__facts {
-      grid-auto-flow: column;
-      grid-auto-columns: minmax(0, max-content);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      max-width: 50%;
       text-align: right;
     }
   }
@@ -501,27 +469,27 @@ body:has(.resume-dialog[open]) { overflow: hidden; }
   }
 
   .applications-table__col-applicant {
-    width: 24%;
-  }
-
-  .applications-table__col-school {
     width: 22%;
   }
 
+  .applications-table__col-school {
+    width: 18%;
+  }
+
   .applications-table__col-submitted {
-    width: 16%;
+    width: 14%;
   }
 
   .applications-table__col-status {
-    width: 14%;
+    width: 20%;
   }
 
   .applications-table__col-reviewer {
-    width: 14%;
+    width: 15%;
   }
 
   .applications-table__col-action {
-    width: 10%;
+    width: 11%;
   }
 
   .applications-table__action {

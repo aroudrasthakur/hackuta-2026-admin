@@ -6,6 +6,8 @@ import { ApplicationsList } from "../../components/ApplicationsList";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
+import { QueryErrorState } from "../../components/states/QueryErrorState";
+import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { listSubmittedApplicationsRef } from "../../convex/adminApi";
 import { useQuery } from "../../convex/reactBindings";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
@@ -148,7 +150,7 @@ function ApplicationsQueue({ sessionToken }: { sessionToken: string }) {
 
   if (applications === undefined) {
     return (
-      <div role="status"><LoadingState message="Loading applications…" /></div>
+      <LoadingState layout="rows" message="Loading applications…" />
     );
   }
 
@@ -259,31 +261,18 @@ export function ApplicationsPage() {
 
   return (
     <section aria-labelledby="applications-heading" className="space-y-5">
-      <header className="space-y-2">
-        <h2 id="applications-heading" className="admin-page-title">Applications</h2>
-        <p className="text-sm text-ocean">Review submitted applications and track participant decisions.</p>
-      </header>
+      <AdminPageHeader id="applications-heading" title="Applications" description="Review submitted applications and track participant decisions." />
       {sessionToken ? (
         <ErrorBoundary
           key={`${sessionToken}:${retry}`}
           fallback={
-            <div role="alert" className="admin-card admin-card__body admin-callout--alert">
-              <h3 className="text-lg font-semibold text-night">Unable to load applications</h3>
-              <p className="mt-2 text-sm text-ocean">Check your connection and try again.</p>
-              <button
-                type="button"
-                className={`mt-4 ${reviewSecondaryButtonClass}`}
-                onClick={() => setRetry((value) => value + 1)}
-              >
-                Try again
-              </button>
-            </div>
+            <QueryErrorState title="Unable to load applications" onRetry={() => setRetry((value) => value + 1)} />
           }
         >
           <ApplicationsQueue sessionToken={sessionToken} />
         </ErrorBoundary>
       ) : (
-        <div role="status"><LoadingState message="Verifying organizer session…" /></div>
+        <LoadingState message="Verifying organizer session…" />
       )}
     </section>
   );

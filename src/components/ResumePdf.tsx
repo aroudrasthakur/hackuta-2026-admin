@@ -39,7 +39,7 @@ export default function ResumePdf({ url, onClose }: { url: string; onClose: () =
   const buttonClass = reviewSecondaryButtonClass;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sand bg-light px-4 py-3" aria-label="PDF controls">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3" aria-label="PDF controls">
         <div className="flex items-center gap-3">
           <button type="button" className={buttonClass} disabled={!pages || page <= 1 || failure !== null} onClick={() => changePage(page - 1)}>Previous</button>
           <span role="status" className="text-sm tabular-nums">{pages ? `Page ${page} of ${pages}` : "PDF"}</span>

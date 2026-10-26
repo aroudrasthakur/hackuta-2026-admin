@@ -207,7 +207,7 @@ export function ApplicationDecisionControls({
 
       {pendingCopy && (
         <div className="space-y-3 rounded-xl border border-sand bg-clay/30 p-4">
-          <h4 className="font-semibold text-night">{pendingCopy.title}</h4>
+          <h3 className="font-semibold text-night">{pendingCopy.title}</h3>
           <p className="break-words text-sm text-night">
             Applicant: <strong>{[detail.application.firstName, detail.application.lastName].filter(Boolean).join(" ") || "Applicant"}</strong>
             {detail.application.email ? ` (${detail.application.email})` : ""}
