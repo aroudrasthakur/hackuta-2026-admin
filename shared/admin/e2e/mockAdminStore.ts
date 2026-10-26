@@ -1,4 +1,5 @@
 import { ADMIN_ERROR_MESSAGES, adminError } from "../errors.ts";
+import { mockMealsMutation, mockMealsQuery, resetMockMeals } from "./mockMeals.ts";
 import { sampleResumeUrl } from "./resumeFixture.ts";
 import {
   E2E_ADMIN,
@@ -137,6 +138,7 @@ function seedApplication(
 }
 
 function resetStore() {
+  resetMockMeals();
   staffById.clear();
   staffByEmail.clear();
   sessions.clear();
@@ -452,6 +454,10 @@ export function e2eMockSignOut(sessionToken: string) {
 
 export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
   const sessionToken = String(args.sessionToken ?? "");
+  if (path.startsWith("admin/meals:")) {
+    requireAdmin(sessionToken);
+    return mockMealsQuery(path, args);
+  }
 
   switch (path) {
     case "admin/volunteerScan:listMyScanOptions": {
@@ -577,6 +583,12 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
 export async function e2eMockRunMutation(path: string, args: Record<string, unknown>) {
   const sessionToken = String(args.sessionToken ?? "");
   const now = Date.now();
+  if (path.startsWith("admin/meals:")) {
+    const admin = requireAdmin(sessionToken);
+    const result = mockMealsMutation(path, args, admin.adminId);
+    bump();
+    return result;
+  }
 
   switch (path) {
     case "admin/volunteerScan:resolveQrForScan": {

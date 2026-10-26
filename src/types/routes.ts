@@ -7,6 +7,7 @@ export const ADMIN_ROUTES = {
   scanPoints: "/admin/scan/points",
   participants: "/admin/participants",
   volunteers: "/admin/volunteers",
+  meals: "/admin/meals",
   applications: "/admin/applications",
   decisionEmails: "/admin/decision-emails",
   applicationReview: (applicationId: string) =>

@@ -7,14 +7,14 @@ const widths = [320, 375, 768, 1024, 1440];
 test("keeps page headers and role navigation usable at every dashboard width", async ({ page }, testInfo) => {
   await signInOrganizer(page, E2E_ADMIN);
   await page.getByRole("button", { name: "Calm", exact: true }).click();
-  for (const name of ["Applications", "Decision emails", "Participants", "Volunteers"]) {
+  for (const name of ["Applications", "Decision emails", "Participants", "Volunteers", "Meals"]) {
     const navigation = page.getByRole("navigation", { name: "Admin", exact: true });
     await navigation.getByRole("link", { name, exact: true }).click();
     for (const width of widths) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
       await expect(navigation.locator('[aria-current="page"]')).toHaveText(name);
-      await expect(navigation.getByRole("link")).toHaveCount(4);
+      await expect(navigation.getByRole("link")).toHaveCount(5);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       if (width === 375 || width === 1440) await page.screenshot({ path: testInfo.outputPath(`${name.toLowerCase().replaceAll(" ", "-")}-${width}.png`), fullPage: true });
     }
@@ -70,7 +70,7 @@ test("keeps management and email controls available at 200 percent CSS zoom", as
   await signInOrganizer(page, E2E_ADMIN);
   await setDecisionQueue(page, "mixed");
   await page.evaluate(() => { document.documentElement.style.zoom = "2"; });
-  for (const name of ["Participants", "Volunteers", "Decision emails"]) {
+  for (const name of ["Participants", "Volunteers", "Meals", "Decision emails"]) {
     await page.getByRole("navigation", { name: "Admin", exact: true }).getByRole("link", { name, exact: true }).click();
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

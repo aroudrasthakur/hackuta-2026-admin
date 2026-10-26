@@ -115,7 +115,7 @@ describe("protected staff screens", () => {
   it.each(["admin", "reviewer"] as const)("shows the correct %s navigation and management routes", async (role) => {
     await render(ADMIN_ROUTES.participants, auth({ staff: { ...staff, role } }));
     expect(path()).toBe(role === "admin" ? ADMIN_ROUTES.participants : ADMIN_ROUTES.applications);
-    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers"] : ["Applications", "Decision emails"]);
+    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers", "Meals"] : ["Applications", "Decision emails"]);
     expect(query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
   });
 
