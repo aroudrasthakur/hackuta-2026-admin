@@ -17,7 +17,7 @@ import type {
   retryFailedDecisionEmails,
   setDecisionEmailHold,
 } from "../../convex/admin/decisionEmailQueue";
-import type { listMyScanOptions, resolveQrForScan } from "../../convex/admin/volunteerScan";
+import type { listMyScanOptions, resolveQrForScan, listActiveMealPeriods, resolveQrForMeal, redeemMeal } from "../../convex/admin/volunteerScan";
 import type {
   awardEventPoints,
   checkInParticipant,
@@ -152,6 +152,25 @@ export const resolveQrForScanRef = adminModuleRef<
   FunctionArgs<ResolveQrMutation>,
   FunctionReturnType<ResolveQrMutation>
 >("admin/volunteerScan:resolveQrForScan");
+
+type MealScanApi = ApiFromModules<{
+  scan: {
+    listActiveMealPeriods: typeof listActiveMealPeriods;
+    resolveQrForMeal: typeof resolveQrForMeal;
+    redeemMeal: typeof redeemMeal;
+  };
+}>["scan"];
+export type VolunteerMealPeriod = FunctionReturnType<MealScanApi["listActiveMealPeriods"]>[number];
+export type MealRedemptionResult = FunctionReturnType<MealScanApi["redeemMeal"]>;
+export const listActiveMealPeriodsRef = adminModuleRef<
+  "query", FunctionArgs<MealScanApi["listActiveMealPeriods"]>, FunctionReturnType<MealScanApi["listActiveMealPeriods"]>
+>("admin/volunteerScan:listActiveMealPeriods");
+export const resolveQrForMealRef = adminModuleRef<
+  "mutation", FunctionArgs<MealScanApi["resolveQrForMeal"]>, FunctionReturnType<MealScanApi["resolveQrForMeal"]>
+>("admin/volunteerScan:resolveQrForMeal");
+export const redeemMealRef = adminModuleRef<
+  "mutation", FunctionArgs<MealScanApi["redeemMeal"]>, MealRedemptionResult
+>("admin/volunteerScan:redeemMeal");
 
 type VolunteerOperations = ApiFromModules<{
   ops: {

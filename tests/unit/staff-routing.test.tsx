@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GenericId } from "convex/values";
 import App from "../../src/App";
 import { AdminAuthContext, type AdminAuthContextValue, type StaffProfile } from "../../src/contexts/adminAuthContext";
-import { listMyScanOptionsRef, type VolunteerScanOptions } from "../../src/convex/adminApi";
+import { listMyScanOptionsRef, listActiveMealPeriodsRef, type VolunteerScanOptions } from "../../src/convex/adminApi";
 import { canAccessStaffRoute, intendedStaffDestination, staffHome } from "../../src/lib/staffRouteAccess";
 import { ADMIN_ROUTES } from "../../src/types/routes";
 vi.mock("../../src/components/WeatherMoodToggle", () => ({ WeatherMoodToggle: () => null }));
@@ -54,6 +54,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   options = allOptions;
   query.mockReset().mockImplementation((ref) => {
+    if (ref === listActiveMealPeriodsRef) return [];
     expect(ref).toBe(listMyScanOptionsRef);
     return options;
   });

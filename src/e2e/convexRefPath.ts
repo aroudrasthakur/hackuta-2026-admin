@@ -5,6 +5,9 @@ import {
   getApplicationRef,
   getCurrentStaffRef,
   listMyScanOptionsRef,
+  listActiveMealPeriodsRef,
+  resolveQrForMealRef,
+  redeemMealRef,
   listApplicationReviewLogsRef,
   listDecisionEmailQueueRef,
   listSubmittedApplicationsRef,
@@ -18,6 +21,9 @@ import {
 import { createMealPeriodRef, listMealPeriodsRef, listMealRedemptionsRef, removeMealPeriodRef, setMealPeriodActiveRef, updateMealPeriodRef } from "../convex/mealsApi";
 
 const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
+  [listActiveMealPeriodsRef, "admin/volunteerScan:listActiveMealPeriods"],
+  [resolveQrForMealRef, "admin/volunteerScan:resolveQrForMeal"],
+  [redeemMealRef, "admin/volunteerScan:redeemMeal"],
   [listMealPeriodsRef, "admin/meals:listMealPeriods"],
   [listMealRedemptionsRef, "admin/meals:listMealRedemptions"],
   [createMealPeriodRef, "admin/meals:createMealPeriod"],

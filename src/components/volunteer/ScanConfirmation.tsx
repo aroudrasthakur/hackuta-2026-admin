@@ -47,6 +47,10 @@ export function ScanConfirmation({
         {preview.purpose === "food_check_in" ? (
           <>
             <div>
+              <dt className="admin-meta__label">Meal</dt>
+              <dd className="text-2xl font-semibold text-night">{preview.meal.name}</dd>
+            </div>
+            <div>
               <dt className="admin-meta__label">Food status</dt>
               <dd className="font-semibold text-night">Not redeemed yet</dd>
             </div>

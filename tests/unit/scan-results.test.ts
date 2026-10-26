@@ -17,6 +17,7 @@ import {
 
 const token = "ab".repeat(32);
 const eventId = "event-1" as GenericId<"events">;
+const meal = { mealPeriodId: "meal-1" as GenericId<"mealPeriods">, name: "Lunch" };
 const at = Date.UTC(2026, 9, 25, 15, 30);
 
 afterEach(() => {
@@ -95,8 +96,9 @@ describe("previewOutcome", () => {
     expect(previewOutcome({
       status: "ok",
       purpose: "food_check_in",
-      participant: { name: "Sam", foodCheckedIn: true, foodCheckedInAt: null, dietaryInfo: "Vegan" },
-    })).toMatchObject({ tone: "duplicate", title: "Food already redeemed", detail: "Sam already received food. Nothing was changed." });
+      meal,
+      participant: { name: "Sam", alreadyRedeemed: true, redeemedAt: null, dietaryInfo: "Vegan" },
+    })).toMatchObject({ tone: "duplicate", title: "Food Already Collected", detail: "This participant has already received their food for Lunch." });
     expect(previewOutcome({
       status: "ok",
       purpose: "point_scan",
@@ -111,7 +113,8 @@ describe("previewOutcome", () => {
     expect(previewOutcome({
       status: "ok",
       purpose: "food_check_in",
-      participant: { name: "Sam", foodCheckedIn: false, foodCheckedInAt: null, dietaryInfo: null },
+      meal,
+      participant: { name: "Sam", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: null },
     })).toBeNull();
     expect(previewOutcome({
       status: "ok",
@@ -133,9 +136,13 @@ describe("operation outcomes", () => {
   });
 
   it("describes food results", () => {
-    expect(foodOutcome({ status: "success", foodCheckedInAt: at }, "Sam").title).toBe("Food redeemed");
-    expect(foodOutcome({ status: "already_food_checked_in", foodCheckedInAt: at }, "Sam").title).toBe("Food already redeemed");
+    expect(foodOutcome({ status: "success", redeemedAt: at, meal }, "Sam")).toMatchObject({ title: "Food collected", detail: "Sam's food collection for Lunch is recorded." });
+    expect(foodOutcome({ status: "already_redeemed", redeemedAt: at, meal }, "Sam").title).toBe("Food Already Collected");
     expect(foodOutcome({ status: "rate_limited" }, "Sam")).toBe(scanFailureOutcome("rate_limited"));
+    for (const status of ["meal_not_active", "meal_not_started", "meal_ended", "participant_ineligible", "qr_not_found", "not_authorized"] as const) {
+      expect(foodOutcome({ status }, "Sam")).toBe(scanFailureOutcome(status));
+      expect(previewOutcome({ status })).toBe(scanFailureOutcome(status));
+    }
   });
 
   it("describes award results with the server's point value", () => {
