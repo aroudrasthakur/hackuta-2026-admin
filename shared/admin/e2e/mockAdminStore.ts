@@ -80,7 +80,10 @@ const decisionQueue = new Map<string, {
   decision: "accepted" | "rejected" | "waitlisted";
   status: "queued" | "held" | "sending" | "sent" | "failed";
   queuedAt: number;
+  errorMessage?: string;
 }>();
+export type DecisionQueueScenario = "mixed" | "sending" | "empty" | "loading" | "error" | "ready";
+let decisionQueueScenario: DecisionQueueScenario = "ready";
 let nextLogId = 100;
 
 function seedStaff(record: StaffRecord) {
@@ -112,6 +115,7 @@ function resetStore() {
   reviews.clear();
   logs.length = 0;
   decisionQueue.clear();
+  decisionQueueScenario = "ready";
   nextLogId = 100;
 
   seedStaff({
@@ -224,6 +228,22 @@ resetStore();
 
 export function resetE2eMockStore() {
   resetStore();
+}
+
+/** Deterministic browser fixtures; exposed only when VITE_E2E_MOCK is enabled. */
+export function configureE2eDecisionQueue(scenario: DecisionQueueScenario) {
+  decisionQueueScenario = scenario;
+  if (scenario === "mixed" || scenario === "sending" || scenario === "empty") {
+    decisionQueue.clear();
+    if (scenario !== "empty") {
+      const now = Date.now();
+      decisionQueue.set(E2E_APPLICATION_IDS.readyForDecision, { decision: "accepted", status: scenario === "sending" ? "sending" : "queued", queuedAt: now });
+      decisionQueue.set(E2E_APPLICATION_IDS.underReview, { decision: "rejected", status: "held", queuedAt: now - 1000 });
+      decisionQueue.set(E2E_APPLICATION_IDS.unreviewed, { decision: "waitlisted", status: "failed", queuedAt: now - 2000, errorMessage: "Email service unavailable. Retry this delivery." });
+      decisionQueue.set(E2E_APPLICATION_IDS.accepted, { decision: "accepted", status: "sent", queuedAt: now - 3000 });
+    }
+  }
+  bump();
 }
 
 function adminFromSessionToken(sessionToken: string) {
@@ -399,6 +419,8 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
     }
     case "admin/decisionEmailQueue:listDecisionEmailQueue": {
       requireReviewer(sessionToken);
+      if (decisionQueueScenario === "loading") return undefined;
+      if (decisionQueueScenario === "error") throw new Error("Mock decision queue unavailable");
       const rows = [...decisionQueue.entries()].map(([applicationId, row]) => {
         const application = applications.get(applicationId);
         const applicantName = [application?.firstName, application?.lastName].filter(Boolean).join(" ");
@@ -411,7 +433,7 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
           status: row.status,
           queuedAt: row.queuedAt,
           sentAt: row.status === "sent" ? row.queuedAt : null,
-          errorMessage: null,
+          errorMessage: row.status === "failed" ? row.errorMessage ?? "Delivery failed" : null,
         };
       });
       const counts = { queued: 0, held: 0, sending: 0, failed: 0, sent: 0 };

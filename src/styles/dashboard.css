@@ -166,6 +166,13 @@
   .admin-table tbody tr + tr { border-top: 1px solid var(--color-border); }
   .admin-table tbody tr:is(:hover, :focus-within) { background: #f7f9fa; }
   .admin-table-scroll { max-width: 100%; overflow-x: auto; border-radius: var(--radius-panel); }
+  .decision-email-table { min-width: 44rem; }
+  .decision-email-table th[scope="row"] { min-width: 13rem; max-width: 22rem; }
+  .admin-delivery-counts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+  .admin-delivery-counts > div { border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); padding: 0.875rem 1rem; }
+  .admin-delivery-counts dt { color: var(--color-muted); font-size: 0.8125rem; }
+  .admin-delivery-counts dd { color: var(--color-night); font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  @media (min-width: 640px) { .admin-delivery-counts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
   .admin-badge {
     display: inline-flex;
