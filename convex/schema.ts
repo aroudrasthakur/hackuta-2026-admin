@@ -116,7 +116,11 @@ export default defineSchema({
   admins: defineTable({
     email: v.string(),
     name: v.string(),
+<<<<<<< Updated upstream
     role: staffRole,
+=======
+    role: v.union(v.literal("reviewer"), v.literal("admin"), v.literal("volunteer")),
+>>>>>>> Stashed changes
     active: v.boolean(),
     /** When a participant is promoted to volunteer staff. */
     participantId: v.optional(v.id("participants")),

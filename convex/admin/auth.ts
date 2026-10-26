@@ -176,7 +176,7 @@ export const createAndProvisionAdmin = mutation({
     ...sessionTokenArgs,
     email: v.string(),
     name: v.string(),
-    role: v.union(v.literal("reviewer"), v.literal("admin")),
+    role: v.union(v.literal("reviewer"), v.literal("admin"), v.literal("volunteer")),
     password: v.string(),
   },
   handler: async (ctx, { sessionToken, email, name, role, password }) => {

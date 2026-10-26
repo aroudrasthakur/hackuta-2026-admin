@@ -151,7 +151,7 @@ export async function insertStaffSession(
 /** Reviewer or admin with a valid session and one submitted application + review row. */
 export async function createStaffAuthorizationFixture(
   t: ConvexTestInstance,
-  role: "reviewer" | "admin" = "reviewer",
+  role: "reviewer" | "admin" | "volunteer" = "reviewer",
 ) {
   const adminId = await t.run((ctx) =>
     ctx.db.insert("admins", {
