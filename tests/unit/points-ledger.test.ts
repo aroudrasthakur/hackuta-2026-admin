@@ -2,9 +2,9 @@ import type { GenericId } from "convex/values";
 import { describe, expect, it } from "vitest";
 import {
   adjustPoints,
-  assertEventPointsEditable,
   awardEventPoints,
   computeLedgerPoints,
+  eventHasAwards,
   requireEligibleParticipant,
 } from "../../convex/admin/pointsLedger";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
@@ -414,29 +414,18 @@ describe("ledger totals", () => {
   });
 });
 
-describe("event points lock", () => {
-  it("allows point changes until the first award, then locks them", async () => {
+describe("event awards lookup", () => {
+  it("reports awards only after the first one is recorded", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
     const participantId = await insertParticipant(t, adminId, "accepted", 0);
     const eventId = await insertEvent(t, { pointsAwarded: 10 });
-    const editable = (points: number) => t.run((ctx) => assertEventPointsEditable(ctx, eventId, points));
+    const hasAwards = () => t.run((ctx) => eventHasAwards(ctx, eventId));
 
-    await editable(20);
+    expect(await hasAwards()).toBe(false);
     await t.run((ctx) =>
       awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now: NOW }),
     );
-    await expectAdminErrorCode(editable(20), "EVENT_POINTS_LOCKED");
-    await editable(10);
-  });
-
-  it("rejects a missing event", async () => {
-    const t = createConvexTest();
-    const eventId = await insertEvent(t);
-    await t.run((ctx) => ctx.db.delete(eventId));
-    await expectAdminErrorCode(
-      t.run((ctx) => assertEventPointsEditable(ctx, eventId, 5)),
-      "EVENT_NOT_FOUND",
-    );
+    expect(await hasAwards()).toBe(true);
   });
 });

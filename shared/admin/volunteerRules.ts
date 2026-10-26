@@ -1,17 +1,13 @@
-import { adminError } from "./errors";
+import { adminError } from "./errors.ts";
 
 /** Longest stored admin point-adjustment note. */
 export const ADJUSTMENT_REASON_MAX_LENGTH = 200;
+export const EVENT_NAME_MAX_LENGTH = 120;
+export const EVENT_DESCRIPTION_MAX_LENGTH = 2_000;
+export const EVENT_POINTS_MAX = 100_000;
 
 const STAFF_CONFIG_KEYS = [
   "changedFields",
-  "canCheckIn",
-  "canFoodCheckIn",
-  "canRedeemShop",
-  "active",
-  "pointsAwarded",
-  "startsAt",
-  "endsAt",
   "eventIds",
   "addedEventIds",
   "removedEventIds",
@@ -21,8 +17,32 @@ const STAFF_CONFIG_KEYS = [
 
 type StaffConfigKey = (typeof STAFF_CONFIG_KEYS)[number];
 
-/** Keys allowed inside a `before` / `after` snapshot. All boolean. */
-const SNAPSHOT_KEYS = ["canCheckIn", "canFoodCheckIn", "canRedeemShop", "active"] as const;
+/** Keys allowed inside a `before` / `after` snapshot, with their value type. */
+const SNAPSHOT_KEYS: Record<string, "boolean" | "integer"> = {
+  canCheckIn: "boolean",
+  canFoodCheckIn: "boolean",
+  canRedeemShop: "boolean",
+  active: "boolean",
+  pointsAwarded: "integer",
+  startsAt: "integer",
+  endsAt: "integer",
+};
+
+export type EventStatus = "inactive" | "upcoming" | "active" | "ended";
+
+/**
+ * UI schedule label only. Not an authorization helper — do not use this to
+ * allow or deny awards.
+ *
+ * `"active"` here means "switched on and currently inside `startsAt`/`endsAt`".
+ * Award, preview, ledger, and staff-guard code check `event.active` only.
+ * `startsAt` / `endsAt` are reference metadata and do not gate scanning.
+ */
+export function eventStatus(event: { active: boolean; startsAt: number; endsAt: number }, now: number): EventStatus {
+  if (!event.active) return "inactive";
+  if (now < event.startsAt) return "upcoming";
+  return now < event.endsAt ? "active" : "ended";
+}
 
 const CHANGED_FIELD_NAMES = new Set([
   "name",
@@ -102,13 +122,24 @@ export function normalizeAdjustmentReason(reason: string): string {
   return trimmed;
 }
 
-/** Trims event fields and rejects an empty name, non-positive points, or a bad window. */
+/** Rejects anything but a whole number from 1 to `EVENT_POINTS_MAX`. */
+export function assertEventPoints(points: number): number {
+  if (!Number.isSafeInteger(points) || points <= 0 || points > EVENT_POINTS_MAX) {
+    throw adminError("INVALID_EVENT");
+  }
+  return points;
+}
+
+/**
+ * Trims event fields and rejects an empty or over-long name, an over-long
+ * description, out-of-range points, or a bad window.
+ */
 export function normalizeEventInput(input: EventScheduleInput): NormalizedEventInput {
   if (typeof input.name !== "string") {
     throw adminError("INVALID_EVENT");
   }
   const name = input.name.trim();
-  if (!name) {
+  if (!name || name.length > EVENT_NAME_MAX_LENGTH) {
     throw adminError("INVALID_EVENT");
   }
 
@@ -118,14 +149,15 @@ export function normalizeEventInput(input: EventScheduleInput): NormalizedEventI
       throw adminError("INVALID_EVENT");
     }
     const trimmed = input.description.trim();
+    if (trimmed.length > EVENT_DESCRIPTION_MAX_LENGTH) {
+      throw adminError("INVALID_EVENT");
+    }
     if (trimmed) {
       description = trimmed;
     }
   }
 
-  if (!Number.isSafeInteger(input.pointsAwarded) || input.pointsAwarded <= 0) {
-    throw adminError("INVALID_EVENT");
-  }
+  assertEventPoints(input.pointsAwarded);
   if (
     !Number.isSafeInteger(input.startsAt) ||
     !Number.isSafeInteger(input.endsAt) ||
@@ -166,18 +198,19 @@ function readChangedFields(value: unknown): string[] {
   });
 }
 
-function readSnapshot(value: unknown): Record<string, boolean> {
+function readSnapshot(value: unknown): Record<string, boolean | number> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     rejectDetails();
   }
   const input = value as Record<string, unknown>;
-  const snapshot: Record<string, boolean> = {};
+  const snapshot: Record<string, boolean | number> = {};
   for (const key of Object.keys(input)) {
-    const flag = input[key];
-    if (!(SNAPSHOT_KEYS as readonly string[]).includes(key) || typeof flag !== "boolean") {
+    const item = input[key];
+    const kind = Object.prototype.hasOwnProperty.call(SNAPSHOT_KEYS, key) ? SNAPSHOT_KEYS[key] : undefined;
+    if (kind === "boolean" ? typeof item !== "boolean" : kind !== "integer" || !Number.isSafeInteger(item)) {
       rejectDetails();
     }
-    snapshot[key] = flag;
+    snapshot[key] = item as boolean | number;
   }
   return snapshot;
 }
@@ -193,21 +226,6 @@ function readDetailValue(key: StaffConfigKey, value: unknown): unknown {
     case "before":
     case "after":
       return readSnapshot(value);
-    case "canCheckIn":
-    case "canFoodCheckIn":
-    case "canRedeemShop":
-    case "active":
-      if (typeof value !== "boolean") {
-        rejectDetails();
-      }
-      return value;
-    case "pointsAwarded":
-    case "startsAt":
-    case "endsAt":
-      if (typeof value !== "number" || !Number.isSafeInteger(value)) {
-        rejectDetails();
-      }
-      return value;
   }
 }
 

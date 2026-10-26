@@ -7,8 +7,11 @@ import { DecisionEmailQueuePage } from "./pages/admin/DecisionEmailQueuePage";
 import { AdminLoginPage } from "./pages/admin/AdminLoginPage";
 import { ADMIN_ROUTES } from "./types/routes";
 import { VolunteerDashboardPage } from "./pages/admin/VolunteerDashboardPage";
-import { StaffWorkflowPage } from "./pages/admin/StaffWorkflowPage";
+import { ParticipantsPage } from "./pages/admin/ParticipantsPage";
 import { VolunteerScanPage } from "./pages/admin/VolunteerScanPage";
+import { VolunteersPage } from "./pages/admin/VolunteersPage";
+import { VolunteerDetailPage } from "./pages/admin/VolunteerDetailPage";
+import { EventsPage } from "./pages/admin/EventsPage";
 import { ShopPage } from "./pages/admin/ShopPage";
 import { VolunteerShopPage } from "./pages/admin/VolunteerShopPage";
 
@@ -34,8 +37,10 @@ export default function App() {
         <Route path="scan/food" element={<VolunteerScanPage workflow="food" />} />
         <Route path="scan/points" element={<VolunteerScanPage workflow="points" />} />
         <Route path="scan/shop" element={<VolunteerShopPage />} />
-        <Route path="participants" element={<StaffWorkflowPage workflow="participants" />} />
-        <Route path="volunteers" element={<StaffWorkflowPage workflow="volunteers" />} />
+        <Route path="participants" element={<ParticipantsPage />} />
+        <Route path="volunteers" element={<VolunteersPage />} />
+        <Route path="volunteers/:volunteerAdminId" element={<VolunteerDetailPage />} />
+        <Route path="events" element={<EventsPage />} />
         <Route path="shop" element={<ShopPage />} />
       </Route>
       <Route path="*" element={<AdminProtectedRoute />} />

@@ -1,34 +1,36 @@
 /* Dashboard patterns extend the HackUTA palette without affecting sign-in. */
 @layer components {
   .admin-topbar {
-    position: relative;
-    z-index: 40;
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-surface);
+    position: fixed;
+    z-index: 50;
+    top: 4.25rem;
+    left: 1rem;
+    right: 1rem;
+    border-radius: 1.35rem;
+    border: 1.5px solid rgb(48 88 115 / 0.22);
+    background: rgb(246 237 223 / 0.92);
+    box-shadow: 0 8px 24px rgb(16 47 70 / 0.12);
+    backdrop-filter: blur(8px);
   }
   .admin-topbar__inner {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 1rem;
-    max-width: 72rem;
-    margin: auto;
-    padding: 0.875rem 1rem;
+    gap: 0.5rem 0.75rem;
+    padding: 0.45rem 0.65rem;
   }
-  .admin-topbar__brand { min-width: 0; }
-  .admin-topbar__logo { display: block; width: auto; height: 1.75rem; max-width: 100%; }
-  .admin-topbar .weather-mood-toggle {
-    position: static;
-    grid-row: 2;
-    justify-self: start;
-    width: max-content;
-    box-shadow: none;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface-muted);
+  .admin-topbar__brand { min-width: 0; flex: 1 1 auto; }
+  .admin-topbar__logo { display: block; width: auto; height: 1.5rem; max-width: 100%; }
+  .admin-topbar--compact {
+    top: 3.75rem;
+    width: auto;
   }
+  .admin-topbar__inner--compact {
+    justify-content: space-between;
+    padding: 0.35rem 0.75rem 0.35rem 1rem;
+  }
+  .admin-topbar--compact .admin-topbar__brand { padding-left: 0.35rem; }
   .admin-topbar__account {
-    grid-column: 2;
-    grid-row: 1;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -96,16 +98,38 @@
   .admin-section-link:hover { background: var(--color-surface-muted); border-color: var(--color-border); }
   .admin-section-link[aria-current="page"] { background: var(--color-night); color: white; border-color: var(--color-night); }
   @media (min-width: 640px) {
-    .admin-topbar__inner { grid-template-columns: auto 1fr auto; gap: 1.5rem; }
-    .admin-topbar .weather-mood-toggle { grid-row: 1; grid-column: 2; }
-    .admin-topbar__account { grid-column: 3; }
+    .admin-topbar {
+      top: 1rem;
+      left: 11.25rem;
+      right: 1rem;
+      border-radius: 999px;
+    }
+    .admin-topbar--compact {
+      top: 1rem;
+      left: 30%;
+      right: 30%;
+      width: auto;
+      transform: none;
+      border-radius: 999px;
+    }
+    .admin-topbar__inner--compact {
+      display: flex;
+      min-height: 2.65rem;
+      align-items: center;
+      padding: 0.3rem 1rem 0.3rem 1.35rem;
+    }
+    .admin-topbar--compact .admin-topbar__brand { padding-left: 0.5rem; }
+    .admin-topbar--compact .admin-topbar__account {
+      position: static;
+      transform: none;
+      margin-left: auto;
+    }
     .admin-section-list > li { flex: 0 1 auto; }
     .admin-section-link { padding-inline: 1.25rem; }
   }
 
   .admin-workspace {
     --color-mist: var(--color-muted);
-    background: rgb(246 237 223 / 0.95);
     font-size: 1rem;
     line-height: 1.5;
   }

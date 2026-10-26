@@ -34,13 +34,16 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "decisionEmailQueue.ts", exportName: "retryFailedDecisionEmails", guard: "requireAdminRole" },
   { file: "auth.ts", exportName: "createAndProvisionAdmin", guard: "requireAdminRole" },
   ...[
-    "createVolunteer", "listVolunteers", "resetVolunteerPassword",
+    "createVolunteer", "listVolunteers", "getVolunteer", "resetVolunteerPassword",
     "setVolunteerCapabilities", "setVolunteerEventAccess", "listVolunteerActionLogs", "listStaffConfigLogs",
   ].map((exportName) => ({ file: "volunteers.ts", exportName, guard: "requireAdminRole" })),
   ...[
     "listParticipants", "getParticipantDetails", "setParticipantPoints",
     "listPointAdjustments", "promoteParticipantToVolunteer",
   ].map((exportName) => ({ file: "participantsAdmin.ts", exportName, guard: "requireAdminRole" })),
+  ...["listEvents", "getEvent", "createEvent", "updateEvent", "setEventPoints", "setEventActive"].map((exportName) => ({
+    file: "events.ts", exportName, guard: "requireAdminRole",
+  })),
   ...["revokeVolunteer", "restoreVolunteer"].map((exportName) => ({
     file: "volunteers.ts", exportName, guard: "volunteerActiveMutation",
   })),
@@ -110,6 +113,7 @@ describe("volunteer authorization contract (public entry points)", () => {
       "applications.ts",
       "applicationReviewLogs.ts",
       "auth.ts",
+      "events.ts",
       "volunteers.ts",
       "volunteerScan.ts",
       "participantsAdmin.ts",

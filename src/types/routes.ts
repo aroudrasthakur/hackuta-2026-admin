@@ -8,11 +8,14 @@ export const ADMIN_ROUTES = {
   scanShop: "/admin/scan/shop",
   participants: "/admin/participants",
   volunteers: "/admin/volunteers",
+  events: "/admin/events",
   applications: "/admin/applications",
   decisionEmails: "/admin/decision-emails",
   shop: "/admin/shop",
   applicationReview: (applicationId: string) =>
     `/admin/applications/${applicationId}`,
+  volunteerDetail: (volunteerAdminId: string) =>
+    `/admin/volunteers/${volunteerAdminId}`,
 } as const;
 
-export type AdminRoutePath = (typeof ADMIN_ROUTES)[keyof Omit<typeof ADMIN_ROUTES, "applicationReview">];
+export type AdminRoutePath = (typeof ADMIN_ROUTES)[keyof Omit<typeof ADMIN_ROUTES, "applicationReview" | "volunteerDetail">];

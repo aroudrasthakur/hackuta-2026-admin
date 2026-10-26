@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { AdminAccountControls } from "../components/AdminAccountControls";
 import { HackUtaLogo } from "../components/HackUtaLogo";
@@ -8,8 +8,6 @@ import { useAdminAuth } from "../hooks/useAdminAuth";
 import { useVolunteerAccess } from "../hooks/useVolunteerAccess";
 import { canAccessStaffRoute } from "../lib/staffRouteAccess";
 import { SectionIcon, type SectionIconName } from "../components/SectionIcon";
-import { WeatherMoodToggle } from "../components/WeatherMoodToggle";
-
 function AdminSectionLink({
   to,
   active,
@@ -47,6 +45,7 @@ export function AdminLayout() {
     { to: ADMIN_ROUTES.decisionEmails, label: "Decision emails", icon: "emails" as const },
     { to: ADMIN_ROUTES.participants, label: "Participants", icon: "participants" as const },
     { to: ADMIN_ROUTES.volunteers, label: "Volunteers", icon: "volunteers" as const },
+    { to: ADMIN_ROUTES.events, label: "Events", icon: "events" as const },
     { to: ADMIN_ROUTES.shop, label: "Shop", icon: "shop" as const },
   ];
   const permittedTabs = tabs.filter(({ to }) => staff && canAccessStaffRoute(to, staff, options) === true);
@@ -66,12 +65,36 @@ export function AdminLayout() {
     });
   }, [grants]);
   const accessNotice = (state as { accessNotice?: unknown } | null)?.accessNotice;
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerOffset, setHeaderOffset] = useState(0);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const syncOffset = () => {
+      const rect = header.getBoundingClientRect();
+      setHeaderOffset(rect.bottom + 12);
+    };
+    syncOffset();
+
+    let observer: ResizeObserver | undefined;
+    if (typeof window.ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(syncOffset);
+      observer.observe(header);
+    }
+    addEventListener("resize", syncOffset);
+    return () => {
+      observer?.disconnect();
+      removeEventListener("resize", syncOffset);
+    };
+  }, []);
 
   return (
-    <StormPageFrame embeddedWeather>
+    <StormPageFrame>
       <div className="admin-workspace min-h-screen">
-        <header className="admin-topbar">
-          <div className="admin-topbar__inner">
+        <header ref={headerRef} className="admin-topbar admin-topbar--compact">
+          <div className="admin-topbar__inner admin-topbar__inner--compact">
             <div className="admin-topbar__brand">
               <HackUtaLogo className="admin-topbar__logo" />
               {import.meta.env.DEV &&
@@ -81,14 +104,14 @@ export function AdminLayout() {
                 </p>
               ) : null}
             </div>
-            <WeatherMoodToggle />
             <AdminAccountControls />
           </div>
         </header>
+        <div style={{ height: headerOffset }} aria-hidden="true" />
         <nav aria-label={staff?.role === "volunteer" ? "Volunteer" : "Admin"} className="admin-section-nav mx-auto max-w-6xl px-4 pt-5">
           <ul className="admin-section-list">
             {permittedTabs.map(({ to, label, icon }) => (
-              <li key={to}><AdminSectionLink to={to} icon={icon} active={pathname === to || (to === ADMIN_ROUTES.applications && pathname.startsWith(`${to}/`))}>
+              <li key={to}><AdminSectionLink to={to} icon={icon} active={pathname === to || ((to === ADMIN_ROUTES.applications || to === ADMIN_ROUTES.volunteers) && pathname.startsWith(`${to}/`))}>
                 {label}
               </AdminSectionLink></li>
             ))}
