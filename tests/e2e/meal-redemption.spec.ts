@@ -34,6 +34,7 @@ test("collects once per meal, preserves legacy eligibility, and automatically mo
   await expect(page.getByRole("heading", { name: "Morgan Present" })).toBeVisible();
   await page.getByRole("button", { name: "Confirm food given" }).click();
   await expect(page.getByRole("status")).toContainText("Food collected");
+  await page.getByRole("button", { name: "Scan next" }).click();
   await page.clock.fastForward(60_000);
   await expect(page.getByText("Dinner", { exact: true })).toBeVisible();
   await scan(page); await page.getByRole("button", { name: "Confirm food given" }).click();

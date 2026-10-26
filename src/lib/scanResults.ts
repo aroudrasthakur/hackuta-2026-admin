@@ -83,7 +83,7 @@ const OUTCOMES = {
   },
   meal_ended: {
     tone: "error", title: "Meal has ended",
-    detail: "This meal's serving window has ended. No food collection was recorded. Choose an available meal.",
+    detail: "This meal's serving window has ended. No new collection can be recorded. Choose an available meal.",
   },
   qr_not_found: {
     tone: "error",

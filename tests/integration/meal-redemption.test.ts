@@ -38,6 +38,20 @@ async function scene() {
 }
 
 describe("meal redemption", () => {
+  it.each([true, false])("cannot orphan a redemption when removal races collection (redeem first: %s)", async (redeemFirst) => {
+    const s = await scene();
+    const remove = () => s.t.mutation(removeMealPeriodRef, { sessionToken: s.admin.sessionToken, mealPeriodId: s.mealPeriodId });
+    await Promise.allSettled(redeemFirst ? [s.redeem(), remove()] : [remove(), s.redeem()]);
+    const state = await s.data();
+    if (state.redemptions.length > 0) {
+      expect(state.redemptions).toHaveLength(1); expect(state.logs).toHaveLength(1);
+      expect(state.meals.some((meal) => meal._id === s.mealPeriodId)).toBe(true);
+    } else {
+      expect(state.logs).toEqual([]);
+      expect(state.meals.some((meal) => meal._id === s.mealPeriodId)).toBe(false);
+    }
+  });
+
   it("previews only authorized display fields without recording collection", async () => {
     const s = await scene(); const before = await s.data();
     expect(await s.preview()).toEqual({

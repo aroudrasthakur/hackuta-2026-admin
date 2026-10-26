@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Developers | Repo layout, deploy ownership, register lock, flows |
 | [OPERATIONS.md](OPERATIONS.md) | Operators | Deploy checklist, env vars, Convex push workflow |
+| [MEALS_AUDIT.md](MEALS_AUDIT.md) | Developers | Issue #83 audit findings, fixes, dependency findings, and validation limits |
 
 ## Directory READMEs
 

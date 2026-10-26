@@ -28,7 +28,9 @@ Schedule overlap checks and removal protection run in backend transactions.
 
 Food scanning selects a currently available meal (automatically when only one is
 available). Availability reacts to admin edits and serving-window boundaries.
-Changing or disabling the selected meal clears the participant and dietary card.
+Changing or disabling the selected meal clears an unsubmitted preview and dietary
+card. Once distribution is confirmed, its request and result stay visible until
+the volunteer continues, even if the meal ends while the request is in flight.
 Confirmation calls `redeemMeal`, which rechecks all permissions and eligibility;
 duplicates show **Food Already Collected** with the meal and original collection
 time. Rate-limit and connection errors keep the confirmation available for retry.
