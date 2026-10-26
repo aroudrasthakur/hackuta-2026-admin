@@ -67,7 +67,7 @@ export function ApplicationReviewContent({
     return () => { active = false; };
   }, [loadedId, sessionToken, recordView]);
 
-  if (detail === undefined) return <LoadingState message="Loading application…" />;
+  if (detail === undefined) return <LoadingState layout="rows" message="Loading application…" />;
   if (detail === null) {
     return <EmptyState title="Application not found" description="This link does not identify a submitted application." />;
   }

@@ -8,6 +8,7 @@ import { AdminLoginPage } from "./pages/admin/AdminLoginPage";
 import { ADMIN_ROUTES } from "./types/routes";
 import { VolunteerDashboardPage } from "./pages/admin/VolunteerDashboardPage";
 import { StaffWorkflowPage } from "./pages/admin/StaffWorkflowPage";
+import { ParticipantsPage } from "./pages/admin/ParticipantsPage";
 import { VolunteerScanPage } from "./pages/admin/VolunteerScanPage";
 
 export default function App() {
@@ -31,7 +32,8 @@ export default function App() {
         <Route path="scan/check-in" element={<VolunteerScanPage workflow="check-in" />} />
         <Route path="scan/food" element={<VolunteerScanPage workflow="food" />} />
         <Route path="scan/points" element={<VolunteerScanPage workflow="points" />} />
-        <Route path="participants" element={<StaffWorkflowPage workflow="participants" />} />
+        <Route path="participants" element={<ParticipantsPage />} />
+
         <Route path="volunteers" element={<StaffWorkflowPage workflow="volunteers" />} />
       </Route>
       <Route path="*" element={<AdminProtectedRoute />} />

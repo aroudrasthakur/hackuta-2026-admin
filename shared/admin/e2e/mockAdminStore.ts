@@ -20,8 +20,28 @@ type StaffRecord = {
   email: string;
   name: string;
   role: StaffRole;
+  active?: boolean;
+  participantId?: string;
   canCheckIn?: boolean;
   canFoodCheckIn?: boolean;
+};
+
+type ParticipantRecord = {
+  participantId: string;
+  applicationId: string;
+  name: string;
+  email: string;
+  points: number;
+  checkedInAt: number | null;
+  foodCheckedInAt: number | null;
+  volunteerAdminId?: string;
+  awards: Array<{
+    eventId: string;
+    eventName: string;
+    pointsAwarded: number;
+    awardedAt: number;
+    awardedBy: { adminId: string; name: string };
+  }>;
 };
 
 type ApplicationRecord = {
@@ -61,7 +81,7 @@ type SessionRecord = {
   expiresAt: number;
 };
 
-type ParticipantRecord = {
+type ScanParticipantRecord = {
   name: string;
   eligible: boolean;
   foodRestriction?: string;
@@ -101,14 +121,18 @@ const staffByEmail = new Map<string, StaffRecord>();
 const sessions = new Map<string, SessionRecord>();
 const applications = new Map<string, ApplicationRecord>();
 const reviews = new Map<string, ReviewRecord>();
+const participants = new Map<string, ParticipantRecord>();
 const logs: LogRecord[] = [];
 const decisionQueue = new Map<string, {
   decision: "accepted" | "rejected" | "waitlisted";
   status: "queued" | "held" | "sending" | "sent" | "failed";
   queuedAt: number;
+  errorMessage?: string;
 }>();
+export type DecisionQueueScenario = "mixed" | "sending" | "empty" | "loading" | "error" | "ready" | "long-content";
+let decisionQueueScenario: DecisionQueueScenario = "ready";
 let nextLogId = 100;
-const participantsByToken = new Map<string, ParticipantRecord>();
+const participantsByToken = new Map<string, ScanParticipantRecord>();
 const events = new Map<string, EventRecord>();
 const eventAssignments = new Map<string, string[]>();
 
@@ -139,8 +163,10 @@ function resetStore() {
   sessions.clear();
   applications.clear();
   reviews.clear();
+  participants.clear();
   logs.length = 0;
   decisionQueue.clear();
+  decisionQueueScenario = "ready";
   nextLogId = 100;
   participantsByToken.clear();
   events.clear();
@@ -278,6 +304,16 @@ function resetStore() {
     action: "accepted",
     createdAt: now - 2_000,
   });
+  participants.set("e2e-participant-accepted", {
+    participantId: "e2e-participant-accepted",
+    applicationId: E2E_APPLICATION_IDS.accepted,
+    name: "Alex Accepted",
+    email: "alex.accepted@example.com",
+    points: 20,
+    checkedInAt: null,
+    foodCheckedInAt: null,
+    awards: [],
+  });
 
   bump();
 }
@@ -286,6 +322,30 @@ resetStore();
 
 export function resetE2eMockStore() {
   resetStore();
+}
+
+/** Deterministic browser fixtures; exposed only when VITE_E2E_MOCK is enabled. */
+export function configureE2eDecisionQueue(scenario: DecisionQueueScenario) {
+  decisionQueueScenario = scenario;
+  if (scenario === "long-content") {
+    for (const staff of staffById.values()) staff.name = "Alexandria Montgomery-Wellington, HackUTA Operations";
+    for (const application of applications.values()) {
+      application.lastName = "Montgomery-Wellington-With-A-Very-Long-Family-Name";
+      application.email = `${"longemail".repeat(8)}@example.com`;
+      application.school = "The International University of Engineering, Technology, and Applied Sciences";
+    }
+  }
+  if (scenario === "mixed" || scenario === "sending" || scenario === "empty") {
+    decisionQueue.clear();
+    if (scenario !== "empty") {
+      const now = Date.now();
+      decisionQueue.set(E2E_APPLICATION_IDS.readyForDecision, { decision: "accepted", status: scenario === "sending" ? "sending" : "queued", queuedAt: now });
+      decisionQueue.set(E2E_APPLICATION_IDS.underReview, { decision: "rejected", status: "held", queuedAt: now - 1000 });
+      decisionQueue.set(E2E_APPLICATION_IDS.unreviewed, { decision: "waitlisted", status: "failed", queuedAt: now - 2000, errorMessage: "Email service unavailable. Retry this delivery." });
+      decisionQueue.set(E2E_APPLICATION_IDS.accepted, { decision: "accepted", status: "sent", queuedAt: now - 3000 });
+    }
+  }
+  bump();
 }
 
 function adminFromSessionToken(sessionToken: string) {
@@ -470,6 +530,71 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
         })
         .sort((left, right) => (right.submittedAt ?? 0) - (left.submittedAt ?? 0));
     }
+    case "admin/participantsAdmin:listParticipants": {
+      requireAdmin(sessionToken);
+      const search = String(args.search ?? "").trim().toLowerCase();
+      const checkedIn = typeof args.checkedIn === "boolean" ? args.checkedIn : undefined;
+      const foodRedeemed = typeof args.foodRedeemed === "boolean" ? args.foodRedeemed : undefined;
+      const volunteerStatus = String(args.volunteerStatus ?? "");
+      const paginationOpts = args.paginationOpts as { numItems: number; cursor: string | null };
+      const filtered = [...participants.values()].filter((participant) => {
+        const volunteer = participant.volunteerAdminId ? staffById.get(participant.volunteerAdminId) : undefined;
+        if (search && !participant.name.toLowerCase().includes(search) && !participant.email.toLowerCase().includes(search)) return false;
+        if (checkedIn !== undefined && (participant.checkedInAt !== null) !== checkedIn) return false;
+        if (foodRedeemed !== undefined && (participant.foodCheckedInAt !== null) !== foodRedeemed) return false;
+        if (volunteerStatus === "none" && volunteer) return false;
+        if (volunteerStatus === "linked" && !volunteer) return false;
+        if (volunteerStatus === "active" && (!volunteer || volunteer.active === false)) return false;
+        if (volunteerStatus === "inactive" && (!volunteer || volunteer.active !== false)) return false;
+        return true;
+      });
+      const start = Number(paginationOpts.cursor ?? 0);
+      const end = start + paginationOpts.numItems;
+      const page = filtered.slice(start, end).map((participant) => {
+        const volunteer = participant.volunteerAdminId ? staffById.get(participant.volunteerAdminId) : undefined;
+        return {
+          participantId: participant.participantId,
+          name: participant.name,
+          email: participant.email,
+          points: participant.points,
+          checkedInAt: participant.checkedInAt,
+          foodCheckedInAt: participant.foodCheckedInAt,
+          volunteer: volunteer ? { adminId: volunteer.adminId, active: volunteer.active !== false } : null,
+        };
+      });
+      return {
+        page,
+        continueCursor: end >= filtered.length ? null : String(end),
+        isDone: end >= filtered.length,
+        scanned: page.length,
+      };
+    }
+    case "admin/participantsAdmin:getParticipantDetails": {
+      requireAdmin(sessionToken);
+      const participant = participants.get(String(args.participantId ?? ""));
+      if (!participant) return null;
+      const volunteer = participant.volunteerAdminId ? staffById.get(participant.volunteerAdminId) : undefined;
+      return {
+        participantId: participant.participantId,
+        name: participant.name,
+        email: participant.email,
+        points: participant.points,
+        acceptedAt: reviews.get(participant.applicationId)?.updatedAt ?? Date.now(),
+        ledgerPoints: participant.points,
+        pointsConsistent: true,
+        checkedInAt: participant.checkedInAt,
+        foodCheckedInAt: participant.foodCheckedInAt,
+        awards: participant.awards,
+        volunteer: volunteer ? {
+          adminId: volunteer.adminId,
+          name: volunteer.name,
+          email: volunteer.email,
+          active: volunteer.active !== false,
+          canCheckIn: volunteer.canCheckIn === true,
+          canFoodCheckIn: volunteer.canFoodCheckIn === true,
+        } : null,
+      };
+    }
     case "admin/applications:getApplication": {
       requireReviewer(sessionToken);
       const applicationId = String(args.applicationId ?? "");
@@ -495,6 +620,8 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
     }
     case "admin/decisionEmailQueue:listDecisionEmailQueue": {
       requireReviewer(sessionToken);
+      if (decisionQueueScenario === "loading") return undefined;
+      if (decisionQueueScenario === "error") throw new Error("Mock decision queue unavailable");
       const rows = [...decisionQueue.entries()].map(([applicationId, row]) => {
         const application = applications.get(applicationId);
         const applicantName = [application?.firstName, application?.lastName].filter(Boolean).join(" ");
@@ -507,7 +634,7 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
           status: row.status,
           queuedAt: row.queuedAt,
           sentAt: row.status === "sent" ? row.queuedAt : null,
-          errorMessage: null,
+          errorMessage: row.status === "failed" ? row.errorMessage ?? "Delivery failed" : null,
         };
       });
       const counts = { queued: 0, held: 0, sending: 0, failed: 0, sent: 0 };
@@ -714,6 +841,55 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       }
       bump();
       return { retried };
+    }
+    case "admin/participantsAdmin:setParticipantPoints": {
+      requireAdmin(sessionToken);
+      const participant = participants.get(String(args.participantId ?? ""));
+      if (!participant) throw adminError("PARTICIPANT_NOT_FOUND");
+      const nextPoints = Number(args.points);
+      if (!Number.isSafeInteger(nextPoints) || nextPoints < 0) throw adminError("INVALID_POINTS");
+      const previousPoints = participant.points;
+      participant.points = nextPoints;
+      bump();
+      return {
+        ok: true,
+        changed: previousPoints !== nextPoints,
+        previousPoints,
+        newPoints: nextPoints,
+        pointsDelta: nextPoints - previousPoints,
+      };
+    }
+    case "admin/participantsAdmin:promoteParticipantToVolunteer": {
+      requireAdmin(sessionToken);
+      const participant = participants.get(String(args.participantId ?? ""));
+      if (!participant) throw adminError("PARTICIPANT_NOT_FOUND");
+      const email = String(args.email ?? "").trim().toLowerCase();
+      if (participant.volunteerAdminId || staffByEmail.has(email)) throw adminError("STAFF_ACCOUNT_EXISTS");
+      const adminId = `e2e-volunteer-${staffById.size}`;
+      const volunteer: StaffRecord = {
+        adminId,
+        email,
+        name: participant.name,
+        role: "volunteer",
+        active: true,
+        participantId: participant.participantId,
+        canCheckIn: args.canCheckIn === true,
+        canFoodCheckIn: args.canFoodCheckIn === true,
+      };
+      staffById.set(adminId, volunteer);
+      staffByEmail.set(email, volunteer);
+      participant.volunteerAdminId = adminId;
+      bump();
+      return { ok: true, adminId, email };
+    }
+    case "admin/volunteers:revokeVolunteer":
+    case "admin/volunteers:restoreVolunteer": {
+      requireAdmin(sessionToken);
+      const volunteer = staffById.get(String(args.volunteerAdminId ?? ""));
+      if (!volunteer || volunteer.role !== "volunteer") throw adminError("VOLUNTEER_NOT_FOUND");
+      volunteer.active = path.endsWith("restoreVolunteer");
+      bump();
+      return { ok: true };
     }
     case "admin/decisionEmailRelease:releaseDecisionEmails": {
       requireAdmin(sessionToken);

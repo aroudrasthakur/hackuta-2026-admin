@@ -157,6 +157,33 @@ describe("DecisionEmailQueuePage", () => {
     mocks.query.mockReturnValue(undefined);
     await renderPage("admin");
     expect(container.textContent).toContain("Loading decision emails");
+    expect(container.querySelector("h1")?.textContent).toBe("Decision emails");
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1);
+  });
+
+  it("contains query failures and retries without losing the heading", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.query.mockImplementation(() => { throw new Error("network details"); });
+    await renderPage("admin");
+    expect(container.querySelector("h1")?.textContent).toBe("Decision emails");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to load decision emails");
+    expect(container.textContent).not.toContain("network details");
+    mocks.query.mockReturnValue(sampleQueue());
+    await act(async () => button("Try again")!.click());
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.textContent).toContain("Taylor Student");
+    expect(mocks.releaseAction).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it("gives the table a caption, scoped headers, and readable delivery labels", async () => {
+    await renderPage("admin");
+    expect(container.querySelector("caption")?.textContent).toBe("Decision email queue");
+    expect(container.querySelectorAll('thead th[scope="col"]')).toHaveLength(6);
+    expect(container.querySelectorAll('tbody th[scope="row"]')).toHaveLength(3);
+    for (const status of ["queued", "held", "failed"]) {
+      expect(container.querySelector(`[aria-label="Delivery: ${status}"]`)?.textContent?.toLowerCase()).toBe(status);
+    }
   });
 
   it("renders queue rows and recently sent for an admin", async () => {

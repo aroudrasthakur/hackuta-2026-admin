@@ -19,7 +19,7 @@ async function signInScanVolunteer(page: Page) {
 
 /** In-app navigation keeps the in-memory mock store; `page.goto` would reset it. */
 async function openTab(page: Page, name: "Check-in" | "Food" | "Points") {
-  await page.getByRole("navigation", { name: "Volunteer" }).getByRole("tab", { name, exact: true }).click();
+  await page.getByRole("navigation", { name: "Volunteer" }).getByRole("link", { name, exact: true }).click();
 }
 
 async function lookUp(page: Page, token: string) {

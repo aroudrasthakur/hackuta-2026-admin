@@ -31,6 +31,15 @@ import type {
   setEventPoints,
   updateEvent,
 } from "../../convex/admin/events";
+  getParticipantDetails,
+  listParticipants,
+  promoteParticipantToVolunteer,
+  setParticipantPoints,
+} from "../../convex/admin/participantsAdmin";
+import type {
+  restoreVolunteer,
+  revokeVolunteer,
+} from "../../convex/admin/volunteers";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -240,3 +249,57 @@ export const setEventPointsRef = adminModuleRef<
   FunctionArgs<EventAdmin["setEventPoints"]>,
   FunctionReturnType<EventAdmin["setEventPoints"]>
 >("admin/events:setEventPoints");
+type ParticipantsAdmin = ApiFromModules<{
+  participants: {
+    getParticipantDetails: typeof getParticipantDetails;
+    listParticipants: typeof listParticipants;
+    promoteParticipantToVolunteer: typeof promoteParticipantToVolunteer;
+    setParticipantPoints: typeof setParticipantPoints;
+  };
+}>["participants"];
+
+export type ParticipantRow = FunctionReturnType<ParticipantsAdmin["listParticipants"]>["page"][number];
+export type ParticipantDetails = NonNullable<FunctionReturnType<ParticipantsAdmin["getParticipantDetails"]>>;
+
+export const listParticipantsRef = adminModuleRef<
+  "query",
+  FunctionArgs<ParticipantsAdmin["listParticipants"]>,
+  FunctionReturnType<ParticipantsAdmin["listParticipants"]>
+>("admin/participantsAdmin:listParticipants");
+
+export const getParticipantDetailsRef = adminModuleRef<
+  "query",
+  FunctionArgs<ParticipantsAdmin["getParticipantDetails"]>,
+  FunctionReturnType<ParticipantsAdmin["getParticipantDetails"]>
+>("admin/participantsAdmin:getParticipantDetails");
+
+export const setParticipantPointsRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<ParticipantsAdmin["setParticipantPoints"]>,
+  FunctionReturnType<ParticipantsAdmin["setParticipantPoints"]>
+>("admin/participantsAdmin:setParticipantPoints");
+
+export const promoteParticipantToVolunteerRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<ParticipantsAdmin["promoteParticipantToVolunteer"]>,
+  FunctionReturnType<ParticipantsAdmin["promoteParticipantToVolunteer"]>
+>("admin/participantsAdmin:promoteParticipantToVolunteer");
+
+type VolunteerManagement = ApiFromModules<{
+  volunteers: {
+    revokeVolunteer: typeof revokeVolunteer;
+    restoreVolunteer: typeof restoreVolunteer;
+  };
+}>["volunteers"];
+
+export const revokeVolunteerRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["revokeVolunteer"]>,
+  FunctionReturnType<VolunteerManagement["revokeVolunteer"]>
+>("admin/volunteers:revokeVolunteer");
+
+export const restoreVolunteerRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["restoreVolunteer"]>,
+  FunctionReturnType<VolunteerManagement["restoreVolunteer"]>
+>("admin/volunteers:restoreVolunteer");

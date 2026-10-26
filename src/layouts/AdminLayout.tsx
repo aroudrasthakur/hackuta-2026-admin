@@ -7,24 +7,25 @@ import { ADMIN_ROUTES } from "../types/routes";
 import { useAdminAuth } from "../hooks/useAdminAuth";
 import { useVolunteerAccess } from "../hooks/useVolunteerAccess";
 import { canAccessStaffRoute } from "../lib/staffRouteAccess";
-
-function AdminTab({
+import { SectionIcon, type SectionIconName } from "../components/SectionIcon";
+function AdminSectionLink({
   to,
   active,
   children,
+  icon,
 }: {
   to: string;
   active: boolean;
   children: string;
+  icon: SectionIconName;
 }) {
   return (
     <Link
       to={to}
-      role="tab"
-      aria-selected={active}
-      className={`admin-nav-tab${active ? " admin-nav-tab--active" : ""}`}
+      aria-current={active ? "page" : undefined}
+      className="admin-section-link"
     >
-      {children}
+      <SectionIcon name={icon} /><span>{children}</span>
     </Link>
   );
 }
@@ -34,15 +35,15 @@ export function AdminLayout() {
   const { staff } = useAdminAuth();
   const options = useVolunteerAccess();
   const tabs = staff?.role === "volunteer" ? [
-    { to: ADMIN_ROUTES.scan, label: "Dashboard" },
-    { to: ADMIN_ROUTES.scanCheckIn, label: "Check-in" },
-    { to: ADMIN_ROUTES.scanFood, label: "Food" },
-    { to: ADMIN_ROUTES.scanPoints, label: "Points" },
+    { to: ADMIN_ROUTES.scan, label: "Dashboard", icon: "dashboard" as const },
+    { to: ADMIN_ROUTES.scanCheckIn, label: "Check-in", icon: "checkIn" as const },
+    { to: ADMIN_ROUTES.scanFood, label: "Food", icon: "food" as const },
+    { to: ADMIN_ROUTES.scanPoints, label: "Points", icon: "points" as const },
   ] : [
-    { to: ADMIN_ROUTES.applications, label: "Applications" },
-    { to: ADMIN_ROUTES.decisionEmails, label: "Decision emails" },
-    { to: ADMIN_ROUTES.participants, label: "Participants" },
-    { to: ADMIN_ROUTES.volunteers, label: "Volunteers" },
+    { to: ADMIN_ROUTES.applications, label: "Applications", icon: "applications" as const },
+    { to: ADMIN_ROUTES.decisionEmails, label: "Decision emails", icon: "emails" as const },
+    { to: ADMIN_ROUTES.participants, label: "Participants", icon: "participants" as const },
+    { to: ADMIN_ROUTES.volunteers, label: "Volunteers", icon: "volunteers" as const },
   ];
   const permittedTabs = tabs.filter(({ to }) => staff && canAccessStaffRoute(to, staff, options) === true);
   const grants = staff?.role === "volunteer"
@@ -100,23 +101,22 @@ export function AdminLayout() {
                 </p>
               ) : null}
             </div>
-
             <AdminAccountControls />
           </div>
         </header>
         <div style={{ height: headerOffset }} aria-hidden="true" />
-        <nav aria-label={staff?.role === "volunteer" ? "Volunteer" : "Admin"} className="mx-auto max-w-6xl px-4 pt-6">
-          <div role="tablist" aria-label="Staff sections" className="admin-nav-tabs">
-            {permittedTabs.map(({ to, label }) => (
-              <AdminTab key={to} to={to} active={pathname === to || (to === ADMIN_ROUTES.applications && pathname.startsWith(`${to}/`))}>
+        <nav aria-label={staff?.role === "volunteer" ? "Volunteer" : "Admin"} className="admin-section-nav mx-auto max-w-6xl px-4 pt-5">
+          <ul className="admin-section-list">
+            {permittedTabs.map(({ to, label, icon }) => (
+              <li key={to}><AdminSectionLink to={to} icon={icon} active={pathname === to || (to === ADMIN_ROUTES.applications && pathname.startsWith(`${to}/`))}>
                 {label}
-              </AdminTab>
+              </AdminSectionLink></li>
             ))}
-          </div>
+          </ul>
         </nav>
-        <main id="admin-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-8">
-          {typeof accessNotice === "string" ? <p role="alert" className="admin-card mb-6 p-4">{accessNotice}</p> : null}
-          {access.revoked ? <p role="status" className="admin-card mb-6 p-4">Some of your scan access was removed. Your available actions and events are up to date. Contact an administrator if you need help.</p> : null}
+        <main id="admin-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          {typeof accessNotice === "string" ? <p role="alert" className="admin-callout admin-callout--alert mb-6">{accessNotice}</p> : null}
+          {access.revoked ? <p role="status" className="admin-callout mb-6">Some of your scan access was removed. Your available actions and events are up to date. Contact an administrator if you need help.</p> : null}
           <Outlet />
         </main>
       </div>

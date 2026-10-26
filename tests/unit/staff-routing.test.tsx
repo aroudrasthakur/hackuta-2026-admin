@@ -9,6 +9,7 @@ import { AdminAuthContext, type AdminAuthContextValue, type StaffProfile } from 
 import { listMyScanOptionsRef, type VolunteerScanOptions } from "../../src/convex/adminApi";
 import { canAccessStaffRoute, intendedStaffDestination, staffHome } from "../../src/lib/staffRouteAccess";
 import { ADMIN_ROUTES } from "../../src/types/routes";
+vi.mock("../../src/components/WeatherMoodToggle", () => ({ WeatherMoodToggle: () => null }));
 
 vi.mock("../../src/components/StormPageFrame", () => ({ StormPageFrame: ({ children }: { children: unknown }) => <div>{children}</div> }));
 vi.mock("../../src/pages/admin/ApplicationsPage", () => ({ ApplicationsPage: () => <h1>Applications queue</h1> }));
@@ -174,7 +175,8 @@ describe("protected staff screens", () => {
 
     options = undefined;
     await render(ADMIN_ROUTES.scan);
-    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Loading your responsibilities");
+    expect(container.textContent).not.toContain("scan access was removed");
     expect(links()).toEqual(["Dashboard"]);
 
     options = allOptions;

@@ -186,7 +186,8 @@ describe("app routes", () => {
     expect(container.textContent).toContain("Jordan Reviewer");
     expect(container.textContent).toContain("Reviewer");
     expect(container.querySelector('nav[aria-label="Admin"]')?.textContent).toContain("Decision emails");
-    expect(container.textContent).toMatch(/Jordan Reviewer\s*·\s*Reviewer/);
+    expect(container.querySelector(".admin-topbar__identity-name")?.textContent).toBe("Jordan Reviewer");
+    expect(container.querySelector(".admin-topbar__identity-role")?.textContent).toBe("Reviewer");
   });
 
   it("sends signed-out visitors to sign-in", async () => {
