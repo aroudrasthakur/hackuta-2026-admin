@@ -46,12 +46,20 @@ export function AdminLayout() {
   ];
   const permittedTabs = tabs.filter(({ to }) => staff && canAccessStaffRoute(to, staff, options) === true);
   const grants = staff?.role === "volunteer"
-    ? [...permittedTabs.map(({ to }) => to), ...(options?.events.map(({ eventId }) => eventId) ?? [])].sort().join(",")
+    ? options === undefined ? null : [...permittedTabs.map(({ to }) => to), ...options.events.map(({ eventId }) => eventId)].sort().join(",")
     : "";
   const [access, setAccess] = useState({ grants, revoked: false });
-  if (access.grants !== grants) {
-    setAccess({ grants, revoked: access.revoked || access.grants.split(",").some((grant) => grant && !grants.split(",").includes(grant)) });
-  }
+
+  useEffect(() => {
+    // Compare committed permission snapshots; loading is not a revocation.
+    if (grants === null) return;
+    // Persist revocation history even if access is later restored.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAccess((previous) => previous.grants === grants ? previous : {
+      grants,
+      revoked: previous.revoked || (previous.grants ?? "").split(",").some((grant) => grant && !grants.split(",").includes(grant)),
+    });
+  }, [grants]);
   const accessNotice = (state as { accessNotice?: unknown } | null)?.accessNotice;
   const headerRef = useRef<HTMLElement>(null);
   const [headerOffset, setHeaderOffset] = useState(0);

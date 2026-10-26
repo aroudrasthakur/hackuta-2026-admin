@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAdminAuth } from "../hooks/useAdminAuth";
 import { LoadingState } from "./states/LoadingState";
 import { ADMIN_ROUTES } from "../types/routes";
@@ -11,8 +11,15 @@ export function AdminProtectedRoute({ children }: { children?: ReactNode }) {
   const location = useLocation();
   const { isAuthenticated, isLoading, sessionReady, staff } = useAdminAuth();
   const options = useVolunteerAccess();
-  const [hadSession, setHadSession] = useState(isAuthenticated && !!staff);
-  if (!hadSession && isAuthenticated && staff) setHadSession(true);
+  const hasSession = isAuthenticated && !!staff;
+  const [hadSession, setHadSession] = useState(hasSession);
+
+  useEffect(() => {
+    // Remember committed sessions so expiry clears the old account's destination.
+    // This history cannot be derived from the current, unauthenticated inputs.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (hasSession) setHadSession(true);
+  }, [hasSession]);
 
   if (!sessionReady || isLoading) {
     return <LoadingState message="Verifying organizer session…" />;

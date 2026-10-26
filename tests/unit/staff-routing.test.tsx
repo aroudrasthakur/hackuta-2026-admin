@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,9 +36,11 @@ function Probe() {
 
 async function render(path: string | { pathname: string; state: unknown }, context = auth()) {
   await act(async () => root.render(
-    <AdminAuthContext.Provider value={context}>
-      <MemoryRouter initialEntries={[path]}><App /><Probe /></MemoryRouter>
-    </AdminAuthContext.Provider>,
+    <StrictMode>
+      <AdminAuthContext.Provider value={context}>
+        <MemoryRouter initialEntries={[path]}><App /><Probe /></MemoryRouter>
+      </AdminAuthContext.Provider>
+    </StrictMode>,
   ));
 }
 const path = () => container.querySelector("output")?.textContent;
@@ -163,6 +165,40 @@ describe("protected staff screens", () => {
     expect(container.querySelector('[role="status"]')?.textContent).toContain("scan access was removed");
   });
 
+  it("does not treat initial permission loading or a refresh as revoked access", async () => {
+    options = undefined;
+    await render(ADMIN_ROUTES.scan);
+    options = allOptions;
+    await render(ADMIN_ROUTES.scan);
+    expect(container.querySelector('[role="status"]')).toBeNull();
+
+    options = undefined;
+    await render(ADMIN_ROUTES.scan);
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(links()).toEqual(["Dashboard"]);
+
+    options = allOptions;
+    await render(ADMIN_ROUTES.scan);
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(links()).toEqual(["Dashboard", "Check-in", "Food", "Points"]);
+
+    options = { ...allOptions, events: [] };
+    await render(ADMIN_ROUTES.scan);
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("scan access was removed");
+  });
+
+  it("retains the revocation notice after permissions are restored and navigation changes", async () => {
+    await render(ADMIN_ROUTES.scan);
+    options = { ...allOptions, events: [] };
+    await render(ADMIN_ROUTES.scan);
+    options = allOptions;
+    await render(ADMIN_ROUTES.scan);
+    await click('nav a[href="/admin/scan/check-in"]');
+    expect(path()).toBe(ADMIN_ROUTES.scanCheckIn);
+    expect(links()).toEqual(["Dashboard", "Check-in", "Food", "Points"]);
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("scan access was removed");
+  });
+
   it("rejects a stale selected event even when another event remains assigned", async () => {
     await render(`${ADMIN_ROUTES.scanPoints}?event=event-1`);
     expect(path()).toBe("/admin/scan/points?event=event-1");
@@ -188,6 +224,37 @@ describe("protected staff screens", () => {
     expect(container.querySelector("output")?.getAttribute("data-state")).toBe("null");
     await render(ADMIN_ROUTES.login, auth({ staff: { ...staff, role: "admin" } }));
     expect(path()).toBe(ADMIN_ROUTES.applications);
+  });
+
+  it("remembers a session resolved after bootstrap across a later session refresh", async () => {
+    const route = "/admin/applications?status=waitlisted";
+    const loading = auth({ isLoading: true, isAuthenticated: false, sessionReady: false, sessionToken: null, staff: undefined });
+    await render(route, loading);
+    expect(path()).toBe(route);
+    expect(container.querySelector("h1")).toBeNull();
+
+    await render(route, auth({ staff: { ...staff, role: "reviewer" } }));
+    expect(container.querySelector("h1")?.textContent).toBe("Applications queue");
+    await render(route, { ...loading, sessionReady: true, sessionToken: "token" });
+    expect(path()).toBe(route);
+    expect(container.querySelector("h1")).toBeNull();
+
+    await render(route, auth({ isAuthenticated: false, sessionToken: null, staff: null }));
+    expect(path()).toBe(ADMIN_ROUTES.login);
+    expect(container.querySelector("output")?.getAttribute("data-state")).toBe("null");
+  });
+
+  it("restores a signed-out visitor's full deep link after login", async () => {
+    const route = "/admin/scan/points?event=event-1#scan";
+    await render(route, auth({ isAuthenticated: false, sessionToken: null, staff: null }));
+    expect(path()).toBe(ADMIN_ROUTES.login);
+    expect(JSON.parse(container.querySelector("output")!.getAttribute("data-state")!)).toMatchObject({
+      from: { pathname: ADMIN_ROUTES.scanPoints, search: "?event=event-1", hash: "#scan" },
+    });
+
+    await render(ADMIN_ROUTES.login);
+    expect(path()).toBe(route);
+    expect(container.querySelector("h1")?.textContent).toBe("Points");
   });
 
   it("fails closed when a profile is missing despite an authenticated flag", async () => {
