@@ -46,6 +46,9 @@ const PUBLIC_ENTRY_GUARDS = [
   })),
   { file: "volunteerScan.ts", exportName: "listMyScanOptions", guard: "requireVolunteerAccess" },
   { file: "volunteerScan.ts", exportName: "resolveQrForScan", guard: "requireVolunteerAccess" },
+  { file: "volunteerOperations.ts", exportName: "checkInParticipant", guard: "requireVolunteerAccess" },
+  { file: "volunteerOperations.ts", exportName: "foodCheckInParticipant", guard: "requireVolunteerAccess" },
+  { file: "volunteerOperations.ts", exportName: "awardEventPoints", guard: "requireVolunteerAccess" },
 ] as const;
 
 function exportSection(source: string, exportName: string) {
@@ -89,7 +92,9 @@ describe("volunteer authorization contract (public entry points)", () => {
     }
   });
 
-  it("does not expose awardEventPoints through a public mutation module yet", () => {
+  it("exposes event awards only from volunteerOperations, with no client points argument", () => {
+    const operations = readFileSync(join(adminDir, "volunteerOperations.ts"), "utf8");
+    expect(exportSection(operations, "awardEventPoints")).not.toMatch(/points\w*\s*:\s*v\./i);
     const files = [
       "applications.ts",
       "applicationReviewLogs.ts",

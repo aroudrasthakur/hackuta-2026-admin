@@ -18,6 +18,11 @@ import type {
   setDecisionEmailHold,
 } from "../../convex/admin/decisionEmailQueue";
 import type { listMyScanOptions, resolveQrForScan } from "../../convex/admin/volunteerScan";
+import type {
+  awardEventPoints,
+  checkInParticipant,
+  foodCheckInParticipant,
+} from "../../convex/admin/volunteerOperations";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -147,3 +152,32 @@ export const resolveQrForScanRef = adminModuleRef<
   FunctionArgs<ResolveQrMutation>,
   FunctionReturnType<ResolveQrMutation>
 >("admin/volunteerScan:resolveQrForScan");
+
+type VolunteerOperations = ApiFromModules<{
+  ops: {
+    checkInParticipant: typeof checkInParticipant;
+    foodCheckInParticipant: typeof foodCheckInParticipant;
+    awardEventPoints: typeof awardEventPoints;
+  };
+}>["ops"];
+export type CheckInResult = FunctionReturnType<VolunteerOperations["checkInParticipant"]>;
+export type FoodCheckInResult = FunctionReturnType<VolunteerOperations["foodCheckInParticipant"]>;
+export type AwardEventPointsResult = FunctionReturnType<VolunteerOperations["awardEventPoints"]>;
+
+export const checkInParticipantRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerOperations["checkInParticipant"]>,
+  CheckInResult
+>("admin/volunteerOperations:checkInParticipant");
+
+export const foodCheckInParticipantRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerOperations["foodCheckInParticipant"]>,
+  FoodCheckInResult
+>("admin/volunteerOperations:foodCheckInParticipant");
+
+export const awardEventPointsRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerOperations["awardEventPoints"]>,
+  AwardEventPointsResult
+>("admin/volunteerOperations:awardEventPoints");
