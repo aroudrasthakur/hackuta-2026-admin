@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
-import { useVolunteerAccess } from "../../contexts/volunteerAccessContext";
+import { useVolunteerAccess } from "../../hooks/useVolunteerAccess";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { useNow } from "../../hooks/useNow";
 import { canAccessStaffRoute } from "../../lib/staffRouteAccess";

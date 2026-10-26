@@ -17,6 +17,7 @@ vi.mock("../../src/components/HackUtaLogo", () => ({
 vi.mock("../../src/hooks/useAdminAuth", () => ({
   useAdminAuth: () => ({ staff: { role: "reviewer" } }),
 }));
+vi.mock("../../src/hooks/useVolunteerAccess", () => ({ useVolunteerAccess: () => undefined }));
 
 describe("AdminLayout tabs", () => {
   let container: HTMLDivElement;

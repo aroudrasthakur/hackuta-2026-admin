@@ -5,7 +5,7 @@ import { StormPageFrame } from "../../components/StormPageFrame";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { LoadingState } from "../../components/states/LoadingState";
 import { intendedStaffDestination } from "../../lib/staffRouteAccess";
-import { useVolunteerAccess } from "../../contexts/volunteerAccessContext";
+import { useVolunteerAccess } from "../../hooks/useVolunteerAccess";
 import { SIGN_IN_FAILED_MESSAGE } from "../../../shared/admin/errors";
 import { reportUserFacingError } from "../../lib/userFacingError";
 

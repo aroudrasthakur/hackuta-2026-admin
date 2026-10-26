@@ -3,14 +3,11 @@ import { useState, type ReactNode } from "react";
 import { useAdminAuth } from "../hooks/useAdminAuth";
 import { LoadingState } from "./states/LoadingState";
 import { ADMIN_ROUTES } from "../types/routes";
-import { useVolunteerAccess } from "../contexts/volunteerAccessContext";
+import { useVolunteerAccess } from "../hooks/useVolunteerAccess";
 import { canAccessStaffRoute, staffHome } from "../lib/staffRouteAccess";
 
-type AdminProtectedRouteProps = {
-  children: ReactNode;
-};
-
-export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
+/** Without children, redirect to the current staff member's home. */
+export function AdminProtectedRoute({ children }: { children?: ReactNode }) {
   const location = useLocation();
   const { isAuthenticated, isLoading, sessionReady, staff } = useAdminAuth();
   const options = useVolunteerAccess();
@@ -24,6 +21,7 @@ export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
   if (!isAuthenticated || !staff) {
     return <Navigate to={ADMIN_ROUTES.login} replace state={hadSession ? null : { from: location }} />;
   }
+  if (!children) return <Navigate to={staffHome(staff)} replace />;
 
   const allowed = canAccessStaffRoute(location.pathname, staff, options, location.search);
   if (allowed === undefined) {

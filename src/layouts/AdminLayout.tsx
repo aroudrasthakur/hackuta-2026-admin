@@ -5,9 +5,8 @@ import { HackUtaLogo } from "../components/HackUtaLogo";
 import { StormPageFrame } from "../components/StormPageFrame";
 import { ADMIN_ROUTES } from "../types/routes";
 import { useAdminAuth } from "../hooks/useAdminAuth";
-import { useVolunteerAccess } from "../contexts/volunteerAccessContext";
+import { useVolunteerAccess } from "../hooks/useVolunteerAccess";
 import { canAccessStaffRoute } from "../lib/staffRouteAccess";
-import { VolunteerPermissionNotice } from "../components/VolunteerPermissionNotice";
 
 function AdminTab({
   to,
@@ -45,6 +44,14 @@ export function AdminLayout() {
     { to: ADMIN_ROUTES.participants, label: "Participants" },
     { to: ADMIN_ROUTES.volunteers, label: "Volunteers" },
   ];
+  const permittedTabs = tabs.filter(({ to }) => staff && canAccessStaffRoute(to, staff, options) === true);
+  const grants = staff?.role === "volunteer"
+    ? [...permittedTabs.map(({ to }) => to), ...(options?.events.map(({ eventId }) => eventId) ?? [])].sort().join(",")
+    : "";
+  const [access, setAccess] = useState({ grants, revoked: false });
+  if (access.grants !== grants) {
+    setAccess({ grants, revoked: access.revoked || access.grants.split(",").some((grant) => grant && !grants.split(",").includes(grant)) });
+  }
   const accessNotice = (state as { accessNotice?: unknown } | null)?.accessNotice;
   const headerRef = useRef<HTMLElement>(null);
   const [headerOffset, setHeaderOffset] = useState(0);
@@ -92,7 +99,7 @@ export function AdminLayout() {
         <div style={{ height: headerOffset }} aria-hidden="true" />
         <nav aria-label={staff?.role === "volunteer" ? "Volunteer" : "Admin"} className="mx-auto max-w-6xl px-4 pt-6">
           <div role="tablist" aria-label="Staff sections" className="admin-nav-tabs">
-            {tabs.filter(({ to }) => staff && canAccessStaffRoute(to, staff, options) === true).map(({ to, label }) => (
+            {permittedTabs.map(({ to, label }) => (
               <AdminTab key={to} to={to} active={pathname === to || (to === ADMIN_ROUTES.applications && pathname.startsWith(`${to}/`))}>
                 {label}
               </AdminTab>
@@ -101,7 +108,7 @@ export function AdminLayout() {
         </nav>
         <main id="admin-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-8">
           {typeof accessNotice === "string" ? <p role="alert" className="admin-card mb-6 p-4">{accessNotice}</p> : null}
-          <VolunteerPermissionNotice />
+          {access.revoked ? <p role="status" className="admin-card mb-6 p-4">Some of your scan access was removed. Your available actions and events are up to date. Contact an administrator if you need help.</p> : null}
           <Outlet />
         </main>
       </div>
