@@ -6,17 +6,25 @@
 | [`ApplicationsPage.tsx`](ApplicationsPage.tsx) | `/admin/applications` |
 | [`ApplicationReviewPage.tsx`](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` |
 | [`DecisionEmailQueuePage.tsx`](DecisionEmailQueuePage.tsx) | `/admin/decision-emails` |
+| [`MealsPage.tsx`](MealsPage.tsx) | `/admin/meals` — admin-only serving windows, counts, and collection history |
 | [`VolunteerDashboardPage.tsx`](VolunteerDashboardPage.tsx) | `/admin/scan` |
-| [`StaffWorkflowPage.tsx`](StaffWorkflowPage.tsx) | `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points`, `/admin/participants`, `/admin/volunteers` |
+| [`VolunteerScanPage.tsx`](VolunteerScanPage.tsx) | `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points` |
+| [`StaffWorkflowPage.tsx`](StaffWorkflowPage.tsx) | `/admin/participants`, `/admin/volunteers` |
 
 Admins and reviewers land on applications; volunteers land on `/admin/scan`.
 Login restores authorized internal destinations; unknown routes return home.
 
 Scan access follows `listMyScanOptions`: check-in and food need explicit grants,
 and points need an assigned active event. Revoked access hides actions and
-redirects stale routes. Event times are advisory. Scanner and management pages
-are placeholders; management requires an admin. Every backend operation enforces
+redirects stale routes. Event times are advisory. Participant and volunteer management
+pages are placeholders; management requires an admin. Every backend operation enforces
 authorization separately.
+
+Meals use reactive queries for schedules, served counts, and paginated collection
+history. Status labels refresh every 15 seconds even without database writes.
+Create/edit forms use the browser's local timezone. Disabling a meal requires
+confirmation, and meals with history must be deactivated rather than removed.
+Schedule overlap checks and removal protection run in backend transactions.
 
 The application queue defaults to all applications, oldest first. URL parameters
 preserve search, status, sort and assignment through review navigation. “Mine”

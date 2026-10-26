@@ -88,12 +88,14 @@ All register-owned blocks must remain identical to [`schema.reference.ts`](../sc
 
 `mealRedemptions` stores `participantId` (`Id<"participants">`), `mealPeriodId` (`Id<"mealPeriods">`), `scannedBy` (`Id<"admins">`), and `redeemedAt`. `by_participant_meal` supports duplicate checks. `by_meal` indexes `[mealPeriodId, redeemedAt]`, and `by_participant` indexes `[participantId, redeemedAt]`, allowing chronological history queries for either entity.
 
-These schema additions do not change existing food scanning behavior. The meal-management and redemption mutations must enforce the following rules when implemented:
+Meal management in `admin/meals.ts` enforces schedule validation, overlap prevention, and removal protection. Existing food scanning behavior is unchanged until the redemption workflow is integrated. The full meal system must enforce these rules:
 
 - Require `startsAt < endsAt` and reject overlapping active serving windows.
 - Allow deletion only for unused meals; deactivate meals with redemption history.
 - Check `by_participant_meal` and insert in one mutation to enforce one redemption per participant per meal. Convex indexes do not enforce uniqueness.
 - Use meal redemptions for eligibility, preserving legacy `participants.foodCheckedInAt` values and original redemption timestamps.
+
+`staffConfigLogs.targetMealPeriodId` optionally identifies meal configuration changes (`meal_created`, `meal_updated`, `meal_active_changed`, `meal_removed`). Existing audit rows remain valid. Removal logs retain the meal name and serving window in `details` after the unused meal is deleted.
 
 The new tables are empty on first deployment; no legacy timestamp can be assigned to a particular meal automatically. Synchronize the admin schema into `hackuta-2026-profile` using its `admin-schema-lock:refresh` workflow before deploying from profile. Do not refresh the register schema lock for these admin-owned additions.
 

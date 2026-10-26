@@ -1,0 +1,57 @@
+import { expect, test } from "@playwright/test";
+import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
+
+test("admin manages a meal on mobile, checks history, and removes an unused meal", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInOrganizer(page, E2E_ADMIN);
+  await page.getByRole("link", { name: "Meals", exact: true }).click();
+  await expect(page.getByText("No meals scheduled")).toBeVisible();
+  await page.getByRole("button", { name: "Create meal" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Meal name")).toBeFocused();
+  await dialog.getByLabel("Meal name").fill("Sunday brunch");
+  await dialog.getByLabel("Description").fill("Fruit, pastries, and coffee");
+  await dialog.getByLabel("Starts at").fill("2027-01-10T10:00");
+  await dialog.getByLabel("Ends at").fill("2027-01-10T12:00");
+  await page.screenshot({ path: test.info().outputPath("meal-form-mobile.png"), fullPage: true });
+  await dialog.getByRole("button", { name: "Save meal" }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByText("Meal created.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Upcoming", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "0", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("meals-mobile.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.getByRole("heading", { name: "Meals", exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("meals-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Edit Sunday brunch", exact: true }).click();
+  await dialog.getByLabel("Meal name").fill("Sunday lunch");
+  await dialog.getByRole("button", { name: "Save meal" }).click();
+  await expect(page.getByText("Meal updated.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Deactivate Sunday lunch", exact: true }).click();
+  await expect(dialog.getByText(/history will be preserved/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("button", { name: "Deactivate Sunday lunch", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "Deactivate Sunday lunch", exact: true }).click();
+  await dialog.getByRole("button", { name: "Deactivate meal", exact: true }).click();
+  await expect(page.getByRole("cell", { name: "Disabled", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "History for Sunday lunch", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Collection history · Sunday lunch" })).toBeVisible();
+  await expect(page.getByText("No collections found", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Remove Sunday lunch", exact: true }).click();
+  await dialog.getByRole("button", { name: "Remove meal", exact: true }).click();
+  await expect(page.getByText("No meals scheduled")).toBeVisible();
+});
+
+test("reviewers and volunteers cannot open meal management", async ({ page }) => {
+  await signInOrganizer(page, E2E_REVIEWER);
+  await expect(page.getByRole("link", { name: "Meals", exact: true })).toHaveCount(0);
+  await page.evaluate(() => { window.history.pushState({}, "", "/admin/meals"); window.dispatchEvent(new PopStateEvent("popstate")); });
+  await expect(page).toHaveURL(/\/admin\/applications$/);
+  await signOutOrganizer(page);
+  await signInVolunteer(page);
+  await page.evaluate(() => { window.history.pushState({}, "", "/admin/meals"); window.dispatchEvent(new PopStateEvent("popstate")); });
+  await expect(page).toHaveURL(/\/admin\/scan$/);
+  await expect(page.getByRole("link", { name: "Meals", exact: true })).toHaveCount(0);
+});

@@ -10,6 +10,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [staffAuth.ts](staffAuth.ts) | Session resolution and role guards (see [VOLUNTEER_AUTHORIZATION.md](VOLUNTEER_AUTHORIZATION.md)) |
 | [volunteers.ts](volunteers.ts) | Admin-only volunteer management: creation, resets, revoke/restore, capabilities, event assignments, and audit log queries |
 | [participantsAdmin.ts](participantsAdmin.ts) | Admin-only participant roster, details, point corrections, adjustment history, and participant-to-volunteer promotion |
+| [meals.ts](meals.ts) | Admin-only meal create/edit/activate/remove, reactive served counts, and paginated collection history |
 | [volunteerProvisioning.ts](volunteerProvisioning.ts) | Shared volunteer account provisioning (validation, hashing, audit) used by both modules above |
 | [adminQueryHelpers.ts](adminQueryHelpers.ts) | Display-name lookups and date-range bounds for admin list queries |
 | [staffCredentials.ts](staffCredentials.ts) | Shared password validation, hashing, credential storage, and session invalidation |
@@ -26,6 +27,25 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
 | [volunteerScan.ts](volunteerScan.ts) | Volunteer scan options and read-only QR preview (`listMyScanOptions`, `resolveQrForScan`) |
 | [volunteerScanRateLimit.ts](volunteerScanRateLimit.ts) | Per-volunteer QR lookup throttling in `rateLimits`, plus internal cleanup |
+
+## Meal management
+
+Meal management requires `requireAdminRole` on every endpoint. `createMealPeriod`
+and `updateMealPeriod` validate custom names (1–100 characters), optional descriptions
+(up to 1000 characters), and Unix millisecond serving windows with `startsAt < endsAt`.
+Enabled windows must not overlap; adjacent windows are allowed. `setMealPeriodActive`
+rechecks overlaps on activation. `removeMealPeriod` rejects meals with redemption
+history, including collections recorded since the UI loaded; deactivate these meals
+instead. Configuration changes write `staffConfigLogs` entries with the actor,
+meal ID, and schedule/name details, preserving the name even after removal.
+
+`listMealPeriods` returns schedules ordered by start and live counts from
+`mealRedemptions.by_meal`. `listMealRedemptions` requires a meal ID and pagination
+options and accepts inclusive `from`/`to` collection timestamps. History is newest
+first and exposes participant/staff display names and collection times only.
+The existing food scanner remains on the legacy workflow until meal redemption
+is integrated separately. Deploy backend changes through profile after refreshing
+its admin schema lock.
 
 ## Authentication
 
