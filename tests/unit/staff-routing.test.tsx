@@ -15,7 +15,7 @@ vi.mock("../../src/pages/admin/ApplicationsPage", () => ({ ApplicationsPage: () 
 vi.mock("../../src/pages/admin/ApplicationReviewPage", () => ({ ApplicationReviewPage: () => <h1>Application review</h1> }));
 vi.mock("../../src/pages/admin/DecisionEmailQueuePage", () => ({ DecisionEmailQueuePage: () => <h1>Decision email queue</h1> }));
 const query = vi.hoisted(() => vi.fn());
-vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query }));
+vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query, useMutation: () => vi.fn() }));
 
 const staff: StaffProfile = { adminId: "staff", email: "staff@example.com", name: "Avery", role: "volunteer", canCheckIn: true, canFoodCheckIn: true, expiresAt: Date.now() + 60_000 };
 const event = { eventId: "event-1" as GenericId<"events">, name: "Opening workshop", pointsAwarded: 20, startsAt: Date.now() - 1000, endsAt: Date.now() + 60_000 };
