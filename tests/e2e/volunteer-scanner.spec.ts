@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { E2E_EVENTS, E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { qrCodeSvg, showQrToCamera } from "./fixtures/qrCamera";
+import { setMealScenario } from "./fixtures/meals";
 
 /**
  * Full Chromium (the default headless shell has no media capture) with its
@@ -15,6 +16,7 @@ async function signInScanVolunteer(page: Page) {
   await page.getByLabel("Password", { exact: true }).fill(E2E_SCAN_VOLUNTEER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+  await setMealScenario(page, "serving");
 }
 
 /** In-app navigation keeps the in-memory mock store; `page.goto` would reset it. */
@@ -83,12 +85,12 @@ test.describe("volunteer QR scanner", () => {
     await page.screenshot({ path: "test-results/scanner-food-confirm-mobile.png", fullPage: true });
 
     await page.getByRole("button", { name: "Confirm food given" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Food redeemed" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Food collected" })).toBeVisible();
     await expect(page.getByText("Vegetarian; Allergies: peanuts")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Scan next" }).click();
-    await lookUp(page, E2E_QR_TOKENS.checkedIn);
-    await expect(page.getByRole("status").filter({ hasText: "Food already redeemed" })).toContainText("Morgan Present");
+    await lookUp(page, E2E_QR_TOKENS.ready);
+    await expect(page.getByRole("status").filter({ hasText: "Food Already Collected" })).toContainText("already received their food for Lunch.");
 
     await openTab(page, "Check-in");
     await lookUp(page, E2E_QR_TOKENS.ready);

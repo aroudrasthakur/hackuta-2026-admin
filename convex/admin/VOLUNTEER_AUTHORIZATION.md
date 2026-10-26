@@ -57,7 +57,8 @@ If you add a new public mutation that imports `pointsLedger`, add a row to the e
 | `volunteers.ts` | all exports (accounts, capabilities, event access, `listVolunteerActionLogs`, `listStaffConfigLogs`) | `requireAdminRole` |
 | `participantsAdmin.ts` | all exports (`listParticipants`, `getParticipantDetails`, `setParticipantPoints`, `listPointAdjustments`, `promoteParticipantToVolunteer`) | `requireAdminRole` |
 | `volunteerProvisioning.ts`, `adminQueryHelpers.ts` | — | **Helpers only** (callers must guard first) |
-| `volunteerScan.ts` | `listMyScanOptions`, `resolveQrForScan` | `requireVolunteerAccess`, then per-purpose capability / assignment checks |
+| `volunteerScan.ts` | `listMyScanOptions`, `resolveQrForScan`, `listActiveMealPeriods`, `resolveQrForMeal`, `redeemMeal` | `requireVolunteerAccess`, then per-purpose capability / assignment checks |
+| `meals.ts` | all exports (schedules, availability, counts, and history) | `requireAdminRole` |
 | `volunteerOperations.ts` | `checkInParticipant`, `foodCheckInParticipant`, `awardEventPoints` | `requireVolunteerAccess`, then capability / assignment checks |
 | `volunteerScanRateLimit.ts` | `pruneVolunteerScanRateLimits` | **Internal only** (`internalMutation`) |
 | `participants.ts` | — | **Internal only** (`internalMutation`) |
@@ -67,7 +68,7 @@ Future volunteer scan modules belong in `convex/admin/` and must follow the guar
 
 ## QR scan preview (`volunteerScan.ts`)
 
-`resolveQrForScan` only **previews** a participant. It writes nothing except rate-limit rows. The check-in, food, and point-award mutations in `volunteerOperations.ts` re-run the session guard, the capability or assignment check, the eligibility check, and the event check themselves. A preview result is never proof of permission.
+`resolveQrForScan` only **previews** a participant. It writes nothing except rate-limit rows. Check-in, meal redemption, and point-award mutations re-run their session, capability/assignment, eligibility, and availability checks. A preview result is never proof of permission. Food previews require a `mealPeriodId` and use the meal flow below, including through the compatibility endpoint.
 
 Order inside the handler:
 
@@ -76,7 +77,7 @@ Order inside the handler:
 3. Record one attempt row.
 4. Purpose check: `check_in` needs `canCheckIn === true`, `food_check_in` needs `canFoodCheckIn === true`, and `point_scan` needs an `eventId` with a current assignment on an active event. Missing, unassigned, and inactive events all return `not_authorized`, and the token is not looked up.
 5. Token check: 64-char lowercase hex (256-bit), then `participants.by_qr_token`. Malformed and unknown tokens both return `qr_not_found`.
-6. Eligibility: the linked `applicationReviews` row must be `accepted`, otherwise `participant_not_eligible` with no participant data.
+6. Eligibility: the linked `applicationReviews` row must be `accepted`, otherwise `participant_not_eligible` for check-in/points or `participant_ineligible` for meals, with no participant data.
 
 After step 2, outcomes are **returned, not thrown**, because a throw would roll back the counter rows.
 
@@ -85,7 +86,7 @@ Response fields by purpose. Point totals, emails, applications, and QR tokens ar
 | Purpose | Fields |
 | --- | --- |
 | `check_in` | name, `checkedIn`, `checkedInAt` |
-| `food_check_in` | name, `foodCheckedIn`, `foodCheckedInAt`, `dietaryInfo` (the only response with dietary data) |
+| `food_check_in` | name, `alreadyRedeemed`, `redeemedAt`, `dietaryInfo`, and selected meal ID/name (the only scan response with dietary data) |
 | `point_scan` | name, event name, event `pointsAwarded`, `alreadyAwarded` |
 
 Event `startsAt` / `endsAt` are not checked for point scans (reference schedule only, same as `awardEventPoints`).
@@ -97,15 +98,47 @@ These mutations do the real work. Each one re-checks everything itself and share
 | Mutation | Needs | Writes on success |
 | --- | --- | --- |
 | `checkInParticipant` | `canCheckIn === true`, accepted participant | `checkedInAt`, `updatedAt`, one `check_in` log |
-| `foodCheckInParticipant` | `canFoodCheckIn === true`, accepted participant (door check-in not needed) | `foodCheckedInAt`, `updatedAt`, one `food_check_in` log |
+| `foodCheckInParticipant` | Compatibility alias for `redeemMeal`; requires a selected meal and all the same checks | One `mealRedemptions` row and one meal-specific `food_check_in` log; participant timestamps stay unchanged |
 | `awardEventPoints` | Current assignment, active event, accepted participant who is door checked in | Award row, `points`, one `point_scan` log with delta and previous/new balance |
 
 - Points always come from the stored event. There is no points argument.
-- Repeat scans change nothing and return `already_checked_in` (with `checkedInAt`), `already_food_checked_in` (with `foodCheckedInAt`), or `already_awarded`.
+- Repeat scans change nothing and return `already_checked_in` (with `checkedInAt`), `already_redeemed` (with the original `redeemedAt` and meal), or `already_awarded`.
 - Other results: `qr_not_found`, `not_authorized` (missing capability), `event_denied` (unassigned or missing event), `event_inactive`, `participant_not_checked_in`, `participant_not_eligible`, `rate_limited`.
 - One award per participant and event comes from the `by_participant_event` lookup inside the mutation's transaction. If two scans race, Convex retries one of them, and the retry sees the first award. The index alone does not enforce uniqueness.
 - Event times are not checked, same as the preview.
 - Logs never contain QR tokens, session tokens, or dietary data.
+
+## Meal redemption (`volunteerScan.ts`)
+
+`listActiveMealPeriods` exposes enabled schedules (including future windows) to
+volunteers with explicit `canFoodCheckIn === true`; volunteers without it receive
+an empty list. The scanner filters by `startsAt <= now < endsAt` and wakes at
+serving boundaries even without database writes. Returning schedule metadata lets
+the UI update time-based availability without polling queries that would interrupt
+an in-progress confirmation. This query returns no participant or dietary data.
+
+`resolveQrForMeal({ sessionToken, qrCodeToken, mealPeriodId })` previews the selected
+meal. `redeemMeal` takes the same arguments and rechecks every guard in its own
+transaction: active volunteer session, explicit food capability, valid QR, current
+accepted status, an existing enabled meal, and its serving window using server time.
+The participant need not have checked in at the door. `foodCheckedInAt` is neither
+read for eligibility nor written. A missing meal on the compatibility endpoints
+returns `meal_not_active`; there is no global food redemption fallback.
+
+The `mealRedemptions.by_participant_meal` lookup and insertion share one mutation.
+Concurrent calls retry against the committed redemption and exactly one succeeds.
+A duplicate preserves the first timestamp and writes no redemption or audit log.
+Successful redemptions write a `food_check_in` audit row with `mealPeriodId` in the
+same transaction. A preview writes only rate-limit counters and returns `ok` with
+`alreadyRedeemed`; the UI shows **Food Already Collected** when this flag is set.
+
+Meal mutation outcomes are `success`, `already_redeemed`, `meal_not_active`,
+`meal_not_started`, `meal_ended`, `participant_ineligible`, `qr_not_found`,
+`not_authorized`, and `rate_limited`. Session failures throw before any writes.
+All other failures are returned so throttle counters commit. Invalid tokens and
+capability denials increment the shared failure bucket; expected eligibility and
+schedule failures increment only the attempt bucket. Expiry or disabled/removed
+meals are checked before duplicates, so an unavailable meal cannot be redeemed.
 
 ### Rate limits
 

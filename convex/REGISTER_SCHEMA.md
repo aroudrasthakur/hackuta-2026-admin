@@ -88,7 +88,7 @@ All register-owned blocks must remain identical to [`schema.reference.ts`](../sc
 
 `mealRedemptions` stores `participantId` (`Id<"participants">`), `mealPeriodId` (`Id<"mealPeriods">`), `scannedBy` (`Id<"admins">`), and `redeemedAt`. `by_participant_meal` supports duplicate checks. `by_meal` indexes `[mealPeriodId, redeemedAt]`, and `by_participant` indexes `[participantId, redeemedAt]`, allowing chronological history queries for either entity.
 
-Meal management in `admin/meals.ts` enforces schedule validation, overlap prevention, and removal protection. Existing food scanning behavior is unchanged until the redemption workflow is integrated. The full meal system must enforce these rules:
+Meal management in `admin/meals.ts` enforces schedule validation, overlap prevention, and removal protection. Food scanning in `admin/volunteerScan.ts` uses meal redemptions and preserves legacy timestamps. The meal system enforces these rules:
 
 - Require `startsAt < endsAt` and reject overlapping active serving windows.
 - Allow deletion only for unused meals; deactivate meals with redemption history.
@@ -96,6 +96,8 @@ Meal management in `admin/meals.ts` enforces schedule validation, overlap preven
 - Use meal redemptions for eligibility, preserving legacy `participants.foodCheckedInAt` values and original redemption timestamps.
 
 `staffConfigLogs.targetMealPeriodId` optionally identifies meal configuration changes (`meal_created`, `meal_updated`, `meal_active_changed`, `meal_removed`). Existing audit rows remain valid. Removal logs retain the meal name and serving window in `details` after the unused meal is deleted.
+
+`volunteerActionLogs.mealPeriodId` optionally identifies the meal for new `food_check_in` entries. The redemption and its audit entry are inserted atomically; legacy log rows without a meal ID remain valid.
 
 The new tables are empty on first deployment; no legacy timestamp can be assigned to a particular meal automatically. Synchronize the admin schema into `hackuta-2026-profile` using its `admin-schema-lock:refresh` workflow before deploying from profile. Do not refresh the register schema lock for these admin-owned additions.
 

@@ -25,7 +25,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [decisionEmailService.ts](decisionEmailService.ts) | Decision mail via register-locked `sendMailMessage` (same email service HTTP client) |
 | [sendDecisionEmails.ts](sendDecisionEmails.ts) | Internal action that sends decision notifications |
 | [participants.ts](participants.ts) | `createParticipantFromAcceptance` — internal entry point for the helper |
-| [volunteerScan.ts](volunteerScan.ts) | Volunteer scan options and read-only QR preview (`listMyScanOptions`, `resolveQrForScan`) |
+| [volunteerScan.ts](volunteerScan.ts) | Volunteer scan options, meal availability, QR previews, and atomic per-meal redemption |
 | [volunteerScanRateLimit.ts](volunteerScanRateLimit.ts) | Per-volunteer QR lookup throttling in `rateLimits`, plus internal cleanup |
 
 ## Meal management
@@ -43,9 +43,13 @@ meal ID, and schedule/name details, preserving the name even after removal.
 `mealRedemptions.by_meal`. `listMealRedemptions` requires a meal ID and pagination
 options and accepts inclusive `from`/`to` collection timestamps. History is newest
 first and exposes participant/staff display names and collection times only.
-The existing food scanner remains on the legacy workflow until meal redemption
-is integrated separately. Deploy backend changes through profile after refreshing
-its admin schema lock.
+The food scanner uses `listActiveMealPeriods`, `resolveQrForMeal`, and `redeemMeal`
+from `volunteerScan.ts`. Availability follows enabled schedules and serving-window
+boundaries. Redemption rechecks server time, current eligibility and capability,
+and the indexed per-meal duplicate record in one transaction. Legacy food endpoints
+delegate to the same checks and require a selected meal. Existing
+`participants.foodCheckedInAt` values remain historical data. Deploy backend changes
+through profile after refreshing its admin schema lock.
 
 ## Authentication
 
