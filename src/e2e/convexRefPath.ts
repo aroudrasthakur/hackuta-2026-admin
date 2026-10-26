@@ -4,9 +4,11 @@ import {
   foodCheckInParticipantRef,
   getApplicationRef,
   getCurrentStaffRef,
+  getParticipantDetailsRef,
   listMyScanOptionsRef,
   listApplicationReviewLogsRef,
   listDecisionEmailQueueRef,
+  listParticipantsRef,
   listSubmittedApplicationsRef,
   logApplicationReviewActionRef,
   releaseDecisionEmailsRef,
@@ -14,6 +16,10 @@ import {
   retryFailedDecisionEmailsRef,
   setApplicationDecisionRef,
   setDecisionEmailHoldRef,
+  promoteParticipantToVolunteerRef,
+  restoreVolunteerRef,
+  revokeVolunteerRef,
+  setParticipantPointsRef,
 } from "../convex/adminApi";
 
 const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
@@ -32,6 +38,12 @@ const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
   [setDecisionEmailHoldRef, "admin/decisionEmailQueue:setDecisionEmailHold"],
   [retryFailedDecisionEmailsRef, "admin/decisionEmailQueue:retryFailedDecisionEmails"],
   [releaseDecisionEmailsRef, "admin/decisionEmailRelease:releaseDecisionEmails"],
+  [listParticipantsRef, "admin/participantsAdmin:listParticipants"],
+  [getParticipantDetailsRef, "admin/participantsAdmin:getParticipantDetails"],
+  [setParticipantPointsRef, "admin/participantsAdmin:setParticipantPoints"],
+  [promoteParticipantToVolunteerRef, "admin/participantsAdmin:promoteParticipantToVolunteer"],
+  [revokeVolunteerRef, "admin/volunteers:revokeVolunteer"],
+  [restoreVolunteerRef, "admin/volunteers:restoreVolunteer"],
 ];
 
 export function convexRefPath(ref: unknown): string {

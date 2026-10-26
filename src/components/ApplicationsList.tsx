@@ -45,7 +45,7 @@ export function ApplicationsList({
   return (
     <>
       <div className="admin-card admin-card--flush applications-table-panel hidden lg:block">
-        <table className="applications-table w-full text-left text-sm">
+        <table className="admin-table applications-table">
           <caption className="sr-only">Submitted applications matching the current search and review status filter</caption>
           <colgroup>
             <col className="applications-table__col-applicant" />
@@ -55,28 +55,28 @@ export function ApplicationsList({
             <col className="applications-table__col-reviewer" />
             <col className="applications-table__col-action" />
           </colgroup>
-          <thead className="border-b border-sand bg-clay/50 text-xs uppercase tracking-wide text-ink">
+          <thead>
             <tr>
-              <th scope="col" className="px-3 py-3 font-semibold sm:px-4">Applicant</th>
-              <th scope="col" className="px-3 py-3 font-semibold">School</th>
-              <th scope="col" className="px-3 py-3 font-semibold">Submitted</th>
-              <th scope="col" className="px-3 py-3 font-semibold">Status</th>
-              <th scope="col" className="px-3 py-3 font-semibold">Reviewer</th>
-              <th scope="col" className="px-3 py-3"><span className="sr-only">Review application</span></th>
+              <th scope="col">Applicant</th>
+              <th scope="col">School</th>
+              <th scope="col">Submitted</th>
+              <th scope="col">Status</th>
+              <th scope="col">Reviewer</th>
+              <th scope="col"><span className="sr-only">Review application</span></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-sand/70">
+          <tbody>
             {applications.map((application) => (
-              <tr key={application.applicationId} className="hover:bg-clay/25 focus-within:bg-clay/25">
-                <th scope="row" className="min-w-0 px-3 py-3 font-normal sm:px-4">
+              <tr key={application.applicationId}>
+                <th scope="row" className="min-w-0 font-normal">
                   <span className="block truncate font-semibold text-night">{application.applicantName}</span>
                   <span className="mt-1 block truncate text-xs text-ocean">{application.email}</span>
                 </th>
-                <td className="min-w-0 px-3 py-3"><span className="line-clamp-2 break-words">{application.school || "Not provided"}</span></td>
-                <td className="whitespace-nowrap px-3 py-3 text-xs leading-5">{formatApplicationDate(application.submittedAt)}</td>
-                <td className="px-3 py-3"><ApplicationStatusBadge status={status(application)} /></td>
-                <td className="min-w-0 break-words px-3 py-3 text-xs sm:text-sm">{reviewer(application)}</td>
-                <td className="px-3 py-3">{reviewLink(application)}</td>
+                <td className="min-w-0"><span className="line-clamp-2 break-words">{application.school || "Not provided"}</span></td>
+                <td className="text-xs leading-5">{formatApplicationDate(application.submittedAt)}</td>
+                <td><ApplicationStatusBadge status={status(application)} /></td>
+                <td className="min-w-0 break-words text-xs sm:text-sm">{reviewer(application)}</td>
+                <td>{reviewLink(application)}</td>
               </tr>
             ))}
           </tbody>

@@ -15,6 +15,11 @@ import { ADMIN_ROUTES } from "../../types/routes";
 import { ApplicationDecisionBadge } from "../../components/ApplicationDecisionBadge";
 import { LoadingState } from "../../components/states/LoadingState";
 import { formatApplicationDisplayDate } from "../../lib/dateFormat";
+import { AdminPageHeader } from "../../components/AdminPageHeader";
+import { AdminStatusBadge, type StatusTone } from "../../components/AdminStatusBadge";
+import { EmptyState } from "../../components/states/EmptyState";
+import { QueryErrorState } from "../../components/states/QueryErrorState";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 
 type QueueRow = DecisionEmailQueue["active"][number];
 type SentRow = DecisionEmailQueue["sent"][number];
@@ -22,14 +27,9 @@ type SentRow = DecisionEmailQueue["sent"][number];
 /** Maximum recently sent rows rendered on the decision emails page. */
 const RECENTLY_SENT_DISPLAY_LIMIT = 5;
 
-function decisionLabel(decision: QueueRow["decision"]) {
-  if (decision === "accepted") return "Accepted";
-  if (decision === "rejected") return "Rejected";
-  return "Waitlisted";
-}
-
-const queueTableCellClass = "px-3 py-2 text-center align-middle";
-const queueTableHeadClass = `${queueTableCellClass} font-semibold`;
+const deliveryTones: Record<QueueRow["status"], StatusTone> = {
+  queued: "info", held: "warning", sending: "info", failed: "negative", sent: "positive",
+};
 
 function QueueTable({
   rows,
@@ -47,31 +47,32 @@ function QueueTable({
   busy: boolean;
 }) {
   if (rows.length === 0) {
-    return <p className="admin-page-lead">No decision emails are waiting.</p>;
+    return <EmptyState title="No decision emails are waiting" description="Queued decisions will appear here before they are released." />;
   }
 
   return (
-    <div className="admin-card overflow-x-auto">
-      <table className="w-full text-base">
+    <div role="region" aria-label="Queued decision emails" tabIndex={0} className="admin-card admin-table-scroll">
+      <table className="admin-table decision-email-table">
+        <caption className="sr-only">Decision email queue</caption>
         <thead>
-          <tr className="border-b border-sand text-ocean">
-            {isAdmin ? <th className={`${queueTableHeadClass} w-12`}>Send</th> : null}
-            <th className={queueTableHeadClass}>Applicant</th>
-            <th className={queueTableHeadClass}>Decision</th>
-            <th className={`${queueTableHeadClass} min-w-[4.5rem]`}>Status</th>
-            <th className={queueTableHeadClass}>Queued</th>
-            {isAdmin ? <th className={`${queueTableHeadClass} min-w-[5.75rem]`}>Hold</th> : null}
+          <tr>
+            {isAdmin ? <th scope="col" className="w-12">Send</th> : null}
+            <th scope="col">Applicant</th>
+            <th scope="col">Decision</th>
+            <th scope="col">Status</th>
+            <th scope="col">Queued</th>
+            {isAdmin ? <th scope="col">Hold</th> : null}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.itemId} className="border-b border-sand/70">
+            <tr key={row.itemId}>
               {isAdmin ? (
-                <td className={`${queueTableCellClass} w-12`}>
+                <td className="w-12">
                   {row.status === "queued" || row.status === "held" ? (
                     <input
                       type="checkbox"
-                      className="mx-auto block"
+                      className="block size-4 accent-ocean"
                       aria-label={`Select ${row.applicantName}`}
                       checked={selected.has(row.itemId)}
                       disabled={row.status === "held"}
@@ -80,18 +81,18 @@ function QueueTable({
                   ) : null}
                 </td>
               ) : null}
-              <td className={queueTableCellClass}>
+              <th scope="row" className="font-normal">
                 <Link className="font-semibold text-night underline" to={ADMIN_ROUTES.applicationReview(row.applicationId)}>
                   {row.applicantName}
                 </Link>
-                <p className="text-ocean">{row.recipientEmail}</p>
+                <p className="break-all text-muted">{row.recipientEmail}</p>
                 {row.errorMessage ? <p className="text-red-700">{row.errorMessage}</p> : null}
-              </td>
-              <td className={queueTableCellClass}>{decisionLabel(row.decision)}</td>
-              <td className={`${queueTableCellClass} whitespace-nowrap capitalize`}>{row.status}</td>
-              <td className={queueTableCellClass}>{new Date(row.queuedAt).toLocaleString()}</td>
+              </th>
+              <td><ApplicationDecisionBadge status={row.decision} /></td>
+              <td><AdminStatusBadge tone={deliveryTones[row.status]} label={`Delivery: ${row.status}`}>{row.status.charAt(0).toUpperCase() + row.status.slice(1)}</AdminStatusBadge></td>
+              <td>{new Date(row.queuedAt).toLocaleString()}</td>
               {isAdmin ? (
-                <td className={`${queueTableCellClass} whitespace-nowrap`}>
+                <td className="whitespace-nowrap">
                   {row.status === "queued" || row.status === "held" ? (
                     <button
                       type="button"
@@ -121,7 +122,7 @@ function RecentlySentSection({ rows, totalSent }: { rows: SentRow[]; totalSent: 
   return (
     <section aria-label="Recently sent decision emails" className="admin-card admin-card__body space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="admin-card__title">Recently sent</h3>
+        <h2 className="admin-card__title">Recently sent</h2>
         {totalSent > 0 ? (
           <p className="admin-card__hint m-0">
             {showMoreNotice
@@ -163,7 +164,7 @@ function RecentlySentSection({ rows, totalSent }: { rows: SentRow[]; totalSent: 
   );
 }
 
-export function DecisionEmailQueuePage() {
+function DecisionEmailQueueContent() {
   const { sessionToken, staff } = useAdminAuth();
   const isAdmin = staff?.role === "admin";
   const queue = useQuery(listDecisionEmailQueueRef, sessionToken ? { sessionToken } : "skip");
@@ -240,29 +241,19 @@ export function DecisionEmailQueuePage() {
   }
 
   if (!sessionToken || queue === undefined) {
-    return <LoadingState message="Loading decision emails…" />;
+    return <LoadingState layout="rows" message="Loading decision emails…" />;
   }
 
   const sending = queue.counts.sending > 0;
   const selectedIds = [...selected] as Array<QueueRow["itemId"]>;
 
   return (
-    <section aria-labelledby="decision-emails-heading" className="space-y-5">
-      <header className="space-y-2">
-        <h2 id="decision-emails-heading" className="admin-page-title">
-          Decision emails
-        </h2>
-        <p className="admin-page-lead">
-          Review queued decisions before they are emailed. Review status and participant records update only after the email server accepts each message.
-        </p>
-        {!isAdmin ? (
-          <p className="admin-page-lead">An admin releases these emails. You can review the queue, but you cannot send it.</p>
-        ) : null}
-      </header>
-
-      <p className="admin-page-meta">
-        Queued {queue.counts.queued} · Held {queue.counts.held} · Sending {queue.counts.sending} · Failed {queue.counts.failed}
-      </p>
+    <div className="space-y-5">
+      <dl aria-label="Delivery counts" className="admin-delivery-counts">
+        {(["queued", "held", "sending", "failed"] as const).map((status) => (
+          <div key={status}><dt className="capitalize">{status}</dt><dd>{queue.counts[status]}</dd></div>
+        ))}
+      </dl>
 
       {error ? <p role="alert" className="admin-callout admin-callout--alert">{error}</p> : null}
       {notice ? <p role="status" className="admin-callout admin-callout--success">{notice}</p> : null}
@@ -306,6 +297,20 @@ export function DecisionEmailQueuePage() {
       />
 
       <RecentlySentSection rows={queue.sent} totalSent={queue.counts.sent} />
+    </div>
+  );
+}
+
+export function DecisionEmailQueuePage() {
+  const { sessionToken, staff } = useAdminAuth();
+  const [retry, setRetry] = useState(0);
+  return (
+    <section aria-labelledby="decision-emails-heading" className="space-y-5">
+      <AdminPageHeader id="decision-emails-heading" title="Decision emails" description="Review queued decisions before they are emailed. Review status and participant records update only after the email server accepts each message." />
+      {staff?.role !== "admin" ? <p className="admin-callout">An admin releases these emails. You can review the queue, but you cannot send it.</p> : null}
+      <ErrorBoundary key={`${sessionToken}:${retry}`} fallback={<QueryErrorState title="Unable to load decision emails" onRetry={() => setRetry((value) => value + 1)} />}>
+        <DecisionEmailQueueContent />
+      </ErrorBoundary>
     </section>
   );
 }

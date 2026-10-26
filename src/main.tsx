@@ -6,7 +6,7 @@ import { AdminAuthProvider } from "./contexts/AdminAuthProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ErrorState } from "./components/states/ErrorState";
 import { isE2eMockEnabled } from "./constants/e2eMock";
-import { resetE2eMockStore } from "../shared/admin/e2e/mockAdminStore.ts";
+import { configureE2eDecisionQueue, resetE2eMockStore } from "../shared/admin/e2e/mockAdminStore.ts";
 import { ConvexProvider } from "./convex/reactBindings";
 import { convexClient } from "./lib/convexClient";
 import "./styles/index.css";
@@ -28,6 +28,7 @@ const app = (
 
 if (isE2eMockEnabled() && typeof window !== "undefined") {
   (window as Window & { __resetE2eMock?: () => void }).__resetE2eMock = resetE2eMockStore;
+  (window as Window & { __setE2eDecisionQueue?: typeof configureE2eDecisionQueue }).__setE2eDecisionQueue = configureE2eDecisionQueue;
 }
 
 const convexReady = convexClient !== null || isE2eMockEnabled();

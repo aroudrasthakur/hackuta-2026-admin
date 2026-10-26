@@ -77,6 +77,12 @@ export function AdminAccountControls() {
   }
 
   function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Tab") {
+      setMenuOpen(false);
+      // Resume normal document navigation from the trigger when the menu closes.
+      menuButtonRef.current?.focus();
+      return;
+    }
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") {
       return;
     }
@@ -90,17 +96,12 @@ export function AdminAccountControls() {
   return (
     <div className="admin-topbar__account">
       {staff && !compact ? (
-        <>
-          <p className="admin-topbar__identity">
-            <span className="admin-topbar__identity-name">{staff.name}</span>
-            {roleLabel ? (
-              <span className="admin-topbar__identity-role"> · {roleLabel}</span>
-            ) : null}
-          </p>
-          <span className="admin-topbar__divider" aria-hidden="true">
-            |
-          </span>
-        </>
+        <p className="admin-topbar__identity" title={`${staff.name} · ${roleLabel}`}>
+          <span className="admin-topbar__identity-name">{staff.name}</span>
+          {roleLabel ? (
+            <span className="admin-topbar__identity-role">{roleLabel}</span>
+          ) : null}
+        </p>
       ) : null}
 
       {staff && compact ? (
@@ -113,6 +114,12 @@ export function AdminAccountControls() {
             aria-controls={menuId}
             aria-haspopup="menu"
             aria-label={`Account menu for ${staff.name}`}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setMenuOpen(true);
+              }
+            }}
             disabled={isSigningOut}
             onClick={() => setMenuOpen((open) => !open)}
           >

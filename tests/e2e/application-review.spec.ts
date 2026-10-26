@@ -11,6 +11,24 @@ test.describe("application review workflow", () => {
   test.beforeEach(async ({ page }) => {
     await resetE2eMockBackend(page);
   });
+  test("keeps keyboard focus in the native resume dialog and restores it on close", async ({ page }) => {
+    await signInOrganizer(page, E2E_REVIEWER);
+    await page.getByRole("link", { name: "Review application for Taylor Unreviewed" }).click();
+    const trigger = page.getByRole("button", { name: "Preview Resume" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeVisible();
+    for (let index = 0; index < 12; index += 1) {
+      await page.keyboard.press("Tab");
+      // Chromium may briefly focus the document at the native dialog's wrap point.
+      expect(await dialog.evaluate((element) => element.contains(document.activeElement) || document.activeElement === document.body)).toBe(true);
+    }
+    await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await expect(trigger).toBeFocused();
+  });
+
   test("reviewer can start review on an unreviewed application", async ({ page }) => {
     await signInOrganizer(page, E2E_REVIEWER);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.unreviewed}`);
