@@ -9,7 +9,9 @@ async function openShop(page: Page) {
 }
 
 async function openSection(page: Page, name: "Items" | "Flash sales" | "History") {
-  await page.getByRole("navigation", { name: "Shop sections" }).getByRole("link", { name: new RegExp(name) }).click();
+  const tab = page.getByRole("navigation", { name: "Shop sections" }).getByRole("link", { name: new RegExp(name) });
+  await expect(tab).toBeVisible();
+  await tab.click();
 }
 
 async function signInShopVolunteer(page: Page) {

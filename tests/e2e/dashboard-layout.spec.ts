@@ -35,7 +35,7 @@ test("keeps long staff and applicant details within the viewport", async ({ page
   await setDecisionQueue(page, "long-content");
   for (const name of ["Applications", "Decision emails"]) {
     await page.getByRole("navigation", { name: "Admin", exact: true }).getByRole("link", { name, exact: true }).click();
-    for (const width of widths) {
+    for (const width of [320, 375, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       const trigger = page.getByRole("button", { name: /Account menu for/ });

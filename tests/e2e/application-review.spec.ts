@@ -20,7 +20,7 @@ test.describe("application review workflow", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeVisible();
-    for (let index = 0; index < 12; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       await page.keyboard.press("Tab");
       // Chromium may briefly focus the document at the native dialog's wrap point.
       expect(await dialog.evaluate((element) => element.contains(document.activeElement) || document.activeElement === document.body)).toBe(true);

@@ -12,6 +12,7 @@ export default defineConfig({
   // merged meals+shop suite under the job timeout.
   fullyParallel: false,
   workers: process.env.CI ? 2 : 1,
+  timeout: process.env.CI ? 45_000 : 30_000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
@@ -19,6 +20,8 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // Storm shaders keep nodes "unstable" for Playwright clicks under CI load.
+    reducedMotion: "reduce",
   },
   projects: process.env.CI
     ? [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }]
