@@ -154,6 +154,7 @@ export default defineSchema({
     qrCodeToken: v.string(),
     foodRestriction: v.optional(v.string()),
     checkedInAt: v.optional(v.number()),
+    /** Legacy single-use food timestamp; preserved when meal redemptions replace food check-in. */
     foodCheckedInAt: v.optional(v.number()),
     /** Cached balance; optional until backfill, then required in a later deploy. */
     points: v.optional(v.number()),
@@ -163,6 +164,39 @@ export default defineSchema({
     .index("by_application", ["applicationId"])
     .index("by_auth_user", ["authUserId"])
     .index("by_qr_token", ["qrCodeToken"]),
+
+  /**
+   * Configurable serving windows, stored as Unix timestamps in milliseconds.
+   * Mutations must validate startsAt < endsAt and prevent overlapping active windows.
+   * Meals with redemption history must be deactivated rather than deleted.
+   */
+  mealPeriods: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    startsAt: v.number(),
+    endsAt: v.number(),
+    active: v.boolean(),
+    createdBy: v.id("admins"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_active_startsAt", ["active", "startsAt"])
+    .index("by_startsAt", ["startsAt"]),
+
+  /**
+   * Authoritative meal collection history, independent of legacy foodCheckedInAt.
+   * The redemption mutation must check by_participant_meal and insert atomically;
+   * indexes do not enforce uniqueness. Duplicate scans must preserve redeemedAt.
+   */
+  mealRedemptions: defineTable({
+    participantId: v.id("participants"),
+    mealPeriodId: v.id("mealPeriods"),
+    scannedBy: v.id("admins"),
+    redeemedAt: v.number(),
+  })
+    .index("by_participant_meal", ["participantId", "mealPeriodId"])
+    .index("by_meal", ["mealPeriodId", "redeemedAt"])
+    .index("by_participant", ["participantId", "redeemedAt"]),
 
   /** Point-bearing hackathon activities volunteers may award (fixed points per event). */
   events: defineTable({
