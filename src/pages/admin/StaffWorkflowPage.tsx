@@ -2,7 +2,6 @@ import { EmptyState } from "../../components/states/EmptyState";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 
 const workflows = {
-  participants: { title: "Participants", description: "Participant management will be available when the participant administration workflow is ready." },
   volunteers: { title: "Volunteers", description: "Volunteer management will be available when the account management workflow is ready." },
 } as const;
 
