@@ -110,6 +110,11 @@ const OUTCOMES = {
     title: "Event not active",
     detail: "This event has ended or was turned off, so no points were awarded. Contact an administrator if this is unexpected.",
   },
+  self_purchase_denied: {
+    tone: "error",
+    title: "Can't sell to yourself",
+    detail: "Volunteers can't complete shop purchases for their own account. Ask another shop volunteer to help.",
+  },
   rate_limited: {
     tone: "error",
     title: "Too many scans",

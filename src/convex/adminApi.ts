@@ -24,15 +24,32 @@ import type {
   foodCheckInParticipant,
 } from "../../convex/admin/volunteerOperations";
 import type {
+  createEvent,
+  getEvent,
+  listEvents,
+  setEventActive,
+  setEventPoints,
+  updateEvent,
+} from "../../convex/admin/events";
+import type {
   getParticipantDetails,
   listParticipants,
   promoteParticipantToVolunteer,
   setParticipantPoints,
 } from "../../convex/admin/participantsAdmin";
 import type {
+  getVolunteer,
+  listStaffConfigLogs,
+  listVolunteerActionLogs,
+  listVolunteers,
   restoreVolunteer,
   revokeVolunteer,
+  setVolunteerCapabilities,
+  setVolunteerEventAccess,
 } from "../../convex/admin/volunteers";
+import type * as shopAdmin from "../../convex/admin/shopAdmin";
+import type * as shopFlashSales from "../../convex/admin/shopFlashSales";
+import type * as shopRedemption from "../../convex/admin/shopRedemption";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -211,6 +228,119 @@ export const awardEventPointsRef = adminModuleRef<
   AwardEventPointsResult
 >("admin/volunteerOperations:awardEventPoints");
 
+type ShopAdmin = ApiFromModules<{ shop: typeof shopAdmin }>["shop"];
+export type ShopItemAdminList = FunctionReturnType<ShopAdmin["listShopItemsAdmin"]>;
+export type ShopItemAdminRow = ShopItemAdminList["items"][number];
+export type ShopInventoryAdjustmentPage = FunctionReturnType<ShopAdmin["listInventoryAdjustments"]>;
+export type ShopRedemptionPage = FunctionReturnType<ShopAdmin["listShopRedemptions"]>;
+export type ShopRedemptionRow = ShopRedemptionPage["page"][number];
+export type ShopVolunteerRow = FunctionReturnType<ShopAdmin["listShopVolunteers"]>[number];
+
+function shopAdminRef<Name extends keyof ShopAdmin>(name: Name) {
+  return adminModuleRef<
+    ShopAdmin[Name]["_type"],
+    FunctionArgs<ShopAdmin[Name]>,
+    FunctionReturnType<ShopAdmin[Name]>
+  >(`admin/shopAdmin:${name}`);
+}
+
+export const generateShopImageUploadUrlRef = shopAdminRef("generateShopImageUploadUrl");
+export const createShopItemRef = shopAdminRef("createShopItem");
+export const updateShopItemRef = shopAdminRef("updateShopItem");
+export const setShopItemStatusRef = shopAdminRef("setShopItemStatus");
+export const adjustShopStockRef = shopAdminRef("adjustShopStock");
+export const listShopItemsAdminRef = shopAdminRef("listShopItemsAdmin");
+export const listInventoryAdjustmentsRef = shopAdminRef("listInventoryAdjustments");
+export const listShopRedemptionsRef = shopAdminRef("listShopRedemptions");
+export const refundShopRedemptionRef = shopAdminRef("refundShopRedemption");
+export const listShopVolunteersRef = shopAdminRef("listShopVolunteers");
+export const setVolunteerShopAccessRef = shopAdminRef("setVolunteerShopAccess");
+
+type ShopFlashSales = ApiFromModules<{ sales: typeof shopFlashSales }>["sales"];
+export type FlashSaleRow = FunctionReturnType<ShopFlashSales["listFlashSales"]>[number];
+
+function flashSaleRef<Name extends keyof ShopFlashSales>(name: Name) {
+  return adminModuleRef<
+    ShopFlashSales[Name]["_type"],
+    FunctionArgs<ShopFlashSales[Name]>,
+    FunctionReturnType<ShopFlashSales[Name]>
+  >(`admin/shopFlashSales:${name}`);
+}
+
+export const createFlashSaleRef = flashSaleRef("createFlashSale");
+export const updateFlashSaleRef = flashSaleRef("updateFlashSale");
+export const cancelFlashSaleRef = flashSaleRef("cancelFlashSale");
+export const listFlashSalesRef = flashSaleRef("listFlashSales");
+
+type ShopRedemption = ApiFromModules<{ redeem: typeof shopRedemption }>["redeem"];
+export type ShopCatalog = FunctionReturnType<ShopRedemption["listShopCatalogForVolunteer"]>;
+export type ShopCatalogItem = ShopCatalog["items"][number];
+export type ShopCustomer = FunctionReturnType<ShopRedemption["getShopCustomer"]>;
+export type ShopPurchasePreview = FunctionReturnType<ShopRedemption["previewShopPurchase"]>;
+export type ShopPurchaseResult = FunctionReturnType<ShopRedemption["purchaseShopItem"]>;
+
+function shopRedemptionRef<Name extends keyof ShopRedemption>(name: Name) {
+  return adminModuleRef<
+    ShopRedemption[Name]["_type"],
+    FunctionArgs<ShopRedemption[Name]>,
+    FunctionReturnType<ShopRedemption[Name]>
+  >(`admin/shopRedemption:${name}`);
+}
+
+export const listShopCatalogForVolunteerRef = shopRedemptionRef("listShopCatalogForVolunteer");
+export const getShopCustomerRef = shopRedemptionRef("getShopCustomer");
+export const previewShopPurchaseRef = shopRedemptionRef("previewShopPurchase");
+export const purchaseShopItemRef = shopRedemptionRef("purchaseShopItem");
+
+type EventAdmin = ApiFromModules<{
+  events: {
+    listEvents: typeof listEvents;
+    getEvent: typeof getEvent;
+    createEvent: typeof createEvent;
+    updateEvent: typeof updateEvent;
+    setEventActive: typeof setEventActive;
+    setEventPoints: typeof setEventPoints;
+  };
+}>["events"];
+
+export type AdminEventRow = FunctionReturnType<EventAdmin["listEvents"]>["page"][number];
+
+export const listEventsRef = adminModuleRef<
+  "query",
+  FunctionArgs<EventAdmin["listEvents"]>,
+  FunctionReturnType<EventAdmin["listEvents"]>
+>("admin/events:listEvents");
+
+export const getEventRef = adminModuleRef<
+  "query",
+  FunctionArgs<EventAdmin["getEvent"]>,
+  FunctionReturnType<EventAdmin["getEvent"]>
+>("admin/events:getEvent");
+
+export const createEventRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["createEvent"]>,
+  FunctionReturnType<EventAdmin["createEvent"]>
+>("admin/events:createEvent");
+
+export const updateEventRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["updateEvent"]>,
+  FunctionReturnType<EventAdmin["updateEvent"]>
+>("admin/events:updateEvent");
+
+export const setEventActiveRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["setEventActive"]>,
+  FunctionReturnType<EventAdmin["setEventActive"]>
+>("admin/events:setEventActive");
+
+export const setEventPointsRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<EventAdmin["setEventPoints"]>,
+  FunctionReturnType<EventAdmin["setEventPoints"]>
+>("admin/events:setEventPoints");
+
 type ParticipantsAdmin = ApiFromModules<{
   participants: {
     getParticipantDetails: typeof getParticipantDetails;
@@ -249,10 +379,56 @@ export const promoteParticipantToVolunteerRef = adminModuleRef<
 
 type VolunteerManagement = ApiFromModules<{
   volunteers: {
+    getVolunteer: typeof getVolunteer;
+    listStaffConfigLogs: typeof listStaffConfigLogs;
+    listVolunteerActionLogs: typeof listVolunteerActionLogs;
+    listVolunteers: typeof listVolunteers;
     revokeVolunteer: typeof revokeVolunteer;
     restoreVolunteer: typeof restoreVolunteer;
+    setVolunteerCapabilities: typeof setVolunteerCapabilities;
+    setVolunteerEventAccess: typeof setVolunteerEventAccess;
   };
 }>["volunteers"];
+
+export type VolunteerRow = FunctionReturnType<VolunteerManagement["listVolunteers"]>["page"][number];
+export type VolunteerActionLogRow = FunctionReturnType<VolunteerManagement["listVolunteerActionLogs"]>["page"][number];
+export type StaffConfigLogRow = FunctionReturnType<VolunteerManagement["listStaffConfigLogs"]>["page"][number];
+
+export const listVolunteersRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listVolunteers"]>,
+  FunctionReturnType<VolunteerManagement["listVolunteers"]>
+>("admin/volunteers:listVolunteers");
+
+export const getVolunteerRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["getVolunteer"]>,
+  FunctionReturnType<VolunteerManagement["getVolunteer"]>
+>("admin/volunteers:getVolunteer");
+
+export const listVolunteerActionLogsRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listVolunteerActionLogs"]>,
+  FunctionReturnType<VolunteerManagement["listVolunteerActionLogs"]>
+>("admin/volunteers:listVolunteerActionLogs");
+
+export const listStaffConfigLogsRef = adminModuleRef<
+  "query",
+  FunctionArgs<VolunteerManagement["listStaffConfigLogs"]>,
+  FunctionReturnType<VolunteerManagement["listStaffConfigLogs"]>
+>("admin/volunteers:listStaffConfigLogs");
+
+export const setVolunteerCapabilitiesRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["setVolunteerCapabilities"]>,
+  FunctionReturnType<VolunteerManagement["setVolunteerCapabilities"]>
+>("admin/volunteers:setVolunteerCapabilities");
+
+export const setVolunteerEventAccessRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["setVolunteerEventAccess"]>,
+  FunctionReturnType<VolunteerManagement["setVolunteerEventAccess"]>
+>("admin/volunteers:setVolunteerEventAccess");
 
 export const revokeVolunteerRef = adminModuleRef<
   "mutation",

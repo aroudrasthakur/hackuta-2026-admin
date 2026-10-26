@@ -15,6 +15,7 @@
 | [`ReviewPanelSection.tsx`](ReviewPanelSection.tsx) | Shared review panel layout |
 | [`AdminProtectedRoute.tsx`](AdminProtectedRoute.tsx) | Session gate |
 | [`SignInPasswordInput.tsx`](SignInPasswordInput.tsx) | Password field with show/hide toggle (matches register sign-in) |
+| [`shop/`](shop/) | Admin shop tabs, item drawer, stock and refund dialogs, shop volunteer switches |
 | [`states/`](states/README.md) | Loading, empty, error |
 
 Buttons share [`reviewButtonClasses.ts`](../lib/reviewButtonClasses.ts).

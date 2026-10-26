@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { ScanOutcome } from "../../lib/scanResults";
 import { scanPrimaryButtonClass } from "../../lib/scanButtonClasses";
 
@@ -8,8 +8,13 @@ const TONES = {
   error: { panel: "border-red-700 bg-red-50 text-red-950", icon: "✕", label: "Not completed" },
 } as const;
 
-/** Final outcome with a focused Scan next action for fast repeat scanning. */
-export function ScanResult({ outcome, onScanNext }: { outcome: ScanOutcome; onScanNext: () => void }) {
+/** Final outcome with a focused Scan next action for fast repeat scanning. `children` adds details such as a receipt. */
+export function ScanResult({ outcome, onScanNext, children, secondaryAction }: {
+  outcome: ScanOutcome;
+  onScanNext: () => void;
+  children?: ReactNode;
+  secondaryAction?: ReactNode;
+}) {
   const tone = TONES[outcome.tone];
   const nextRef = useRef<HTMLButtonElement>(null);
   useEffect(() => nextRef.current?.focus(), []);
@@ -24,7 +29,9 @@ export function ScanResult({ outcome, onScanNext }: { outcome: ScanOutcome; onSc
           <span><span className="sr-only">{tone.label}: </span>{outcome.title}</span>
         </p>
         <p className="mt-2 text-lg">{outcome.detail}</p>
+        {children}
       </div>
+      {secondaryAction}
       <button ref={nextRef} type="button" className={scanPrimaryButtonClass} onClick={onScanNext}>
         Scan next
       </button>

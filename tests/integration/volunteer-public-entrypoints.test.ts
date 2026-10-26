@@ -35,13 +35,16 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "decisionEmailQueue.ts", exportName: "retryFailedDecisionEmails", guard: "requireAdminRole" },
   { file: "auth.ts", exportName: "createAndProvisionAdmin", guard: "requireAdminRole" },
   ...[
-    "createVolunteer", "listVolunteers", "resetVolunteerPassword",
+    "createVolunteer", "listVolunteers", "getVolunteer", "resetVolunteerPassword",
     "setVolunteerCapabilities", "setVolunteerEventAccess", "listVolunteerActionLogs", "listStaffConfigLogs",
   ].map((exportName) => ({ file: "volunteers.ts", exportName, guard: "requireAdminRole" })),
   ...[
     "listParticipants", "getParticipantDetails", "setParticipantPoints",
     "listPointAdjustments", "promoteParticipantToVolunteer",
   ].map((exportName) => ({ file: "participantsAdmin.ts", exportName, guard: "requireAdminRole" })),
+  ...["listEvents", "getEvent", "createEvent", "updateEvent", "setEventPoints", "setEventActive"].map((exportName) => ({
+    file: "events.ts", exportName, guard: "requireAdminRole",
+  })),
   ...["revokeVolunteer", "restoreVolunteer"].map((exportName) => ({
     file: "volunteers.ts", exportName, guard: "volunteerActiveMutation",
   })),
@@ -51,6 +54,17 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "volunteerOperations.ts", exportName: "checkInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "foodCheckInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "awardEventPoints", guard: "requireVolunteerAccess" },
+  ...[
+    "generateShopImageUploadUrl", "createShopItem", "updateShopItem", "setShopItemStatus", "adjustShopStock",
+    "listShopItemsAdmin", "listInventoryAdjustments", "listShopRedemptions", "refundShopRedemption",
+    "listShopVolunteers", "setVolunteerShopAccess",
+  ].map((exportName) => ({ file: "shopAdmin.ts", exportName, guard: "requireAdminRole" })),
+  ...["createFlashSale", "updateFlashSale", "cancelFlashSale", "listFlashSales"].map((exportName) => ({
+    file: "shopFlashSales.ts", exportName, guard: "requireAdminRole",
+  })),
+  ...["listShopCatalogForVolunteer", "getShopCustomer", "previewShopPurchase", "purchaseShopItem"].map((exportName) => ({
+    file: "shopRedemption.ts", exportName, guard: "requireShopVolunteer",
+  })),
 ] as const;
 
 function exportSection(source: string, exportName: string) {
@@ -101,6 +115,7 @@ describe("volunteer authorization contract (public entry points)", () => {
       "applications.ts",
       "applicationReviewLogs.ts",
       "auth.ts",
+      "events.ts",
       "volunteers.ts",
       "volunteerScan.ts",
       "participantsAdmin.ts",
