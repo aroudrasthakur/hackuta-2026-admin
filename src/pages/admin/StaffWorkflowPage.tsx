@@ -6,7 +6,6 @@ const workflows = {
   "check-in": { title: "Participant check-in", description: "The check-in scanner is being prepared. Follow your event lead’s instructions for participant arrivals." },
   food: { title: "Food", description: "The food scanner is being prepared. Follow your event lead’s instructions for meal distribution." },
   points: { title: "Points", description: "The points scanner is being prepared. Follow your event lead’s instructions for event attendance." },
-  participants: { title: "Participants", description: "Participant management will be available when the participant administration workflow is ready." },
   volunteers: { title: "Volunteers", description: "Volunteer management will be available when the account management workflow is ready." },
 } as const;
 

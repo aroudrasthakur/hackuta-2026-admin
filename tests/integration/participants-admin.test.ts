@@ -168,10 +168,11 @@ describe("getParticipantDetails", () => {
     const details = await t.query(api.getParticipantDetails, { sessionToken, participantId });
     expect(details).toMatchObject({
       participantId, name: "Taylor Student", email: "taylor@example.com", points: 10, ledgerPoints: 10,
-      pointsConsistent: true, checkedInAt: null, foodCheckedInAt: null, dietaryInfo: "Vegan", volunteer: null,
+      pointsConsistent: true, checkedInAt: null, foodCheckedInAt: null, volunteer: null,
       awards: [{ eventId, eventName: "Workshop", pointsAwarded: 15, awardedAt: 50, awardedBy: { adminId: admin.adminId, name: "Admin Ada" } }],
     });
     expect(JSON.stringify(details)).not.toMatch(/qrCodeToken/);
+    expect(JSON.stringify(details)).not.toMatch(/dietaryInfo|Vegan/);
   });
 
   it("flags a cached balance that disagrees with the ledger", async () => {
