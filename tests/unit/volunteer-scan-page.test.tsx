@@ -9,7 +9,10 @@ import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts
 import {
   awardEventPointsRef,
   checkInParticipantRef,
-  foodCheckInParticipantRef,
+  redeemMealRef,
+  resolveQrForMealRef,
+  listActiveMealPeriodsRef,
+  type VolunteerMealPeriod,
   listMyScanOptionsRef,
   resolveQrForScanRef,
   type VolunteerScanOptions,
@@ -21,6 +24,7 @@ import { VolunteerScanPage, type ScanWorkflowName } from "../../src/pages/admin/
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   resolve: vi.fn(),
+  resolveMeal: vi.fn(),
   checkIn: vi.fn(),
   food: vi.fn(),
   award: vi.fn(),
@@ -32,7 +36,8 @@ vi.mock("../../src/convex/reactBindings", () => ({
   useMutation: (ref: unknown) => {
     if (ref === resolveQrForScanRef) return mocks.resolve;
     if (ref === checkInParticipantRef) return mocks.checkIn;
-    if (ref === foodCheckInParticipantRef) return mocks.food;
+    if (ref === redeemMealRef) return mocks.food;
+    if (ref === resolveQrForMealRef) return mocks.resolveMeal;
     if (ref === awardEventPointsRef) return mocks.award;
     throw new Error("Unexpected mutation ref");
   },
@@ -50,6 +55,8 @@ const token = "ab".repeat(32);
 const workshop = { eventId: "event-workshop" as GenericId<"events">, name: "Workshop", pointsAwarded: 25, startsAt: 1, endsAt: 2 };
 const panel = { eventId: "event-panel" as GenericId<"events">, name: "Panel", pointsAwarded: 10, startsAt: 3, endsAt: 4 };
 let options: VolunteerScanOptions | undefined;
+const lunch = { mealPeriodId: "meal-lunch" as GenericId<"mealPeriods">, name: "Lunch", startsAt: 0, endsAt: Number.MAX_SAFE_INTEGER, updatedAt: 1 };
+let meals: VolunteerMealPeriod[] | undefined;
 let container: HTMLDivElement;
 let root: Root;
 
@@ -112,11 +119,13 @@ const checkInPreview = { status: "ok", purpose: "check_in", participant: { name:
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   options = { canCheckIn: true, canFoodCheckIn: true, events: [workshop, panel] };
+  meals = [lunch];
   mocks.query.mockReset().mockImplementation((ref) => {
+    if (ref === listActiveMealPeriodsRef) return meals;
     expect(ref).toBe(listMyScanOptionsRef);
     return options;
   });
-  for (const mock of [mocks.resolve, mocks.checkIn, mocks.food, mocks.award]) mock.mockReset();
+  for (const mock of [mocks.resolve, mocks.resolveMeal, mocks.checkIn, mocks.food, mocks.award]) mock.mockReset();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -125,6 +134,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -286,36 +296,147 @@ describe("check-in workflow", () => {
 });
 
 describe("food workflow", () => {
+  it("keeps an in-flight confirmed collection visible when its meal becomes unavailable", async () => {
+    mocks.resolveMeal.mockResolvedValue({ status: "ok", purpose: "food_check_in", meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan" } });
+    const pending = deferred<unknown>(); mocks.food.mockReturnValue(pending.promise);
+    await render("food"); await scan(); await click("Confirm food given");
+    meals = []; await render("food");
+    expect(button("Saving…")).toBeDefined();
+    await act(async () => pending.resolve({ status: "success", redeemedAt: 1, meal: lunch }));
+    expect(result()?.textContent).toContain("Sam Lee's food collection for Lunch is recorded.");
+    expect(text()).not.toContain("Vegan");
+    await click("Scan next"); expect(text()).toContain("No meals available");
+    expect(button("Simulate scan")).toBeUndefined();
+  });
+
+  it("allows cancelling meal selection and keeping the current meal", async () => {
+    meals = [lunch, { ...lunch, mealPeriodId: "snack" as GenericId<"mealPeriods">, name: "Snack" }];
+    await render("food", "/admin/scan/food?meal=meal-lunch");
+    await click("Change meal"); await click("Keep Lunch");
+    expect(text()).not.toContain("Choose your meal"); expect(button("Simulate scan")).toBeDefined();
+    expect(container.querySelector("output")?.textContent).toContain("meal=meal-lunch");
+  });
+
   it("shows dietary information only during confirmation", async () => {
-    mocks.resolve.mockResolvedValue({
+    mocks.resolveMeal.mockResolvedValue({
       status: "ok",
       purpose: "food_check_in",
-      participant: { name: "Sam Lee", foodCheckedIn: false, foodCheckedInAt: null, dietaryInfo: "Vegan; Allergies: nuts" },
+      meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan; Allergies: nuts" },
     });
-    mocks.food.mockResolvedValue({ status: "success", foodCheckedInAt: 1 });
+    mocks.food.mockResolvedValue({ status: "success", redeemedAt: 1, meal: lunch });
     await render("food");
     await scan();
-    expect(mocks.resolve).toHaveBeenCalledWith(expect.objectContaining({ purpose: "food_check_in" }));
+    expect(mocks.resolveMeal).toHaveBeenCalledWith({ sessionToken: "session", qrCodeToken: token, mealPeriodId: lunch.mealPeriodId });
+    expect(mocks.resolve).not.toHaveBeenCalled();
     expect(text()).toContain("Not redeemed yet");
     expect(text()).toContain("Vegan; Allergies: nuts");
     await click("Confirm food given");
-    expect(mocks.food).toHaveBeenCalledWith({ sessionToken: "session", qrCodeToken: token });
-    expect(result()?.textContent).toContain("Food redeemed");
+    expect(mocks.food).toHaveBeenCalledWith({ sessionToken: "session", qrCodeToken: token, mealPeriodId: lunch.mealPeriodId });
+    expect(result()?.textContent).toContain("Food collected");
     expect(text()).not.toContain("Vegan");
   });
 
   it("states when no dietary restrictions are listed and explains repeats", async () => {
-    mocks.resolve.mockResolvedValue({
+    mocks.resolveMeal.mockResolvedValue({
       status: "ok",
       purpose: "food_check_in",
-      participant: { name: "Sam Lee", foodCheckedIn: false, foodCheckedInAt: null, dietaryInfo: null },
+      meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: null },
     });
-    mocks.food.mockResolvedValue({ status: "already_food_checked_in", foodCheckedInAt: 1 });
+    mocks.food.mockResolvedValue({ status: "already_redeemed", redeemedAt: 1, meal: lunch });
     await render("food");
     await scan();
     expect(text()).toContain("None listed");
     await click("Confirm food given");
-    expect(result()?.textContent).toContain("Food already redeemed");
+    expect(result()?.textContent).toContain("Food Already Collected");
+    expect(result()?.textContent).toContain("for Lunch.");
+  });
+
+  it("waits for meal availability and does not scan when no meal is being served", async () => {
+    meals = undefined; await render("food"); expect(text()).toContain("Loading available meals");
+    meals = []; await render("food"); expect(text()).toContain("No meals available");
+    expect(button("Simulate scan")).toBeUndefined();
+  });
+
+  it("requires a choice for multiple available meals and resets the participant when switching", async () => {
+    const snack = { ...lunch, mealPeriodId: "snack" as GenericId<"mealPeriods">, name: "Snack" };
+    meals = [lunch, snack];
+    mocks.resolveMeal.mockResolvedValue({ status: "ok", purpose: "food_check_in", meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan" } });
+    await render("food"); expect(text()).toContain("Choose your meal"); expect(button("Simulate scan")).toBeUndefined();
+    await act(async () => container.querySelector<HTMLInputElement>('input[name="scan-meal"]')!.click());
+    expect(container.querySelector("output")?.textContent).toContain("meal=meal-lunch");
+    await scan(); expect(text()).toContain("Vegan");
+    await click("Change meal"); expect(text()).not.toContain("Sam Lee");
+    await act(async () => container.querySelectorAll<HTMLInputElement>('input[name="scan-meal"]')[1]!.click());
+    expect(text()).toContain("Snack"); expect(text()).not.toContain("Vegan"); expect(mocks.food).not.toHaveBeenCalled();
+  });
+
+  it("clears a pending preview and ignores its late response after a meal is disabled", async () => {
+    const pending = deferred<unknown>(); mocks.resolveMeal.mockReturnValue(pending.promise);
+    await render("food"); await scan();
+    meals = []; await render("food");
+    await act(async () => pending.resolve({ status: "ok", purpose: "food_check_in", meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan" } }));
+    expect(text()).toContain("No meals available"); expect(text()).not.toContain("Sam Lee"); expect(mocks.food).not.toHaveBeenCalled();
+  });
+
+  it("starts and ends availability at the clock boundary without a database change", async () => {
+    vi.useFakeTimers(); const now = Date.now();
+    meals = [{ ...lunch, startsAt: now + 1000, endsAt: now + 2000 }];
+    await render("food"); expect(text()).toContain("No meals available");
+    await act(async () => vi.advanceTimersByTime(1000)); expect(button("Simulate scan")).toBeDefined();
+    await act(async () => vi.advanceTimersByTime(1000)); expect(button("Simulate scan")).toBeUndefined(); expect(text()).toContain("No meals available");
+  });
+
+  it("does not silently replace an explicitly selected meal that was removed", async () => {
+    await render("food", "/admin/scan/food?meal=removed");
+    expect(text()).toContain("selected meal is no longer available"); expect(text()).toContain("Choose your meal");
+    expect(button("Simulate scan")).toBeUndefined();
+  });
+
+  it("clears confirmation after a schedule edit", async () => {
+    mocks.resolveMeal.mockResolvedValue({ status: "ok", purpose: "food_check_in", meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan" } });
+    await render("food"); await scan(); expect(text()).toContain("Sam Lee");
+    meals = [{ ...lunch, updatedAt: 2 }]; await render("food");
+    expect(text()).not.toContain("Sam Lee"); expect(button("Simulate scan")).toBeDefined();
+  });
+
+  it("reports a duplicate during preview and immediately offers Scan next", async () => {
+    mocks.resolveMeal.mockResolvedValue({ status: "ok", purpose: "food_check_in", meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: true, redeemedAt: 1, dietaryInfo: "Vegan" } });
+    await render("food"); await scan(); expect(result()?.textContent).toContain("Food Already Collected");
+    expect(text()).not.toContain("Vegan"); expect(mocks.food).not.toHaveBeenCalled();
+    expect(document.activeElement?.textContent).toBe("Scan next"); await click("Scan next"); expect(button("Simulate scan")).toBeDefined();
+  });
+
+  it.each(["meal_not_active", "meal_not_started", "meal_ended", "participant_ineligible", "not_authorized"])("handles %s between preview and confirmation", async (status) => {
+    mocks.resolveMeal.mockResolvedValue({ status: "ok", purpose: "food_check_in", meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan" } });
+    mocks.food.mockResolvedValue({ status }); await render("food"); await scan(); await click("Confirm food given");
+    expect(result()?.getAttribute("role")).toBe("alert"); expect(text()).not.toContain("Vegan");
+  });
+
+  it("preserves the selected meal and confirmation across retryable failures", async () => {
+    mocks.resolveMeal.mockResolvedValue({ status: "ok", purpose: "food_check_in", meal: lunch,
+      participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan" } });
+    mocks.food.mockResolvedValueOnce({ status: "rate_limited" }).mockRejectedValueOnce(new ScanNetworkError())
+      .mockResolvedValueOnce({ status: "success", redeemedAt: 1, meal: lunch });
+    await render("food"); await scan(); await click("Confirm food given");
+    expect(text()).toContain("Too many scans"); await click(/^Try again/); expect(text()).toContain("Connection problem");
+    await click(/^Try again/); expect(result()?.textContent).toContain("Food collected");
+    expect(mocks.food).toHaveBeenLastCalledWith({ sessionToken: "session", qrCodeToken: token, mealPeriodId: lunch.mealPeriodId });
+  });
+
+  it("contains meal-query errors and retries without exposing server details", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.query.mockImplementation((ref) => { if (ref === listActiveMealPeriodsRef) throw new Error("Private details"); return options; });
+    await render("food"); expect(text()).toContain("Unable to load available meals"); expect(text()).not.toContain("Private details");
+    mocks.query.mockImplementation((ref) => ref === listActiveMealPeriodsRef ? [lunch] : options);
+    await click("Try again"); expect(button("Simulate scan")).toBeDefined();
   });
 });
 
@@ -393,7 +514,7 @@ describe("points workflow", () => {
   });
 });
 
-function WorkflowHarness({ purpose, eventId }: { purpose: "check_in" | "point_scan"; eventId?: GenericId<"events"> }) {
+function WorkflowHarness({ purpose, eventId }: { purpose: "check_in" | "point_scan" | "food_check_in"; eventId?: GenericId<"events"> }) {
   const { state, scan: runScan, confirm } = useScanWorkflow(purpose, eventId);
   return (
     <>
@@ -415,6 +536,11 @@ describe("useScanWorkflow guards", () => {
     await click("scan");
     expect(step()).toBe("Event not assigned");
     expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+
+  it("refuses a food scan without a selected meal", async () => {
+    await renderHarness(<WorkflowHarness purpose="food_check_in" />); await click("scan");
+    expect(step()).toBe("Meal not available"); expect(mocks.resolveMeal).not.toHaveBeenCalled();
   });
 
   it("requires a session to look up or confirm", async () => {

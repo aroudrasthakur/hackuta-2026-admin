@@ -10,6 +10,10 @@ export const VOLUNTEER_ACTION_LABELS: Record<VolunteerActionLogRow["action"], st
 };
 
 export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = {
+  meal_created: "Meal created",
+  meal_updated: "Meal updated",
+  meal_active_changed: "Meal status changed",
+  meal_removed: "Meal removed",
   volunteer_created: "Volunteer account created",
   volunteer_promoted: "Promoted from participant",
   volunteer_restored: "Access restored",

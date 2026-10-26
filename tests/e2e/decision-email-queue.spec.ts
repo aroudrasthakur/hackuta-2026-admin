@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer } from "./fixtures/auth";
 import { setDecisionQueue } from "./fixtures/decisionQueue";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 async function openQueue(page: import("@playwright/test").Page) {
   await page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Decision emails" }).click();
@@ -70,7 +71,7 @@ test.describe("decision email queue", () => {
       await hold.scrollIntoViewIfNeeded();
       await expect(hold).toBeInViewport();
       await region.evaluate((element) => { element.scrollLeft = 0; });
-      if (width === 375 || width === 1440) await page.screenshot({ path: testInfo.outputPath(`decision-emails-${width}.png`), fullPage: true });
+      if (width === 375 || width === 1440) await reviewScreenshot(page, `decision-emails-${width}.png`, testInfo);
     }
   });
 

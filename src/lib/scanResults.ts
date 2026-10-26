@@ -3,7 +3,7 @@ import { logAdminError } from "../../shared/admin/logAdminError";
 import type {
   AwardEventPointsResult,
   CheckInResult,
-  FoodCheckInResult,
+  MealRedemptionResult,
   QrScanPreview,
 } from "../convex/adminApi";
 
@@ -68,6 +68,23 @@ export const INVALID_QR_OUTCOME: ScanOutcome = {
 };
 
 const OUTCOMES = {
+  participant_ineligible: {
+    tone: "error",
+    title: "Participant not eligible",
+    detail: "This person isn't an accepted participant, so no action is allowed. Direct them to the registration desk.",
+  },
+  meal_not_active: {
+    tone: "error", title: "Meal not available",
+    detail: "This meal was disabled or removed, or no meal was selected. Choose an available meal before scanning again.",
+  },
+  meal_not_started: {
+    tone: "error", title: "Meal has not started",
+    detail: "This meal's serving window has not started. Check the selected meal and wait until serving begins.",
+  },
+  meal_ended: {
+    tone: "error", title: "Meal has ended",
+    detail: "This meal's serving window has ended. No new collection can be recorded. Choose an available meal.",
+  },
   qr_not_found: {
     tone: "error",
     title: "Participant not found",
@@ -148,8 +165,8 @@ export function previewOutcome(preview: QrScanPreview): ScanOutcome | null {
   if (preview.purpose === "check_in" && preview.participant.checkedIn) {
     return alreadyCheckedIn(participant.name, preview.participant.checkedInAt);
   }
-  if (preview.purpose === "food_check_in" && preview.participant.foodCheckedIn) {
-    return alreadyRedeemed(participant.name, preview.participant.foodCheckedInAt);
+  if (preview.purpose === "food_check_in" && preview.participant.alreadyRedeemed) {
+    return alreadyRedeemed(preview.meal.name, preview.participant.redeemedAt);
   }
   if (preview.purpose === "point_scan" && preview.alreadyAwarded) {
     return alreadyAwarded(participant.name, preview.event.name);
@@ -165,11 +182,11 @@ function alreadyCheckedIn(name: string, at: number | null): ScanOutcome {
   };
 }
 
-function alreadyRedeemed(name: string, at: number | null): ScanOutcome {
+function alreadyRedeemed(mealName: string, at: number | null): ScanOutcome {
   return {
     tone: "duplicate",
-    title: "Food already redeemed",
-    detail: `${name} already received food${at === null ? "" : ` at ${formatScanTime(at)}`}. Nothing was changed.`,
+    title: "Food Already Collected",
+    detail: `This participant has already received their food for ${mealName}.${at === null ? "" : ` Collected at ${formatScanTime(at)}.`}`,
   };
 }
 
@@ -187,9 +204,9 @@ export function checkInOutcome(result: CheckInResult, name: string): ScanOutcome
   return OUTCOMES[result.status];
 }
 
-export function foodOutcome(result: FoodCheckInResult, name: string): ScanOutcome {
-  if (result.status === "success") return { tone: "success", title: "Food redeemed", detail: `${name} can receive food now.` };
-  if (result.status === "already_food_checked_in") return alreadyRedeemed(name, result.foodCheckedInAt);
+export function foodOutcome(result: MealRedemptionResult, name: string): ScanOutcome {
+  if (result.status === "success") return { tone: "success", title: "Food collected", detail: `${name}'s food collection for ${result.meal.name} is recorded.` };
+  if (result.status === "already_redeemed") return alreadyRedeemed(result.meal.name, result.redeemedAt);
   return OUTCOMES[result.status];
 }
 

@@ -18,12 +18,14 @@ Vite, React 19, TypeScript, React Router, Convex, Tailwind CSS v4.
 | `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points` | Capability-protected scanner entry pages |
 | `/admin/scan/shop` | Shop sales for volunteers with shop access |
 | `/admin/participants`, `/admin/volunteers` | Administrator-only management entry pages |
+| `/admin/events` | Administrator-only event schedule and point values |
+| `/admin/meals` | Admin-only meal schedules, serving availability, live counts, and collection history |
 | `/admin/shop` | Admin shop: items and stock, flash sales (`?tab=sales`), purchase history (`?tab=history`) |
 | `/admin/applications` | Submitted application queue |
 | `/admin/decision-emails` | Decision email queue for admins and reviewers |
 | `/admin/applications/:id` | Application review, decisions, history (admin) |
 
-`/admin` redirects admins and reviewers to applications and volunteers to the scanner dashboard. Scanner and management workflows currently show protected placeholders; their full interfaces are delivered separately.
+`/admin` redirects admins and reviewers to applications and volunteers to the scanner dashboard. Participant and volunteer management pages currently show protected placeholders.
 
 ## Commands
 

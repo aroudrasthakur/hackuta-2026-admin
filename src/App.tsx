@@ -12,6 +12,7 @@ import { VolunteerScanPage } from "./pages/admin/VolunteerScanPage";
 import { VolunteersPage } from "./pages/admin/VolunteersPage";
 import { VolunteerDetailPage } from "./pages/admin/VolunteerDetailPage";
 import { EventsPage } from "./pages/admin/EventsPage";
+import { MealsPage } from "./pages/admin/MealsPage";
 import { ShopPage } from "./pages/admin/ShopPage";
 import { VolunteerShopPage } from "./pages/admin/VolunteerShopPage";
 
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="volunteers" element={<VolunteersPage />} />
         <Route path="volunteers/:volunteerAdminId" element={<VolunteerDetailPage />} />
         <Route path="events" element={<EventsPage />} />
+        <Route path="meals" element={<MealsPage />} />
         <Route path="shop" element={<ShopPage />} />
       </Route>
       <Route path="*" element={<AdminProtectedRoute />} />

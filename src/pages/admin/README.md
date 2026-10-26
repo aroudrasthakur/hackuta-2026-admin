@@ -6,6 +6,7 @@
 | [`ApplicationsPage.tsx`](ApplicationsPage.tsx) | `/admin/applications` |
 | [`ApplicationReviewPage.tsx`](ApplicationReviewPage.tsx) | `/admin/applications/:applicationId` |
 | [`DecisionEmailQueuePage.tsx`](DecisionEmailQueuePage.tsx) | `/admin/decision-emails` |
+| [`MealsPage.tsx`](MealsPage.tsx) | `/admin/meals` — admin-only serving windows, counts, and collection history |
 | [`ParticipantsPage.tsx`](ParticipantsPage.tsx) | `/admin/participants` — paginated accepted-participant roster and administration |
 | [`VolunteerDashboardPage.tsx`](VolunteerDashboardPage.tsx) | `/admin/scan` |
 | [`VolunteerScanPage.tsx`](VolunteerScanPage.tsx) | `/admin/scan/check-in`, `/admin/scan/food`, `/admin/scan/points` — QR scan, confirm, result |
@@ -34,6 +35,22 @@ restore access; every change appears in the account history. The Events page
 creates events (active immediately) and edits them. Points cannot change once
 any participant has received them, and deactivating an event stops point scans
 without removing assignments.
+
+Meals use reactive queries for schedules, served counts, and paginated collection
+history. Status labels refresh every 15 seconds even without database writes.
+Create/edit forms use the browser's local timezone. Disabling a meal requires
+confirmation, and meals with history must be deactivated rather than removed.
+Schedule overlap checks and removal protection run in backend transactions.
+
+Food scanning selects a currently available meal (automatically when only one is
+available). Availability reacts to admin edits and serving-window boundaries.
+Changing or disabling the selected meal clears an unsubmitted preview and dietary
+card. Once distribution is confirmed, its request and result stay visible until
+the volunteer continues, even if the meal ends while the request is in flight.
+Confirmation calls `redeemMeal`, which rechecks all permissions and eligibility;
+duplicates show **Food Already Collected** with the meal and original collection
+time. Rate-limit and connection errors keep the confirmation available for retry.
+Legacy single-use food timestamps do not affect meal eligibility.
 
 The application queue defaults to all applications, oldest first. URL parameters
 preserve search, status, sort and assignment through review navigation. “Mine”

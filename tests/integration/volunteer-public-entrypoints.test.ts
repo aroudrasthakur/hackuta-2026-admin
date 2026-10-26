@@ -23,6 +23,7 @@ const adminDir = join(process.cwd(), "convex", "admin");
 
 /** Each public organizer API must call its guard before sensitive reads/writes. Update when adding endpoints. */
 const PUBLIC_ENTRY_GUARDS = [
+  ...["listMealPeriods", "listMealRedemptions", "createMealPeriod", "updateMealPeriod", "setMealPeriodActive", "removeMealPeriod"].map((exportName) => ({ file: "meals.ts", exportName, guard: "requireAdminRole" })),
   { file: "applications.ts", exportName: "listSubmittedApplications", guard: "requireReviewerAccess" },
   { file: "applications.ts", exportName: "getApplication", guard: "requireReviewerAccess" },
   { file: "applications.ts", exportName: "createSampleApplication", guard: "requireAdminRole" },
@@ -49,6 +50,7 @@ const PUBLIC_ENTRY_GUARDS = [
   })),
   { file: "volunteerScan.ts", exportName: "listMyScanOptions", guard: "requireVolunteerAccess" },
   { file: "volunteerScan.ts", exportName: "resolveQrForScan", guard: "requireVolunteerAccess" },
+  ...["listActiveMealPeriods", "resolveQrForMeal", "redeemMeal"].map((exportName) => ({ file: "volunteerScan.ts", exportName, guard: "requireVolunteerAccess" })),
   { file: "volunteerOperations.ts", exportName: "checkInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "foodCheckInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "awardEventPoints", guard: "requireVolunteerAccess" },

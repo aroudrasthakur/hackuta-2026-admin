@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GenericId } from "convex/values";
 import App from "../../src/App";
 import { AdminAuthContext, type AdminAuthContextValue, type StaffProfile } from "../../src/contexts/adminAuthContext";
-import { listMyScanOptionsRef, type VolunteerScanOptions } from "../../src/convex/adminApi";
+import { listMyScanOptionsRef, listActiveMealPeriodsRef, type VolunteerScanOptions } from "../../src/convex/adminApi";
 import { canAccessStaffRoute, intendedStaffDestination, staffHome } from "../../src/lib/staffRouteAccess";
 import { ADMIN_ROUTES } from "../../src/types/routes";
 vi.mock("../../src/components/WeatherMoodToggle", () => ({ WeatherMoodToggle: () => null }));
@@ -59,6 +59,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   options = allOptions;
   query.mockReset().mockImplementation((ref) => {
+    if (ref === listActiveMealPeriodsRef) return [];
     expect(ref).toBe(listMyScanOptionsRef);
     return options;
   });
@@ -130,7 +131,7 @@ describe("protected staff screens", () => {
   it.each(["admin", "reviewer"] as const)("shows the correct %s navigation and management routes", async (role) => {
     await render(ADMIN_ROUTES.participants, auth({ staff: { ...staff, role } }));
     expect(path()).toBe(role === "admin" ? ADMIN_ROUTES.participants : ADMIN_ROUTES.applications);
-    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Shop"] : ["Applications", "Decision emails"]);
+    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Meals", "Shop"] : ["Applications", "Decision emails"]);
     expect(query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
   });
 
@@ -151,6 +152,7 @@ describe("protected staff screens", () => {
     [ADMIN_ROUTES.volunteers, "Volunteers"],
     [ADMIN_ROUTES.volunteerDetail("volunteer-1"), "Volunteer detail"],
     [ADMIN_ROUTES.events, "Events"],
+    [ADMIN_ROUTES.meals, "Meals"],
   ])("opens %s for administrators", async (route, heading) => {
     await render(route, auth({ staff: { ...staff, role: "admin" } }));
     expect(path()).toBe(route);
@@ -163,7 +165,7 @@ describe("protected staff screens", () => {
     expect(current?.textContent).toBe("Volunteers");
   });
 
-  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop])("sends reviewers away from %s", async (route) => {
+  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop, ADMIN_ROUTES.meals])("sends reviewers away from %s", async (route) => {
     await render(route, auth({ staff: { ...staff, role: "reviewer" } }));
     expect(path()).toBe(ADMIN_ROUTES.applications);
   });

@@ -9,6 +9,7 @@ export const ADMIN_ROUTES = {
   participants: "/admin/participants",
   volunteers: "/admin/volunteers",
   events: "/admin/events",
+  meals: "/admin/meals",
   applications: "/admin/applications",
   decisionEmails: "/admin/decision-emails",
   shop: "/admin/shop",

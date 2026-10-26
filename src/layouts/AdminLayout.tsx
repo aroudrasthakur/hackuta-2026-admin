@@ -46,6 +46,7 @@ export function AdminLayout() {
     { to: ADMIN_ROUTES.participants, label: "Participants", icon: "participants" as const },
     { to: ADMIN_ROUTES.volunteers, label: "Volunteers", icon: "volunteers" as const },
     { to: ADMIN_ROUTES.events, label: "Events", icon: "events" as const },
+    { to: ADMIN_ROUTES.meals, label: "Meals", icon: "food" as const },
     { to: ADMIN_ROUTES.shop, label: "Shop", icon: "shop" as const },
   ];
   const permittedTabs = tabs.filter(({ to }) => staff && canAccessStaffRoute(to, staff, options) === true);

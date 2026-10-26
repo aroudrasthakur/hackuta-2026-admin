@@ -5,6 +5,12 @@ export const reviewHistoryDateFormatter = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
+/** datetime-local values use the browser timezone, including the selected date's DST offset. */
+export function localDateTime(value: number) {
+  const date = new Date(value);
+  return new Date(value - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 /** e.g. "Oct, 14 - 9:58 PM" for application timestamps in the admin UI. */
 export function formatApplicationDisplayDate(timestampMs: number): string {
   const date = new Date(timestampMs);

@@ -51,6 +51,8 @@ File: [`convex/schema.ts`](schema.ts)
 | `admins` | Admin | **Yes** — does not exist in register repo |
 | `applicationReviewLogs` | Admin | **Yes** — append-only reviewer/admin activity history |
 | `participants` | Admin | **Yes** — one row per accepted application (check-in identity; see [participants columns](#participants-columns)) |
+| `mealPeriods` | Admin | **Yes** — custom meal names, serving windows, availability, and creator |
+| `mealRedemptions` | Admin | **Yes** — authoritative per-participant per-meal collection history |
 | `adminAuthAccounts` | Admin | **Yes** — organizer password hashes (separate from applicant auth) |
 | `adminSessions` | Admin | **Yes** — organizer session token hashes |
 | `decisionEmailQueue` | Admin | **Yes** — queued accept, reject, and waitlist emails |
@@ -78,12 +80,41 @@ All register-owned blocks must remain identical to [`schema.reference.ts`](../sc
 | `qrCodeToken` | `string` | Check-in QR identity (256-bit hex) |
 | `foodRestriction` | `string` (optional) | Snapshot from the linked application’s `dietaryRestrictions`, `otherDietaryRestrictions`, and `allergyDetails` at participant creation |
 | `checkedInAt` | `number` (optional) | General hackathon door check-in |
-| `foodCheckedInAt` | `number` (optional) | Food line check-in |
+| `foodCheckedInAt` | `number` (optional) | Legacy single-use food check-in; preserve historical values when switching to meal redemptions |
 | `points` | `number` (optional, then required) | Cached point balance; new accepts start at `0` |
 | `createdAt` | `number` | Row creation time |
 | `updatedAt` | `number` | Last update time |
 
 `points` stays optional until `admin/pointsBackfill:backfillParticipantPoints` is deployed from hackuta-2026-profile and run until `isDone`. A later schema change can make `points` required only after that backfill finishes. Deploying `points` as required while any participant row omits it fails the Convex push.
+
+### Meal periods and redemptions
+
+`mealPeriods` stores `name`, optional `description`, `startsAt`, `endsAt`, `active`, `createdBy` (`Id<"admins">`), `createdAt`, and `updatedAt`. All timestamps are Unix milliseconds. `by_active_startsAt` indexes availability and serving-window start; `by_startsAt` supports schedule ordering across dates. Upcoming, Active, Ended, and Disabled are derived from the current time, serving window, and `active` flag rather than stored statuses.
+
+`mealRedemptions` stores `participantId` (`Id<"participants">`), `mealPeriodId` (`Id<"mealPeriods">`), `scannedBy` (`Id<"admins">`), and `redeemedAt`. `by_participant_meal` supports duplicate checks. `by_meal` indexes `[mealPeriodId, redeemedAt]`, and `by_participant` indexes `[participantId, redeemedAt]`, allowing chronological history queries for either entity.
+
+`mealPeriods.servedCount` is an optional cached total, initialized to zero for new
+meals and incremented atomically on successful redemption. Optional
+`servedCountBackfillCursor` and `mealRedemptions.countedInServedCount` support a
+bounded, resumable backfill for existing history without double counting live
+collections. An absent count or a present cursor means the total is incomplete;
+the admin query returns `served: null` until the backfill finishes. Run
+`admin/mealCountsBackfill:backfillMealServedCount` for each existing meal until
+`isDone` after deploying the synchronized backend from profile. These fields stay
+optional so the schema accepts existing meals and historical redemption rows.
+
+Meal management in `admin/meals.ts` enforces schedule validation, overlap prevention, and removal protection. Food scanning in `admin/volunteerScan.ts` uses meal redemptions and preserves legacy timestamps. The meal system enforces these rules:
+
+- Require `startsAt < endsAt` and reject overlapping active serving windows.
+- Allow deletion only for unused meals; deactivate meals with redemption history.
+- Check `by_participant_meal` and insert in one mutation to enforce one redemption per participant per meal. Convex indexes do not enforce uniqueness.
+- Use meal redemptions for eligibility, preserving legacy `participants.foodCheckedInAt` values and original redemption timestamps.
+
+`staffConfigLogs.targetMealPeriodId` optionally identifies meal configuration changes (`meal_created`, `meal_updated`, `meal_active_changed`, `meal_removed`). Existing audit rows remain valid. Removal logs retain the meal name and serving window in `details` after the unused meal is deleted.
+
+`volunteerActionLogs.mealPeriodId` optionally identifies the meal for new `food_check_in` entries. The redemption and its audit entry are inserted atomically; legacy log rows without a meal ID remain valid.
+
+The new tables are empty on first deployment; no legacy timestamp can be assigned to a particular meal automatically. Synchronize the admin schema into `hackuta-2026-profile` using its `admin-schema-lock:refresh` workflow before deploying from profile. Do not refresh the register schema lock for these admin-owned additions.
 
 ### `admins` volunteer columns
 

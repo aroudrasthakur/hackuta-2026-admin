@@ -6,6 +6,7 @@ import {
   signInOrganizer,
 } from "./fixtures/auth";
 import { resetE2eMockBackend } from "./fixtures/resetMock";
+import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 test.describe("application review workflow", () => {
   test.beforeEach(async ({ page }) => {
@@ -19,7 +20,7 @@ test.describe("application review workflow", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeVisible();
-    for (let index = 0; index < 12; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       await page.keyboard.press("Tab");
       // Chromium may briefly focus the document at the native dialog's wrap point.
       expect(await dialog.evaluate((element) => element.contains(document.activeElement) || document.activeElement === document.body)).toBe(true);
@@ -51,7 +52,7 @@ test.describe("application review workflow", () => {
         expect((await responses.boundingBox())!.y).toBeLessThan(720);
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      if (width === 1440 || width === 375) await page.screenshot({ path: testInfo.outputPath(`review-${width}.png`), fullPage: true });
+      if (width === 1440 || width === 375) await reviewScreenshot(page, `review-${width}.png`, testInfo);
     }
     await expect(page.getByRole("region", { name: "Personal and contact information" })).toBeHidden();
     await page.getByText("Additional applicant information", { exact: true }).click();

@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GenericId } from "convex/values";
 import { useMutation } from "../convex/reactBindings";
 import {
   awardEventPointsRef,
   checkInParticipantRef,
-  foodCheckInParticipantRef,
+  redeemMealRef,
+  resolveQrForMealRef,
   resolveQrForScanRef,
 } from "../convex/adminApi";
 import {
@@ -30,24 +31,30 @@ export type ScanWorkflowState =
   | { step: "result"; outcome: ScanOutcome };
 
 /**
- * Scan → confirm → result for one purpose (and event, for points). The
+ * Scan → confirm → result for one purpose and selected event or meal. The
  * preview only identifies the participant; the confirmation mutation re-runs
  * every check on the server and its result is what the volunteer sees.
  *
  * The QR token lives only in a ref between preview and confirmation and is
- * dropped on any result or reset. Remount (key by purpose and event) to clear
- * everything when either changes.
+ * dropped on any result, reset, or unmount. Remount when the purpose, event,
+ * meal, or meal schedule changes to clear the previous participant.
  */
-export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"events">) {
+export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"events">, mealPeriodId?: GenericId<"mealPeriods">) {
   const { sessionToken } = useAdminAuth();
   const resolve = useMutation(resolveQrForScanRef);
   const checkIn = useMutation(checkInParticipantRef);
-  const redeemFood = useMutation(foodCheckInParticipantRef);
+  const resolveMeal = useMutation(resolveQrForMealRef);
+  const redeemFood = useMutation(redeemMealRef);
   const awardPoints = useMutation(awardEventPointsRef);
   const [state, setState] = useState<ScanWorkflowState>({ step: "scan" });
   const tokenRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   const requestRef = useRef(0);
+
+  useEffect(() => () => {
+    requestRef.current += 1;
+    tokenRef.current = null;
+  }, []);
 
   const finish = useCallback((outcome: ScanOutcome) => {
     tokenRef.current = null;
@@ -60,12 +67,15 @@ export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"event
     if (!token) return finish(INVALID_QR_OUTCOME);
     if (!sessionToken) return finish(scanFailureOutcome("session_expired"));
     if (purpose === "point_scan" && !eventId) return finish(scanFailureOutcome("event_denied"));
+    if (purpose === "food_check_in" && !mealPeriodId) return finish(scanFailureOutcome("meal_not_active"));
 
     busyRef.current = true;
     const request = ++requestRef.current;
     setState({ step: "resolving" });
     try {
-      const preview = await withScanTimeout(() => resolve({
+      const preview = await withScanTimeout(() => purpose === "food_check_in" && mealPeriodId
+        ? resolveMeal({ sessionToken, qrCodeToken: token, mealPeriodId })
+        : resolve({
         sessionToken,
         qrCodeToken: token,
         purpose,
@@ -81,7 +91,7 @@ export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"event
     } finally {
       if (request === requestRef.current) busyRef.current = false;
     }
-  }, [eventId, finish, purpose, resolve, sessionToken]);
+  }, [eventId, finish, mealPeriodId, purpose, resolve, resolveMeal, sessionToken]);
 
   const confirm = useCallback(async () => {
     const token = tokenRef.current;
@@ -105,7 +115,7 @@ export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"event
         outcome = awardOutcome(result, name, preview.event.name);
         rateLimited = result.status === "rate_limited";
       } else if (preview.purpose === "food_check_in") {
-        const result = await withScanTimeout(() => redeemFood(args));
+        const result = await withScanTimeout(() => redeemFood({ ...args, mealPeriodId: preview.meal.mealPeriodId }));
         outcome = foodOutcome(result, name);
         rateLimited = result.status === "rate_limited";
       } else {

@@ -6,6 +6,9 @@ import {
   getCurrentStaffRef,
   getParticipantDetailsRef,
   listMyScanOptionsRef,
+  listActiveMealPeriodsRef,
+  resolveQrForMealRef,
+  redeemMealRef,
   listApplicationReviewLogsRef,
   listDecisionEmailQueueRef,
   listParticipantsRef,
@@ -51,8 +54,18 @@ import {
   previewShopPurchaseRef,
   purchaseShopItemRef,
 } from "../convex/adminApi";
+import { createMealPeriodRef, listMealPeriodsRef, listMealRedemptionsRef, removeMealPeriodRef, setMealPeriodActiveRef, updateMealPeriodRef } from "../convex/mealsApi";
 
 const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
+  [listActiveMealPeriodsRef, "admin/volunteerScan:listActiveMealPeriods"],
+  [resolveQrForMealRef, "admin/volunteerScan:resolveQrForMeal"],
+  [redeemMealRef, "admin/volunteerScan:redeemMeal"],
+  [listMealPeriodsRef, "admin/meals:listMealPeriods"],
+  [listMealRedemptionsRef, "admin/meals:listMealRedemptions"],
+  [createMealPeriodRef, "admin/meals:createMealPeriod"],
+  [updateMealPeriodRef, "admin/meals:updateMealPeriod"],
+  [removeMealPeriodRef, "admin/meals:removeMealPeriod"],
+  [setMealPeriodActiveRef, "admin/meals:setMealPeriodActive"],
   [getCurrentStaffRef, "admin/auth:getCurrentStaff"],
   [listMyScanOptionsRef, "admin/volunteerScan:listMyScanOptions"],
   [resolveQrForScanRef, "admin/volunteerScan:resolveQrForScan"],
