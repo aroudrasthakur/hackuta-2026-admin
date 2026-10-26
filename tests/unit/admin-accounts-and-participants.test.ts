@@ -12,6 +12,7 @@ import {
   signInOrganizer,
 } from "../helpers/staffTestFixtures";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
+import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 const ref = {
   signOut: makeFunctionReference<"mutation", { sessionToken: string }>("admin/auth:signOut"),
@@ -171,6 +172,13 @@ describe("internal participant creation", () => {
     await expect(t.mutation(ref.createParticipant, { applicationId, acceptedBy: adminId })).rejects.toThrow(
       /inactive/i,
     );
+  });
+
+  it("rejects a volunteer as the accepting staff member even on the internal entry point", async () => {
+    const { t, adminId, applicationId } = await acceptedFixture();
+    await t.run((ctx) => ctx.db.patch(adminId, { role: "volunteer" }));
+    await expectAdminErrorCode(t.mutation(ref.createParticipant, { applicationId, acceptedBy: adminId }), "NOT_AUTHORIZED");
+    expect(await t.run((ctx) => ctx.db.query("participants").collect())).toEqual([]);
   });
 
   it("rejects a missing applicant account", async () => {

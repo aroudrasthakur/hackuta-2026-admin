@@ -1,7 +1,85 @@
 import { test, expect } from "@playwright/test";
-import { E2E_REVIEWER, signInOrganizer, signOutOrganizer } from "./fixtures/auth";
+import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signOutOrganizer } from "./fixtures/auth";
+import { E2E_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 
 test.describe("organizer authentication", () => {
+  async function signInVolunteer(page: import("@playwright/test").Page) {
+    await page.goto("/admin/login");
+    await page.getByLabel("Email").fill(E2E_VOLUNTEER.email);
+    await page.getByLabel("Password", { exact: true }).fill(E2E_VOLUNTEER.password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/admin\/scan$/);
+    await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+  }
+
+  test("keeps volunteer sessions out of review pages and permits signing out", async ({ page }) => {
+    await signInVolunteer(page);
+    await expect(page.getByRole("navigation", { name: "Volunteer" }).getByRole("tab")).toHaveText(["Dashboard", "Check-in"]);
+    await expect(page.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
+    for (const path of ["/admin/applications", "/admin/decision-emails", "/admin/applications/e2e-app-unreviewed", "/admin/participants", "/admin/volunteers", "/admin/scan/food", "/admin/scan/points"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/admin\/scan$/);
+      await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
+    }
+    await signOutOrganizer(page);
+  });
+
+  test("returns an idle volunteer session to login when it expires", async ({ page }) => {
+    await page.clock.install();
+    await signInVolunteer(page);
+    await page.clock.fastForward(24 * 60 * 60 * 1000 + 1000);
+    await expect(page).toHaveURL(/\/admin\/login$/);
+    await expect(page.getByRole("alert")).toHaveText("Your session has expired. Please sign in again.");
+  });
+
+  test("preserves an authorized review deep link through sign-in", async ({ page }) => {
+    await page.goto("/admin/applications/e2e-app-unreviewed?source=direct");
+    await expect(page).toHaveURL(/\/admin\/login$/);
+    await page.getByLabel("Email").fill(E2E_REVIEWER.email);
+    await page.getByLabel("Password", { exact: true }).fill(E2E_REVIEWER.password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/admin\/applications\/e2e-app-unreviewed\?source=direct$/);
+    await expect(page.getByRole("heading", { name: "Taylor Unreviewed" })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Taylor Unreviewed" })).toBeVisible();
+  });
+
+  test("restricts management pages to administrators", async ({ page }) => {
+    await signInOrganizer(page, E2E_REVIEWER);
+    await expect(page.getByRole("tab")).toHaveText(["Applications", "Decision emails"]);
+    for (const path of ["/admin/participants", "/admin/volunteers"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/admin\/applications$/);
+      await expect(page.getByRole("alert")).toContainText("current permissions");
+    }
+    await signOutOrganizer(page);
+    await signInOrganizer(page, E2E_ADMIN);
+    await expect(page.getByRole("tab")).toHaveText(["Applications", "Decision emails", "Participants", "Volunteers"]);
+    await page.getByRole("tab", { name: "Participants", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Participants", exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Volunteers", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Volunteers", exact: true })).toBeVisible();
+  });
+
+  test("supports volunteer scan navigation, refresh, and history on mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await signInVolunteer(page);
+    const navigation = page.getByRole("navigation", { name: "Volunteer" });
+    await expect(navigation.getByRole("tab")).toHaveText(["Dashboard", "Check-in"]);
+    await navigation.getByRole("tab", { name: "Check-in", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/scan\/check-in$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/admin\/scan$/);
+    await page.goForward();
+    await expect(page).toHaveURL(/\/admin\/scan\/check-in$/);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Participant check-in", exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "Back to volunteer dashboard" }).click();
+    await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: "test-results/volunteer-dashboard-mobile.png", fullPage: true });
+  });
   test("redirects unauthenticated users to login", async ({ page }) => {
     await page.goto("/admin/applications");
     await expect(page).toHaveURL(/\/admin\/login$/);

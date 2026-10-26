@@ -35,6 +35,25 @@ export const ADMIN_ERROR_MESSAGES = {
   DECISION_EMAIL_QUEUE_EMPTY: "There are no queued decision emails to send.",
   DECISION_EMAIL_SEND_IN_PROGRESS:
     "Decision emails are already being sent. Wait for that release to finish.",
+  INVALID_POINTS: "That point change isn't allowed.",
+  INVALID_EVENT: "Check the event name, points, and schedule, then try again.",
+  EVENT_NOT_FOUND: "We couldn't find that event.",
+  EVENT_INACTIVE: "This event isn't active.",
+  EVENT_ACCESS_DENIED: "You aren't assigned to this event.",
+  POINTS_ALREADY_AWARDED: "This participant already received points for that event.",
+  EVENT_POINTS_LOCKED:
+    "This event's points can't change because participants have already received them.",
+  PARTICIPANT_NOT_FOUND: "We couldn't find this participant.",
+  PARTICIPANT_NOT_ELIGIBLE: "This participant isn't eligible for that action.",
+  VOLUNTEER_ONLY: "Only volunteers can perform this action.",
+  CAPABILITY_DENIED: "You don't have permission for this scan.",
+  STAFF_ACCOUNT_EXISTS: "A staff account already uses that email or participant.",
+  VOLUNTEER_NOT_FOUND: "We couldn't find that volunteer account.",
+  INVALID_STAFF_NAME: "Enter a name for this staff account.",
+  INVALID_EVENT_ASSIGNMENT: "Each event can be listed once, up to 50 events. Remove duplicates and try again.",
+  INVALID_LOG_FILTER: "Check the date range and try again.",
+  INVALID_ADJUSTMENT_REASON: "Enter a reason for this point change (up to 200 characters).",
+  INVALID_PARTICIPANT_FILTER: "Shorten the search to 100 characters or fewer and try again.",
 } as const;
 
 export type AdminErrorCode = keyof typeof ADMIN_ERROR_MESSAGES;

@@ -70,7 +70,7 @@ export async function seedAdminAccount(
   t: ConvexTestInstance,
   fields: {
     email: string;
-    role: "reviewer" | "admin";
+    role: "reviewer" | "admin" | "volunteer";
     active: boolean;
     password?: string;
     name?: string;

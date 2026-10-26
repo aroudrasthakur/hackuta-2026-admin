@@ -10,6 +10,7 @@ import { AdminProtectedRoute } from "../../src/components/AdminProtectedRoute";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
   getApplicationRef,
+  listMyScanOptionsRef,
   listApplicationReviewLogsRef,
   listSubmittedApplicationsRef,
   logApplicationReviewActionRef,
@@ -303,14 +304,14 @@ describe("read-only application review page", () => {
   it("does not query applicant data while staff authentication is loading", async () => {
     await renderPage({ context: staffContext({ isLoading: true }) });
     expect(container.textContent).toContain("Verifying organizer session");
-    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.query.mock.calls.every(([ref, args]) => ref === listMyScanOptionsRef && args === "skip")).toBe(true);
     expect(mocks.recordView).not.toHaveBeenCalled();
   });
 
   it("redirects unauthenticated visitors before loading application data", async () => {
     await renderPage({ context: staffContext({ staff: null, sessionToken: null, isAuthenticated: false }) });
     expect(container.textContent).toContain("Organizer sign-in");
-    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.query.mock.calls.every(([ref, args]) => ref === listMyScanOptionsRef && args === "skip")).toBe(true);
     expect(mocks.recordView).not.toHaveBeenCalled();
   });
 

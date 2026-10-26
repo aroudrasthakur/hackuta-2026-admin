@@ -1,22 +1,24 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { SignInPasswordInput } from "../../components/SignInPasswordInput";
 import { StormPageFrame } from "../../components/StormPageFrame";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { LoadingState } from "../../components/states/LoadingState";
-import { ADMIN_ROUTES } from "../../types/routes";
+import { intendedStaffDestination } from "../../lib/staffRouteAccess";
+import { useVolunteerAccess } from "../../hooks/useVolunteerAccess";
 import { SIGN_IN_FAILED_MESSAGE } from "../../../shared/admin/errors";
 import { reportUserFacingError } from "../../lib/userFacingError";
 
 export function AdminLoginPage() {
-  const navigate = useNavigate();
-  const { signIn, isAuthenticated, isLoading, staff, authError } = useAdminAuth();
+  const location = useLocation();
+  const options = useVolunteerAccess();
+  const { signIn, isAuthenticated, isLoading, sessionReady, staff, authError } = useAdminAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  if (isLoading) {
+  if (!sessionReady || isLoading || (isAuthenticated && staff?.role === "volunteer" && options === undefined)) {
     return (
       <StormPageFrame>
         <main id="admin-content" tabIndex={-1} className="flex min-h-screen items-center justify-center px-4">
@@ -27,7 +29,7 @@ export function AdminLoginPage() {
   }
 
   if (isAuthenticated && staff) {
-    return <Navigate to={ADMIN_ROUTES.applications} replace />;
+    return <Navigate to={intendedStaffDestination(location.state, staff, options)} replace />;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -36,7 +38,6 @@ export function AdminLoginPage() {
     setPending(true);
     try {
       await signIn(email.trim(), password);
-      navigate(ADMIN_ROUTES.applications, { replace: true });
     } catch (caught) {
       setError(reportUserFacingError("Organizer sign-in failed", caught, SIGN_IN_FAILED_MESSAGE));
     } finally {
@@ -54,8 +55,8 @@ export function AdminLoginPage() {
             <p className="text-xs uppercase tracking-wide text-mist">HackUTA 2026</p>
             <h1 className="sign-in-card__title">Organizer sign-in</h1>
             <p className="sign-in-card__subtitle">
-              Reviewer and admin accounts are provisioned by the organizing team. There is
-              no public sign-up.
+              Reviewer, admin, and volunteer accounts are provisioned by the organizing
+              team. There is no public sign-up.
             </p>
           </div>
 

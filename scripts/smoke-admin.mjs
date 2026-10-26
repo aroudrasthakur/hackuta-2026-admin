@@ -67,12 +67,13 @@ try {
 
   stage = "loading submitted applications";
   await expect(page.getByLabel("Search applications")).toBeVisible();
-  await page.getByLabel("Review status").selectOption("all");
-  await expect(page.getByRole("status")).toContainText(/Showing \d+ of \d+ applications/);
+  await page.getByLabel("Review status", { exact: true }).click();
+  await page.getByRole("option", { name: "All applications", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText(/Showing \d+(?:\u2013\d+)? of \d+ applications/);
   const reviewLink = page.getByRole("link", { name: /^Review application for / }).first();
   await expect(reviewLink).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Review status")).toHaveValue("all");
+  await expect(page.getByLabel("Review status", { exact: true })).toHaveAttribute("data-value", "all");
   passed("the real application queue loads and survives refresh");
 
   stage = "opening an application";
@@ -80,7 +81,7 @@ try {
   await expect(page.getByRole("region", { name: "Application responses", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Review actions" })).toBeVisible();
   await page.getByRole("link", { name: "Back to Applications" }).click();
-  await expect(page.getByLabel("Review status")).toHaveValue("all");
+  await expect(page.getByLabel("Review status", { exact: true })).toHaveAttribute("data-value", "all");
   passed("an application opens and returns to the preserved queue");
 
   stage = "sign-out failure recovery";

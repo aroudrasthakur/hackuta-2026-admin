@@ -1,5 +1,5 @@
 import { useQuery } from "../convex/reactBindings";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ADMIN_ERROR_MESSAGES } from "../../shared/admin/errors";
 import { getCurrentStaffRef } from "../convex/adminApi";
 import {
@@ -63,16 +63,34 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     sessionToken ? { sessionToken } : "skip",
   );
 
-  // A session that was valid and now resolves to null expired or was revoked server-side.
-  const hadStaff = useRef(false);
+  const expireSession = useCallback(() => {
+    setSessionToken(null);
+    setAuthError(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
+  }, []);
+
+  // Server revocation/reset and invalid cookies all discard the local credential.
   useEffect(() => {
-    if (staff) {
-      hadStaff.current = true;
-    } else if (staff === null && hadStaff.current) {
-      hadStaff.current = false;
-      setAuthError(ADMIN_ERROR_MESSAGES.NOT_AUTHENTICATED);
-    }
-  }, [staff]);
+    // Synchronize an external Convex subscription with the local session credential.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (sessionToken && staff === null) expireSession();
+  }, [expireSession, sessionToken, staff]);
+
+  const expiresAt = staff?.expiresAt;
+  useEffect(() => {
+    if (!sessionToken || expiresAt === undefined) return;
+    const checkExpiry = () => {
+      if (Date.now() >= expiresAt) expireSession();
+    };
+    // A quiet tab must expire even without another query result or user action.
+    const timeout = window.setTimeout(expireSession, Math.max(0, expiresAt - Date.now()));
+    window.addEventListener("focus", checkExpiry);
+    document.addEventListener("visibilitychange", checkExpiry);
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("focus", checkExpiry);
+      document.removeEventListener("visibilitychange", checkExpiry);
+    };
+  }, [expireSession, expiresAt, sessionToken]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setAuthError(null);
@@ -97,7 +115,6 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       });
       throw error;
     }
-    hadStaff.current = false;
     setSessionToken(null);
   }, []);
 
@@ -105,10 +122,10 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const isLoading = !sessionReady || (sessionToken !== null && staff === undefined);
     return {
       sessionToken,
-      staff: staff ?? null,
+      staff: sessionToken ? staff ?? null : null,
       authError,
       isLoading,
-      isAuthenticated: !!staff,
+      isAuthenticated: !!sessionToken && !!staff,
       sessionReady,
       signIn,
       signOut,

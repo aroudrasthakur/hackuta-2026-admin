@@ -1,6 +1,7 @@
 import {
   getApplicationRef,
   getCurrentStaffRef,
+  listMyScanOptionsRef,
   listApplicationReviewLogsRef,
   listDecisionEmailQueueRef,
   listSubmittedApplicationsRef,
@@ -13,6 +14,7 @@ import {
 
 const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
   [getCurrentStaffRef, "admin/auth:getCurrentStaff"],
+  [listMyScanOptionsRef, "admin/volunteerScan:listMyScanOptions"],
   [listSubmittedApplicationsRef, "admin/applications:listSubmittedApplications"],
   [getApplicationRef, "admin/applications:getApplication"],
   [listApplicationReviewLogsRef, "admin/applicationReviewLogs:listApplicationReviewLogs"],
