@@ -37,7 +37,7 @@ function defineNavigator(name: string, value: unknown) {
   Object.defineProperty(navigator, name, { value, configurable: true });
 }
 
-async function render(props: { autoStart?: boolean; mode?: ScanMode } = {}) {
+async function renderScanner(props: { autoStart?: boolean; mode?: ScanMode; allowManualEntry?: boolean } = {}) {
   await act(async () => root.render(<QrScanner mode="registration" onScan={onScan} {...props} />));
 }
 
@@ -56,6 +56,7 @@ async function click(name: string) {
   await flush();
 }
 
+const render = renderScanner;
 const video = () => container.querySelector("video")!;
 const message = () => container.querySelector('[role="status"], [role="alert"]')?.textContent;
 
@@ -115,7 +116,7 @@ describe("camera scanning", () => {
     expect(getUserMedia).toHaveBeenCalledWith({ audio: false, video: { facingMode: { ideal: "environment" } } });
     expect(video().srcObject).toBe(stream);
     expect(message()).toBe("Point the camera at the registration QR on the participant's phone.");
-    expect(button("Stop camera and enter code")).toBeDefined();
+    expect(button("Stop camera")).toBeDefined();
 
     await flush(QR_SCAN_INTERVAL_MS * 3);
     expect(onScan).toHaveBeenCalledTimes(1);
@@ -127,12 +128,12 @@ describe("camera scanning", () => {
     expect(button("Scan with camera")).toBeDefined();
   });
 
-  it("stops scanning when the volunteer switches to manual entry", async () => {
+  it("stops scanning when the volunteer stops the camera", async () => {
     const { stream, track } = fakeStream();
     getUserMedia.mockResolvedValue(stream);
     await render();
     await click("Scan with camera");
-    await click("Stop camera and enter code");
+    await click("Stop camera");
     expect(track.stop).toHaveBeenCalled();
     await flush(QR_SCAN_INTERVAL_MS * 3);
     expect(detector.detect).toHaveBeenCalledTimes(1);
@@ -159,7 +160,9 @@ describe("camera scanning", () => {
     await render();
     await click("Scan with camera");
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(text);
-    expect(container.querySelector("input")).not.toBeNull();
+    expect(container.textContent).toContain("ask an organizer for help");
+    expect(container.querySelector("input")).toBeNull();
+    expect(button("Use manual entry")).toBeUndefined();
   });
 
   it("offers a retry when the QR reader cannot load", async () => {
@@ -276,18 +279,25 @@ describe("camera scanning", () => {
     detector.detect.mockReturnValue(new Promise((resolve) => { resolveDetect = resolve; }));
     await render();
     await click("Scan with camera");
-    await click("Stop camera and enter code");
+    await click("Stop camera");
     await act(async () => resolveDetect([{ rawValue: token }]));
     expect(onScan).not.toHaveBeenCalled();
   });
 
-  it("falls back to manual entry without camera support", async () => {
+  it("explains missing camera support without offering typed codes", async () => {
     defineNavigator("mediaDevices", undefined);
     expect(isCameraSupported()).toBe(false);
     await render();
     expect(message()).toContain("isn't available here");
     expect(button("Scan with camera")).toBeUndefined();
-    expect(container.querySelector("input")).not.toBeNull();
+    expect(container.querySelector("input")).toBeNull();
+  });
+
+  it("shows no typed or pasted entry by default", async () => {
+    await render({ mode: "badge" });
+    expect(container.querySelector("form")).toBeNull();
+    expect(container.textContent).not.toContain("Or enter the badge code");
+    expect(button("Paste code")).toBeUndefined();
   });
 
   it("works without the Permissions API", async () => {
@@ -314,7 +324,17 @@ describe("camera scanning", () => {
   });
 });
 
-describe("manual entry", () => {
+describe("manual entry (organizers only)", () => {
+  const render = (props: { mode?: ScanMode } = {}) => renderScanner({ ...props, allowManualEntry: true });
+
+  it("points camera problems at the code field", async () => {
+    getUserMedia.mockRejectedValue(new DOMException("camera failed", "NotAllowedError"));
+    await render();
+    await click("Scan with camera");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("You can also enter the code below.");
+    expect(button("Use manual entry")).toBeDefined();
+  });
+
   it("validates before submitting and clears the field after", async () => {
     await render();
     await submitCode();

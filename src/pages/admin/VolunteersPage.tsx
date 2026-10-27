@@ -33,7 +33,7 @@ function VolunteerRoster({ sessionToken }: { sessionToken: string }) {
               <tr>
                 <th scope="col">Volunteer</th>
                 <th scope="col">Status</th>
-                <th scope="col">Scan permissions</th>
+                <th scope="col">Access</th>
                 <th scope="col">Events</th>
               </tr>
             </thead>

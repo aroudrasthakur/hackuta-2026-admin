@@ -59,7 +59,7 @@ test("admins review volunteers, open one volunteer's log, and assign events", as
   await expect(adminNav(page).locator('[aria-current="page"]')).toHaveText("Volunteers");
   await expect(page.getByRole("region", { name: "E2E Volunteer's activity" })).toContainText("No activity yet");
 
-  await page.getByRole("checkbox", { name: /Intro to Hardware/ }).check();
+  await page.getByRole("switch", { name: "Assign Intro to Hardware" }).click();
   await page.getByRole("button", { name: "Save event assignments" }).click();
   await expect(page.getByRole("status")).toHaveText("Event assignments saved (1 added, 0 removed).");
   await expect(page.getByRole("region", { name: "Account history" })).toContainText("Event assignments changed by E2E Admin · 1 added, 0 removed");

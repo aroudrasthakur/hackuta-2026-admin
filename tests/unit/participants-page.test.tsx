@@ -414,21 +414,18 @@ describe("ParticipantsPage", () => {
 
     await fill("Initial password", "StaffPassword1");
     await fill("Staff account email", "alex.staff@example.com");
-    const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
-    await act(async () => {
-      checkboxes[0]!.click();
-      checkboxes[1]!.click();
-    });
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(container.textContent).toContain("New volunteers start with no access.");
     await submit();
-    expect(mocks.promote).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.promote).toHaveBeenCalledWith({
+      sessionToken: expect.any(String),
       participantId: row.participantId,
       email: "alex.staff@example.com",
       name: row.name,
       password: "StaffPassword1",
-      canCheckIn: true,
-      canFoodCheckIn: true,
-    }));
+    });
     expect(container.textContent).toContain("Volunteer staff account created");
+    expect(container.textContent).toContain("They start with no access");
   });
 
   it("reports a promotion email conflict and keeps the form available to correct", async () => {
@@ -455,8 +452,8 @@ describe("ParticipantsPage", () => {
     });
     await render();
     await openDetails();
-    expect(container.textContent).toContain("Capabilities: Check-in");
-    expect(container.querySelector('a[href="/admin/volunteers"]')).not.toBeNull();
+    expect(container.textContent).toContain("Access: Check-in");
+    expect(container.querySelector('a[href="/admin/volunteers/volunteer-1"]')?.textContent).toBe("Manage access");
     await click("Revoke volunteer access");
     expect(container.textContent).toContain("Revoke this account?");
     await click("Cancel");

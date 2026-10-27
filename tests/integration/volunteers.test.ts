@@ -95,13 +95,16 @@ describe("createVolunteer", () => {
     }
   });
 
-  it("requires explicit capability booleans and grants only those set to true", async () => {
+  it("starts with no access when capabilities are omitted and grants only those set to true", async () => {
     const { t, args } = await fixture();
     const { adminId } = await t.mutation(volunteers.createVolunteer, { ...args, canCheckIn: true });
     expect(await t.run((ctx) => ctx.db.get(adminId))).toMatchObject({ canCheckIn: true, canFoodCheckIn: false });
-    const { canCheckIn: _omitted, ...missingCapability } = args;
-    void _omitted;
-    await expect(t.mutation(volunteers.createVolunteer, { ...missingCapability, email: "other@hackuta.org" } as never)).rejects.toThrow();
+    const { canCheckIn: _check, canFoodCheckIn: _food, ...noCapabilities } = args;
+    void _check;
+    void _food;
+    const bare = await t.mutation(volunteers.createVolunteer, { ...noCapabilities, email: "other@hackuta.org" });
+    expect(await t.run((ctx) => ctx.db.get(bare.adminId))).toMatchObject({ canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false });
+    expect(await t.run((ctx) => ctx.db.query("volunteerEventAccess").withIndex("by_volunteer", (q) => q.eq("volunteerAdminId", bare.adminId)).collect())).toEqual([]);
     await expect(t.mutation(volunteers.createVolunteer, { ...args, email: "third@hackuta.org", canFoodCheckIn: "yes" } as never)).rejects.toThrow();
   });
 
@@ -313,6 +316,21 @@ describe("volunteer lifecycle", () => {
     expect(await configLogs(t)).toHaveLength(logCount);
     await expect(t.mutation(volunteers.setVolunteerCapabilities, { ...target, canCheckIn: "yes", canFoodCheckIn: true }))
       .rejects.toThrow();
+  });
+
+  it("saves shop access in the same change when provided and leaves it alone when omitted", async () => {
+    const { t, target, session } = await managedFixture();
+    const shop = () => t.run((ctx) => requireVolunteerCapability(ctx, session.sessionToken, "canRedeemShop"));
+    await expectAdminErrorCode(shop(), "CAPABILITY_DENIED");
+    await t.mutation(volunteers.setVolunteerCapabilities, { ...target, canCheckIn: true, canFoodCheckIn: false, canRedeemShop: true });
+    expect((await shop())._id).toBe(target.volunteerAdminId);
+    expect((await configLogs(t)).at(-1)?.details).toBe(JSON.stringify({
+      changedFields: ["canCheckIn", "canRedeemShop"],
+      before: { canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false },
+      after: { canCheckIn: true, canFoodCheckIn: false, canRedeemShop: true },
+    }));
+    await t.mutation(volunteers.setVolunteerCapabilities, { ...target, canCheckIn: false, canFoodCheckIn: false });
+    expect((await shop())._id).toBe(target.volunteerAdminId);
   });
 });
 

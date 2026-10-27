@@ -3,7 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import type { GenericId } from "convex/values";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { AdminStatusBadge } from "../../components/AdminStatusBadge";
+import { AccessSwitch } from "../../components/admin/AccessSwitch";
 import { EventStatusBadge } from "../../components/admin/EventStatusBadge";
+import { SectionIcon, type SectionIconName } from "../../components/SectionIcon";
 import { VolunteerActivityLog } from "../../components/admin/VolunteerActivityLog";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
@@ -26,7 +28,7 @@ import {
   reviewPrimaryButtonClass,
   reviewSecondaryButtonClass,
 } from "../../lib/reviewButtonClasses";
-import { formatLogTime, STAFF_CONFIG_LABELS, volunteerPermissions } from "../../lib/staffLogFormat";
+import { formatLogTime, STAFF_CONFIG_LABELS, volunteerPermissionList } from "../../lib/staffLogFormat";
 import { reportUserFacingError } from "../../lib/userFacingError";
 import { ADMIN_ROUTES } from "../../types/routes";
 
@@ -91,10 +93,12 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
   }
 
   return (
-    <form aria-labelledby="volunteer-events-heading" className="admin-card admin-card__body space-y-4" onSubmit={(event) => void submit(event)}>
+    <form aria-labelledby="volunteer-events-heading" className="admin-card admin-card__body flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
       <div>
         <h2 id="volunteer-events-heading" className="admin-card__title">Event assignments</h2>
-        <p className="admin-page-lead">The volunteer can award points only for the events checked here, and only while an event is switched on. Start and end times are for reference.</p>
+        <p className="admin-page-lead">
+          Switch on the events this volunteer can award points for. Points only work while an event is switched on. Start and end times are for reference.
+        </p>
       </div>
       <FeedbackMessage feedback={feedback} />
       {status === "LoadingFirstPage" ? <LoadingState message="Loading events…" /> : events.length === 0 ? (
@@ -102,24 +106,31 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
           No events exist yet. <Link className="font-semibold text-night underline" to={ADMIN_ROUTES.events}>Create an event</Link> first.
         </p>
       ) : (
-        <fieldset className="space-y-1">
-          <legend className="sr-only">Assigned events</legend>
-          {events.map((event) => (
-            <label key={event.eventId} className="flex min-h-11 items-center gap-3 text-sm text-night">
-              <input
-                type="checkbox"
-                checked={selected.includes(event.eventId)}
-                disabled={saving}
-                onChange={(change) => toggle(event.eventId, change.target.checked)}
-              />
-              <span>
-                <span className="font-semibold">{event.name}</span>
-                <span className="text-ocean"> · {event.pointsAwarded} points</span>
-              </span>
-              <EventStatusBadge event={event} now={now} />
-            </label>
-          ))}
-        </fieldset>
+        <>
+          <p className="text-sm font-semibold text-night">{selected.length} of {events.length} events assigned</p>
+          <ul className="admin-access-list" aria-label="Events">
+            {events.map((event) => (
+              <li key={event.eventId} className="admin-access-row">
+                <span className="admin-access-row__icon" aria-hidden="true"><SectionIcon name="events" /></span>
+                <div className="min-w-0">
+                  <p className="admin-access-row__title">
+                    {event.name}
+                    <EventStatusBadge event={event} now={now} />
+                  </p>
+                  <p className="admin-access-row__description">{event.pointsAwarded} points per participant</p>
+                </div>
+                <div className="admin-access-row__control">
+                  <AccessSwitch
+                    label={`Assign ${event.name}`}
+                    checked={selected.includes(event.eventId)}
+                    disabled={saving}
+                    onChange={(checked) => toggle(event.eventId, checked)}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       {status === "CanLoadMore" || status === "LoadingMore" ? (
         <button type="button" disabled={status === "LoadingMore"} onClick={() => loadMore(EVENTS_PAGE_SIZE)} className={reviewSecondaryButtonClass}>
@@ -127,19 +138,45 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
         </button>
       ) : null}
       {!volunteer.active ? <p className="text-sm text-ocean">Restore this volunteer's access before assigning new events.</p> : null}
-      <button type="submit" disabled={saving || !changed} className={reviewPrimaryButtonClass}>
-        {saving ? "Saving…" : "Save event assignments"}
-      </button>
+      <div className="admin-access-footer">
+        <button type="submit" disabled={saving || !changed} className={reviewPrimaryButtonClass}>
+          {saving ? "Saving…" : "Save event assignments"}
+        </button>
+        {changed && !saving ? <p className="text-sm font-semibold text-ocean">Unsaved changes</p> : null}
+      </div>
     </form>
   );
 }
 
-function ScanPermissions({ sessionToken, volunteer, feedback, setFeedback }: SectionProps) {
-  const [canCheckIn, setCanCheckIn] = useState(volunteer.canCheckIn);
-  const [canFoodCheckIn, setCanFoodCheckIn] = useState(volunteer.canFoodCheckIn);
+type Capabilities = { canCheckIn: boolean; canFoodCheckIn: boolean; canRedeemShop: boolean };
+
+const ACCESS_ROWS: Array<{ key: keyof Capabilities; title: string; description: string; icon: SectionIconName }> = [
+  { key: "canCheckIn", title: "Participant check-in", icon: "checkIn", description: "Scan a registration QR, hand over a badge, and check the participant in." },
+  { key: "canFoodCheckIn", title: "Food distribution", icon: "food", description: "Scan badges and record meals." },
+  { key: "canRedeemShop", title: "Shop redemption", icon: "shop", description: "Scan badges and sell shop items for points." },
+];
+
+function accessBadge(allowed: boolean, saved: boolean) {
+  if (allowed === saved) {
+    return allowed
+      ? <AdminStatusBadge tone="positive">Allowed</AdminStatusBadge>
+      : <AdminStatusBadge tone="neutral">Not allowed</AdminStatusBadge>;
+  }
+  return <AdminStatusBadge tone="warning">{allowed ? "Allowed after saving" : "Removed after saving"}</AdminStatusBadge>;
+}
+
+function VolunteerAccess({ sessionToken, volunteer, feedback, setFeedback }: SectionProps) {
+  const saved: Capabilities = {
+    canCheckIn: volunteer.canCheckIn,
+    canFoodCheckIn: volunteer.canFoodCheckIn,
+    canRedeemShop: volunteer.canRedeemShop,
+  };
+  const [access, setAccess] = useState<Capabilities>(saved);
   const [saving, setSaving] = useState(false);
   const save = useMutation(setVolunteerCapabilitiesRef);
-  const changed = canCheckIn !== volunteer.canCheckIn || canFoodCheckIn !== volunteer.canFoodCheckIn;
+  const changed = ACCESS_ROWS.some(({ key }) => access[key] !== saved[key]);
+  const locked = saving || !volunteer.active;
+  const eventCount = volunteer.events.length;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,12 +184,12 @@ function ScanPermissions({ sessionToken, volunteer, feedback, setFeedback }: Sec
     setSaving(true);
     setFeedback(null);
     try {
-      await save({ sessionToken, volunteerAdminId: volunteer.adminId, canCheckIn, canFoodCheckIn });
-      setFeedback({ tone: "success", message: "Scan permissions saved. They apply on the volunteer's next scan." });
+      await save({ sessionToken, volunteerAdminId: volunteer.adminId, ...access });
+      setFeedback({ tone: "success", message: "Volunteer access saved. It applies on the volunteer's next scan." });
     } catch (caught) {
       setFeedback({ tone: "error", message: reportUserFacingError(
-        "Unable to save scan permissions", caught,
-        "Scan permissions were not changed. Please try again.",
+        "Unable to save volunteer access", caught,
+        "Volunteer access was not changed. Please try again.",
         { source: "VolunteerDetailPage.savePermissions" },
       ) });
     } finally {
@@ -161,20 +198,52 @@ function ScanPermissions({ sessionToken, volunteer, feedback, setFeedback }: Sec
   }
 
   return (
-    <form aria-labelledby="volunteer-permissions-heading" className="admin-card admin-card__body space-y-4" onSubmit={(event) => void submit(event)}>
-      <h2 id="volunteer-permissions-heading" className="admin-card__title">Scan permissions</h2>
+    <form aria-labelledby="volunteer-permissions-heading" className="admin-card admin-card__body flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+      <div>
+        <h2 id="volunteer-permissions-heading" className="admin-card__title">Volunteer access</h2>
+        <p className="admin-page-lead">Volunteers can only do what's switched on here. New volunteers start with everything off.</p>
+      </div>
       <FeedbackMessage feedback={feedback} />
-      <label className="flex min-h-11 items-center gap-3 text-sm text-night">
-        <input type="checkbox" checked={canCheckIn} disabled={saving} onChange={(event) => { setFeedback(null); setCanCheckIn(event.target.checked); }} />
-        Can check participants in
-      </label>
-      <label className="flex min-h-11 items-center gap-3 text-sm text-night">
-        <input type="checkbox" checked={canFoodCheckIn} disabled={saving} onChange={(event) => { setFeedback(null); setCanFoodCheckIn(event.target.checked); }} />
-        Can redeem participant food
-      </label>
-      <button type="submit" disabled={saving || !changed} className={reviewPrimaryButtonClass}>
-        {saving ? "Saving…" : "Save scan permissions"}
-      </button>
+      <ul className="admin-access-list" aria-label="Volunteer actions">
+        {ACCESS_ROWS.map(({ key, title, description, icon }) => (
+          <li key={key} className="admin-access-row">
+            <span className="admin-access-row__icon" aria-hidden="true"><SectionIcon name={icon} /></span>
+            <div className="min-w-0">
+              <p className="admin-access-row__title">{title} {accessBadge(access[key], saved[key])}</p>
+              <p className="admin-access-row__description">{description}</p>
+            </div>
+            <div className="admin-access-row__control">
+              <AccessSwitch
+                label={title}
+                checked={access[key]}
+                disabled={locked}
+                onChange={(checked) => { setFeedback(null); setAccess((current) => ({ ...current, [key]: checked })); }}
+              />
+            </div>
+          </li>
+        ))}
+        <li className="admin-access-row">
+          <span className="admin-access-row__icon" aria-hidden="true"><SectionIcon name="points" /></span>
+          <div className="min-w-0">
+            <p className="admin-access-row__title">
+              Event points
+              {eventCount > 0
+                ? <AdminStatusBadge tone="positive">Allowed for {eventCount} {eventCount === 1 ? "event" : "events"}</AdminStatusBadge>
+                : <AdminStatusBadge tone="neutral">Not allowed</AdminStatusBadge>}
+            </p>
+            <p className="admin-access-row__description">
+              Award points for assigned events. <a className="font-semibold text-night underline" href="#volunteer-events-heading">Manage event assignments</a>
+            </p>
+          </div>
+        </li>
+      </ul>
+      {!volunteer.active ? <p className="text-sm text-ocean">Restore this volunteer's account before changing their access.</p> : null}
+      <div className="admin-access-footer">
+        <button type="submit" disabled={saving || !changed} className={reviewPrimaryButtonClass}>
+          {saving ? "Saving…" : "Save access"}
+        </button>
+        {changed && !saving ? <p className="text-sm font-semibold text-ocean">Unsaved changes</p> : null}
+      </div>
     </form>
   );
 }
@@ -243,8 +312,12 @@ function historyDetail(log: StaffConfigLogRow) {
     return `${added} added, ${removed} removed`;
   }
   if (log.action === "volunteer_capabilities_updated" && details.after && typeof details.after === "object") {
-    const after = details.after as { canCheckIn?: boolean; canFoodCheckIn?: boolean };
-    return `Now: ${volunteerPermissions({ canCheckIn: after.canCheckIn === true, canFoodCheckIn: after.canFoodCheckIn === true })}`;
+    const after = details.after as { canCheckIn?: boolean; canFoodCheckIn?: boolean; canRedeemShop?: boolean };
+    const before = (details.before ?? {}) as typeof after;
+    const changes = ([["canCheckIn", "Check-in"], ["canFoodCheckIn", "Food"], ["canRedeemShop", "Shop"]] as const)
+      .filter(([key]) => typeof after[key] === "boolean" && after[key] !== before[key])
+      .map(([key, name]) => `${name} ${after[key] ? "on" : "off"}`);
+    return changes.length ? changes.join(", ") : null;
   }
   return null;
 }
@@ -304,6 +377,11 @@ function VolunteerDetail({ sessionToken, volunteerAdminId }: { sessionToken: str
     );
   }
   const eventKey = volunteer.events.map((event) => event.eventId).sort().join(",");
+  const eventCount = volunteer.events.length;
+  const allowed = [
+    ...volunteerPermissionList(volunteer),
+    ...(eventCount ? [`Points: ${eventCount} ${eventCount === 1 ? "event" : "events"}`] : []),
+  ];
   return (
     <>
       <AdminPageHeader
@@ -312,18 +390,28 @@ function VolunteerDetail({ sessionToken, volunteerAdminId }: { sessionToken: str
         description={volunteer.email}
         actions={<AdminStatusBadge tone={volunteer.active ? "positive" : "negative"}>{volunteer.active ? "Active" : "Revoked"}</AdminStatusBadge>}
       />
-      <dl className="admin-card admin-card__body grid gap-4 sm:grid-cols-3">
-        <div><dt className="text-sm font-semibold text-ocean">Scan permissions</dt><dd className="text-night">{volunteerPermissions(volunteer)}</dd></div>
-        <div><dt className="text-sm font-semibold text-ocean">Assigned events</dt><dd className="text-night">{volunteer.events.length}</dd></div>
-        <div><dt className="text-sm font-semibold text-ocean">Linked participant</dt><dd className="text-night">{volunteer.participant?.name ?? "None"}</dd></div>
-      </dl>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <EventAssignments key={`events:${eventKey}`} volunteer={volunteer} {...section("events")} />
-        <div className="space-y-6">
-          <ScanPermissions key={`caps:${volunteer.canCheckIn}:${volunteer.canFoodCheckIn}`} volunteer={volunteer} {...section("permissions")} />
-          <AccountAccess key={`access:${volunteer.active}`} volunteer={volunteer} {...section("access")} />
+      <dl className="admin-card admin-card__body grid gap-4 sm:grid-cols-[2fr_1fr]">
+        <div>
+          <dt className="text-sm font-semibold text-ocean">Can currently</dt>
+          <dd className="mt-1">
+            {allowed.length ? (
+              <ul className="admin-access-summary">
+                {allowed.map((name) => <li key={name}><AdminStatusBadge tone="positive">{name}</AdminStatusBadge></li>)}
+              </ul>
+            ) : <AdminStatusBadge tone="neutral">No access yet</AdminStatusBadge>}
+          </dd>
         </div>
+        <div><dt className="text-sm font-semibold text-ocean">Linked participant</dt><dd className="mt-1 text-night">{volunteer.participant?.name ?? "None"}</dd></div>
+      </dl>
+      <div className="grid items-stretch gap-6 lg:grid-cols-2">
+        <VolunteerAccess
+          key={`caps:${volunteer.canCheckIn}:${volunteer.canFoodCheckIn}:${volunteer.canRedeemShop}:${volunteer.active}`}
+          volunteer={volunteer}
+          {...section("permissions")}
+        />
+        <EventAssignments key={`events:${eventKey}`} volunteer={volunteer} {...section("events")} />
       </div>
+      <AccountAccess key={`access:${volunteer.active}`} volunteer={volunteer} {...section("access")} />
       <VolunteerActivityLog
         sessionToken={sessionToken}
         volunteerAdminId={volunteer.adminId}

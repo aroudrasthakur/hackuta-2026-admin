@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "../../convex/reactBindings";
 import { listShopVolunteersRef, setVolunteerShopAccessRef, type ShopVolunteerRow } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { reportUserFacingError } from "../../lib/userFacingError";
+import { AccessSwitch } from "../admin/AccessSwitch";
 
 /** Which volunteers may scan participants and complete shop purchases. */
 export function ShopVolunteersPanel({ onNotice }: { onNotice: (message: string) => void }) {
@@ -32,7 +33,7 @@ export function ShopVolunteersPanel({ onNotice }: { onNotice: (message: string) 
       <div className="shop-tablet__body">
         <div>
           <h2 id="shop-volunteers-heading" className="shop-tablet__title">Shop volunteers</h2>
-          <p className="shop-tablet__hint">Only volunteers switched on here can scan participants and complete purchases.</p>
+          <p className="shop-tablet__hint">Only volunteers switched on here can scan participants and complete purchases. All other access is managed on each volunteer's page.</p>
         </div>
         {error ? <p role="alert" className="admin-callout admin-callout--alert">{error}</p> : null}
         {volunteers === undefined ? <p role="status" className="text-sm text-ocean">Loading volunteers…</p> : volunteers.length === 0 ? (
@@ -45,14 +46,11 @@ export function ShopVolunteersPanel({ onNotice }: { onNotice: (message: string) 
                   <strong className="block text-night">{volunteer.name}</strong>
                   <span className="block truncate text-sm text-muted">{volunteer.email}</span>
                 </span>
-                <button
-                  type="button"
-                  role="switch"
-                  className="shop-switch"
-                  aria-checked={volunteer.canRedeemShop}
-                  aria-label={`Shop access for ${volunteer.name}`}
+                <AccessSwitch
+                  label={`Shop access for ${volunteer.name}`}
+                  checked={volunteer.canRedeemShop}
                   disabled={pending === volunteer.adminId}
-                  onClick={() => void toggle(volunteer)}
+                  onChange={() => void toggle(volunteer)}
                 />
               </li>
             ))}

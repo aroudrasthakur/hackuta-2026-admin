@@ -33,12 +33,12 @@ const MODES = {
 const CAMERA_MESSAGES: Partial<Record<CameraStatus, string>> = {
   starting: "Starting camera…",
   paused: "The camera turned off while this page was in the background. Start it again when you're ready.",
-  denied: "Camera access is blocked. Allow camera access for this site in your browser settings, then try again, or enter the code below.",
-  no_camera: "No camera was found on this device. Enter the code below.",
-  in_use: "The camera is in use by another app or tab. Close it and try again, or enter the code below.",
-  interrupted: "The camera stopped. It may have been disconnected or its permission removed. Try again, or enter the code below.",
-  unsupported: "Camera scanning isn't available here. It needs a secure (HTTPS) connection in a browser such as Safari or Chrome. Enter the code below instead.",
-  error: "The camera or QR reader couldn't start. Try again, or enter the code below.",
+  denied: "Camera access is blocked. Allow camera access for this site in your browser settings, then try again.",
+  no_camera: "No camera was found on this device.",
+  in_use: "The camera is in use by another app or tab. Close it and try again.",
+  interrupted: "The camera stopped. It may have been disconnected or its permission removed. Try again.",
+  unsupported: "Camera scanning isn't available here. It needs a secure (HTTPS) connection in a browser such as Safari or Chrome.",
+  error: "The camera or QR reader couldn't start. Try again.",
 };
 
 const PROBLEM_STATUSES = new Set<CameraStatus>(["denied", "no_camera", "in_use", "interrupted", "unsupported", "error", "paused"]);
@@ -55,18 +55,21 @@ const OVERLAY_TITLE: Partial<Record<CameraStatus, string>> = {
 };
 
 /**
- * Camera or manual QR entry for one kind of code. Reports one raw value per
- * scan; the camera stops before `onScan` runs. Set `autoStart` only after the
- * volunteer asked for the camera (for example, Scan next after a camera scan).
+ * Camera QR scanning for one kind of code, with optional typed or pasted
+ * entry (`allowManualEntry`, organizers only). Reports one raw value per scan;
+ * the camera stops before `onScan` runs. Set `autoStart` only after the user
+ * asked for the camera (for example, Scan next after a camera scan).
  */
 export function QrScanner({
   mode,
   onScan,
   autoStart = false,
+  allowManualEntry = false,
 }: {
   mode: ScanMode;
   onScan: (rawValue: string, source: ScanSource) => void;
   autoStart?: boolean;
+  allowManualEntry?: boolean;
 }) {
   const copy = MODES[mode];
   const { status, videoRef, start, stop } = useQrCamera((rawValue) => onScan(rawValue, "camera"));
@@ -113,7 +116,9 @@ export function QrScanner({
     }
   };
 
-  const message = status === "scanning" ? copy.aim : CAMERA_MESSAGES[status];
+  const baseMessage = status === "scanning" ? copy.aim : CAMERA_MESSAGES[status];
+  const problem = PROBLEM_STATUSES.has(status);
+  const message = problem && allowManualEntry && baseMessage ? `${baseMessage} You can also enter the code below.` : baseMessage;
   const focusManual = () => {
     stop();
     document.getElementById(inputId)?.focus();
@@ -139,21 +144,22 @@ export function QrScanner({
             <span className="volunteer-camera__corner volunteer-camera__corner--br" />
           </div>
           {status !== "scanning" && showViewport ? (
-            <div className="volunteer-camera__overlay" role={PROBLEM_STATUSES.has(status) ? "alert" : "status"}>
+            <div className="volunteer-camera__overlay" role={problem ? "alert" : "status"}>
               <CameraIcon className="h-8 w-8" />
               <p className="volunteer-camera__overlay-title">
                 {OVERLAY_TITLE[status] ?? "Camera ready when enabled"}
               </p>
               {message ? <p className="volunteer-camera__overlay-copy">{message}</p> : null}
-              {PROBLEM_STATUSES.has(status) ? (
-                <>
-                  <p className="volunteer-camera__hint">
-                    Tip: close other apps using the camera, then retry, or continue with manual entry below.
-                  </p>
+              {problem ? (
+                allowManualEntry ? (
                   <button type="button" className={scanSecondaryButtonClass} onClick={focusManual}>
                     Use manual entry
                   </button>
-                </>
+                ) : (
+                  <p className="volunteer-camera__hint">
+                    Still stuck? Try another device or ask an organizer for help.
+                  </p>
+                )
               ) : null}
             </div>
           ) : null}
@@ -163,15 +169,15 @@ export function QrScanner({
         ) : null}
         {!showViewport && message ? (
           <p
-            role={PROBLEM_STATUSES.has(status) ? "alert" : "status"}
-            className={PROBLEM_STATUSES.has(status) ? "admin-callout admin-callout--alert text-base" : "admin-callout text-base"}
+            role={problem ? "alert" : "status"}
+            className={problem ? "admin-callout admin-callout--alert text-base" : "admin-callout text-base"}
           >
             {message}
           </p>
         ) : null}
         {cameraActive ? (
           <button type="button" className={scanSecondaryButtonClass} onClick={() => stop()}>
-            Stop camera and enter code
+            {allowManualEntry ? "Stop camera and enter code" : "Stop camera"}
           </button>
         ) : status !== "unsupported" ? (
           <button type="button" className={scanPrimaryButtonClass} onClick={() => void start()}>
@@ -180,35 +186,37 @@ export function QrScanner({
         ) : null}
       </section>
 
-      <form onSubmit={onSubmit} className="volunteer-manual-entry" noValidate>
-        <label htmlFor={inputId} className="block text-base font-semibold text-night">
-          {copy.label}
-        </label>
-        <p id={hintId} className="text-sm text-ocean">{copy.hint}</p>
-        <input
-          id={inputId}
-          className="admin-field__control min-h-14 font-mono text-base"
-          value={code}
-          onChange={(event) => {
-            setCode(event.target.value);
-            setEntryError(null);
-          }}
-          autoComplete="off"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          enterKeyHint="go"
-          aria-invalid={entryError ? true : undefined}
-          aria-describedby={entryError ? `${hintId} ${errorId}` : hintId}
-        />
-        {entryError ? <p id={errorId} role="alert" className="text-sm font-semibold text-red-800">{entryError}</p> : null}
-        <div className="volunteer-manual-entry__actions">
-          <button type="submit" className={scanPrimaryButtonClass}>{copy.submit}</button>
-          {canPaste ? (
-            <button type="button" className={scanSecondaryButtonClass} onClick={() => void paste()}>Paste code</button>
-          ) : null}
-        </div>
-      </form>
+      {allowManualEntry ? (
+        <form onSubmit={onSubmit} className="volunteer-manual-entry" noValidate>
+          <label htmlFor={inputId} className="block text-base font-semibold text-night">
+            {copy.label}
+          </label>
+          <p id={hintId} className="text-sm text-ocean">{copy.hint}</p>
+          <input
+            id={inputId}
+            className="admin-field__control min-h-14 font-mono text-base"
+            value={code}
+            onChange={(event) => {
+              setCode(event.target.value);
+              setEntryError(null);
+            }}
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
+            aria-invalid={entryError ? true : undefined}
+            aria-describedby={entryError ? `${hintId} ${errorId}` : hintId}
+          />
+          {entryError ? <p id={errorId} role="alert" className="text-sm font-semibold text-red-800">{entryError}</p> : null}
+          <div className="volunteer-manual-entry__actions">
+            <button type="submit" className={scanPrimaryButtonClass}>{copy.submit}</button>
+            {canPaste ? (
+              <button type="button" className={scanSecondaryButtonClass} onClick={() => void paste()}>Paste code</button>
+            ) : null}
+          </div>
+        </form>
+      ) : null}
     </div>
   );
 }
