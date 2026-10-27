@@ -25,15 +25,12 @@ export function ShopPage() {
 
   return (
     <section aria-labelledby="shop-heading" className="space-y-6">
-      <div className="shop-frieze">
-        <img className="shop-frieze__art" src="/images/shop/pillars.webp" alt="" aria-hidden="true" width={281} height={480} decoding="async" />
-        <AdminPageHeader
-          id="shop-heading"
-          title="Shop"
-          description={<><span className="shop-eyebrow">The Agora · Event shop</span>Manage items, point prices, stock, and flash sales. Changes show up in the participant shop and the volunteer scanner right away.</>}
-        />
-        <span aria-hidden="true" className="shop-meander shop-meander--flip" />
-      </div>
+      <AdminPageHeader
+        id="shop-heading"
+        title="Shop"
+        eyebrow="The Agora · Event shop"
+        description="Manage items, point prices, stock, and flash sales. Changes show up in the participant shop and the volunteer scanner right away."
+      />
       <nav aria-label="Shop sections" className="shop-tabs">
         {TABS.map(({ tab, numeral, label }) => (
           <Link key={tab} to={{ search: tab === "items" ? "" : `?tab=${tab}` }} className="shop-tab" aria-current={tab === current.tab ? "page" : undefined}>

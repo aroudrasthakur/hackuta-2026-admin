@@ -261,7 +261,7 @@ export function ApplicationsPage() {
 
   return (
     <section aria-labelledby="applications-heading" className="space-y-5">
-      <AdminPageHeader id="applications-heading" title="Applications" description="Review submitted applications and track participant decisions." />
+      <AdminPageHeader id="applications-heading" title="Applications" eyebrow="The Oracle · Application review" description="Review submitted applications and track participant decisions." />
       {sessionToken ? (
         <ErrorBoundary
           key={`${sessionToken}:${retry}`}

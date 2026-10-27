@@ -250,7 +250,7 @@ function ShopWorkflow() {
 export function VolunteerShopPage() {
   return (
     <section aria-labelledby="shop-scan-heading" className="mx-auto max-w-2xl space-y-6">
-      <AdminPageHeader id="shop-scan-heading" title="Shop redemption" description="Scan a participant's QR code, choose their item, then confirm the purchase." />
+      <AdminPageHeader id="shop-scan-heading" title="Shop redemption" eyebrow="The Agora · Volunteer counter" description="Scan a participant's QR code, choose their item, then confirm the purchase." />
       <ShopWorkflow />
       <Link className="inline-block py-3 font-semibold" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link>
     </section>

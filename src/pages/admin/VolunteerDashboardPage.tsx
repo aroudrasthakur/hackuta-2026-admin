@@ -15,7 +15,7 @@ export function VolunteerDashboardPage() {
   const { staff } = useAdminAuth();
   const options = useVolunteerAccess();
   const now = useNow();
-  const header = <AdminPageHeader id="volunteer-dashboard-heading" title="Volunteer dashboard" description={`${staff ? `Welcome, ${staff.name}. ` : ""}Your assigned responsibilities and scan actions appear here as access changes.`} />;
+  const header = <AdminPageHeader id="volunteer-dashboard-heading" title="Volunteer dashboard" eyebrow="The Stoa · Volunteer desk" description={`${staff ? `Welcome, ${staff.name}. ` : ""}Your assigned responsibilities and scan actions appear here as access changes.`} />;
   if (!staff || !options) return <div className="space-y-6">{header}<LoadingState layout="rows" message="Loading your responsibilities…" /></div>;
   const actions = [
     { to: ADMIN_ROUTES.scanCheckIn, title: "Participant check-in", icon: "checkIn" as const, description: "Welcome participants and check their arrival status." },

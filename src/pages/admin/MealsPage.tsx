@@ -50,7 +50,7 @@ function MealManagement({ sessionToken }: { sessionToken: string }) {
   const visible = meals?.filter((meal) => filter === "All" || mealStatus(meal, now) === filter);
 
   return <>
-    <AdminPageHeader id="meals-heading" title="Meals" description="Schedule serving windows and follow meal collections live."
+    <AdminPageHeader id="meals-heading" title="Meals" eyebrow="The Symposium · Meals" description="Schedule serving windows and follow meal collections live."
       actions={<button className={reviewPrimaryButtonClass} onClick={() => { setNotice(""); setForm("new"); }}>Create meal</button>} />
     {notice && <p role="status" className="admin-callout">{notice}</p>}
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -100,7 +100,7 @@ export function MealsPage() {
   const [retry, setRetry] = useState(0);
   if (!sessionToken || staff?.role !== "admin") return null;
   return <section aria-labelledby="meals-heading" className="space-y-6">
-    <ErrorBoundary key={retry} fallback={<><AdminPageHeader id="meals-heading" title="Meals" /><QueryErrorState title="Unable to load meals" onRetry={() => setRetry((value) => value + 1)} /></>}>
+    <ErrorBoundary key={retry} fallback={<><AdminPageHeader id="meals-heading" title="Meals" eyebrow="The Symposium · Meals" /><QueryErrorState title="Unable to load meals" onRetry={() => setRetry((value) => value + 1)} /></>}>
       <MealManagement sessionToken={sessionToken} />
     </ErrorBoundary>
   </section>;
