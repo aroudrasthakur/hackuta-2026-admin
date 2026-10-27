@@ -118,10 +118,19 @@
   }
 
   .shop-table-scroll { overflow-x: auto; background: #fffaf2; }
-  .shop-table { min-width: 60rem; }
+  .shop-table { min-width: 52rem; }
+  .shop-table--items { min-width: 56rem; }
   .shop-table thead { background: transparent; border-bottom: 1.5px solid rgb(26 58 82 / 0.28); color: var(--color-ocean); letter-spacing: 0.12em; }
   .shop-table tbody tr:is(:hover, :focus-within) { background: color-mix(in srgb, var(--color-clay) 55%, #fffaf2); }
-  .shop-item-cell { display: flex; align-items: center; gap: 0.75rem; min-width: 14rem; }
+  .shop-table__name { min-width: 8rem; max-width: 14rem; color: var(--color-night); font-weight: 700; }
+  .shop-table__description { min-width: 10rem; max-width: 18rem; font-size: 0.875rem; line-height: 1.4; vertical-align: top; }
+  .shop-table__price,
+  .shop-table__stock,
+  .shop-table__status,
+  .shop-table__sale { white-space: nowrap; vertical-align: middle; }
+  .shop-table__inventory { min-width: 11rem; vertical-align: middle; }
+  .shop-table__edit { vertical-align: middle; }
+  .shop-item-cell { display: flex; align-items: center; gap: 0.75rem; min-width: 10rem; }
   .shop-item-cell strong { display: block; color: var(--color-night); }
   .shop-item-cell span { color: var(--color-muted); font-size: 0.8125rem; }
   .shop-thumb {
