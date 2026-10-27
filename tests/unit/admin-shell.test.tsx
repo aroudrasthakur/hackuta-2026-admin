@@ -153,7 +153,7 @@ describe("app routes", () => {
     "sends volunteers from %s to their own landing page without review queries", async (path) => {
       await renderApp(path, authContext({ staff: { ...staff, role: "volunteer" } }));
       expect(currentPath()).toBe("/admin/scan");
-      expect(container.querySelector("h1")?.textContent).toBe("Volunteer dashboard");
+      expect(container.querySelector("h1")?.textContent).toMatch(/Good (morning|afternoon|evening),/);
       expect(container.textContent).toContain("No responsibilities assigned yet");
       expect(container.querySelector('nav[aria-label="Admin"]')).toBeNull();
       expect(mocks.query.mock.calls.every(([ref]) => ref === listMyScanOptionsRef)).toBe(true);

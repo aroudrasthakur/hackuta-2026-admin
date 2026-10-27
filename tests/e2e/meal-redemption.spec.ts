@@ -10,7 +10,7 @@ async function start(page: Page) {
   await page.getByLabel("Email").fill(E2E_SCAN_VOLUNTEER.email);
   await page.getByLabel("Password", { exact: true }).fill(E2E_SCAN_VOLUNTEER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
   await setMealScenario(page, "serving");
   await page.getByRole("navigation").getByRole("link", { name: "Food", exact: true }).click();
 }
@@ -48,6 +48,8 @@ test("requires a meal choice when multiple periods are available and clears priv
   await expect(page.getByRole("button", { name: "Look up badge" })).toHaveCount(0);
   await page.getByRole("radio", { name: /Lunch/ }).click(); await scan(page);
   await expect(page.getByText("Vegetarian; Allergies: peanuts")).toBeVisible();
+  // Meal switching is locked while a participant confirmation is open.
+  await page.getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("button", { name: "Change meal" }).click();
   await expect(page.getByText("Vegetarian; Allergies: peanuts")).toHaveCount(0);
   await page.getByRole("radio", { name: /Snack/ }).click();

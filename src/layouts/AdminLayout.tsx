@@ -93,11 +93,14 @@ export function AdminLayout() {
 
   return (
     <StormPageFrame>
-      <div className="admin-workspace min-h-screen">
+      <div className={`admin-workspace min-h-screen${staff?.role === "volunteer" ? " volunteer-ops" : ""}`}>
         <header ref={headerRef} className="admin-topbar admin-topbar--compact">
           <div className="admin-topbar__inner admin-topbar__inner--compact">
             <div className="admin-topbar__brand">
               <HackUtaLogo className="admin-topbar__logo" />
+              {staff?.role === "volunteer" ? (
+                <span className="sr-only">Volunteer workspace</span>
+              ) : null}
               {import.meta.env.DEV &&
               import.meta.env.VITE_DEV_AUTH_BYPASS === "true" ? (
                 <p className="mt-1 text-xs font-medium text-red-700">

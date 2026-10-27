@@ -1,0 +1,663 @@
+/* Volunteer operations UI (issue #69) — mobile-first scanning chrome */
+
+@layer components {
+  .volunteer-ops {
+    color: var(--color-ink);
+  }
+
+  .volunteer-ops :where(a, button, input, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-ocean);
+    outline-offset: 3px;
+  }
+
+  .volunteer-dashboard__greeting {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.65rem, 5vw, 2rem);
+    font-weight: 400;
+    line-height: 1.15;
+    color: var(--color-night);
+  }
+
+  .volunteer-dashboard__lead,
+  .volunteer-scan__lead {
+    margin: 0.55rem 0 0;
+    font-size: 1rem;
+    line-height: 1.45;
+    color: var(--color-ocean);
+  }
+
+  .volunteer-section-title {
+    margin: 0 0 0.75rem;
+    padding: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--color-night);
+  }
+
+  .volunteer-action-grid {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .volunteer-action-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.85rem;
+    min-height: 4.5rem;
+    border: 1px solid rgb(48 88 115 / 0.16);
+    border-radius: 1rem;
+    background: rgb(255 255 255 / 0.9);
+    padding: 0.85rem 1rem;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 8px 20px rgb(16 47 70 / 0.06);
+    transition:
+      transform 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out),
+      border-color 160ms var(--ease-out),
+      background-color 160ms var(--ease-out);
+  }
+
+  .volunteer-action-card:hover {
+    border-color: rgb(48 88 115 / 0.32);
+    background: #fff;
+    box-shadow: 0 10px 24px rgb(16 47 70 / 0.1);
+  }
+
+  .volunteer-action-card:active {
+    transform: scale(0.985);
+  }
+
+  .volunteer-action-card__icon {
+    display: inline-flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.85rem;
+    background: rgb(48 88 115 / 0.1);
+    color: var(--color-ocean);
+  }
+
+  .volunteer-action-card__title {
+    display: block;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--color-night);
+  }
+
+  .volunteer-action-card__description {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    color: var(--color-ocean);
+  }
+
+  .volunteer-action-card__chevron {
+    color: var(--color-mist);
+    font-size: 1.15rem;
+  }
+
+  .volunteer-event-summary {
+    display: grid;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .volunteer-event-summary__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    min-height: 3.25rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(48 88 115 / 0.12);
+    background: rgb(255 255 255 / 0.72);
+    padding: 0.7rem 0.85rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+  }
+
+  .volunteer-event-summary__item:hover {
+    border-color: rgb(48 88 115 / 0.3);
+    background: #fff;
+  }
+
+  .volunteer-event-summary__name {
+    font-weight: 650;
+    color: var(--color-night);
+  }
+
+  .volunteer-event-summary__meta {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    color: var(--color-ocean);
+  }
+
+  .volunteer-dashboard__hint {
+    margin: -0.35rem 0 0.75rem;
+    font-size: 0.9rem;
+    color: var(--color-ocean);
+  }
+
+  .volunteer-inline-link {
+    font-weight: 650;
+    color: var(--color-night);
+  }
+
+  .volunteer-callout {
+    border-radius: 1rem;
+    border: 1px solid rgb(48 88 115 / 0.16);
+    background: rgb(255 255 255 / 0.84);
+    padding: 1rem 1.1rem;
+    color: var(--color-ocean);
+  }
+
+  .volunteer-callout__title {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-night);
+  }
+
+  .volunteer-scan-shell {
+    margin-inline: auto;
+    max-width: 42rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .volunteer-scan__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4.5vw, 1.85rem);
+    font-weight: 400;
+    line-height: 1.15;
+    color: var(--color-night);
+  }
+
+  .volunteer-selected-context {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgb(48 88 115 / 0.16);
+    background: rgb(255 255 255 / 0.86);
+    padding: 0.85rem 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .volunteer-selected-context {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .volunteer-selected-context__kicker {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--color-ocean);
+  }
+
+  .volunteer-selected-context__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-night);
+  }
+
+  .volunteer-selected-context__meta {
+    color: var(--color-ocean);
+  }
+
+  .volunteer-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .volunteer-steps__item {
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-sand);
+    background: rgb(255 255 255 / 0.6);
+    padding: 0.55rem 0.35rem;
+    color: var(--color-mist);
+  }
+
+  .volunteer-steps__item--done {
+    border-color: rgb(48 88 115 / 0.35);
+    background: #fff;
+    color: var(--color-ocean);
+  }
+
+  .volunteer-steps__item--current {
+    border-color: var(--color-ocean);
+    background: var(--color-ocean);
+    color: var(--color-light);
+  }
+
+  .volunteer-camera {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .volunteer-camera__viewport {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 3 / 4;
+    max-height: min(58dvh, 28rem);
+    border-radius: 1.1rem;
+    border: 1px solid rgb(48 88 115 / 0.2);
+    background: #102f46;
+  }
+
+  .volunteer-camera__viewport--idle {
+    display: none;
+  }
+
+  .volunteer-camera__video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .volunteer-camera__frame {
+    pointer-events: none;
+    position: absolute;
+    inset: 12%;
+  }
+
+  .volunteer-camera__corner {
+    position: absolute;
+    width: 1.35rem;
+    height: 1.35rem;
+    border: 3px solid #f6eddf;
+  }
+
+  .volunteer-camera__corner--tl {
+    top: 0;
+    left: 0;
+    border-right: 0;
+    border-bottom: 0;
+  }
+
+  .volunteer-camera__corner--tr {
+    top: 0;
+    right: 0;
+    border-left: 0;
+    border-bottom: 0;
+  }
+
+  .volunteer-camera__corner--bl {
+    bottom: 0;
+    left: 0;
+    border-right: 0;
+    border-top: 0;
+  }
+
+  .volunteer-camera__corner--br {
+    right: 0;
+    bottom: 0;
+    border-left: 0;
+    border-top: 0;
+  }
+
+  .volunteer-camera__overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 0.55rem;
+    padding: 1.25rem;
+    text-align: center;
+    color: #f6eddf;
+    background: rgb(16 47 70 / 0.78);
+  }
+
+  .volunteer-camera__overlay-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .volunteer-camera__overlay-copy,
+  .volunteer-camera__hint,
+  .volunteer-camera__caption {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .volunteer-camera__caption {
+    color: var(--color-ocean);
+  }
+
+  .volunteer-manual-entry {
+    display: grid;
+    gap: 0.75rem;
+    border-radius: 1rem;
+    border: 1px solid rgb(48 88 115 / 0.14);
+    background: rgb(255 255 255 / 0.86);
+    padding: 0.95rem 1rem;
+  }
+
+  .volunteer-manual-entry__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .volunteer-manual-entry__actions {
+      flex-direction: row;
+    }
+  }
+
+  .volunteer-event-selector {
+    margin: 0;
+    border: 0;
+    padding: 0;
+  }
+
+  .volunteer-event-selector__list {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  @media (min-width: 640px) {
+    .volunteer-event-selector__list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .volunteer-event-card {
+    display: flex;
+    width: 100%;
+    min-height: 3.75rem;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid rgb(48 88 115 / 0.16);
+    border-radius: 0.9rem;
+    background: rgb(255 255 255 / 0.88);
+    padding: 0.75rem 0.9rem;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color 160ms var(--ease-out),
+      box-shadow 160ms var(--ease-out),
+      background-color 160ms var(--ease-out);
+  }
+
+  .volunteer-event-card:hover {
+    border-color: rgb(48 88 115 / 0.3);
+  }
+
+  .volunteer-event-card:has(.volunteer-event-card__radio:checked) {
+    border-color: var(--color-ocean);
+    background: #fff;
+    box-shadow: 0 0 0 2px rgb(48 88 115 / 0.18);
+  }
+
+  .volunteer-event-card:has(.volunteer-event-card__radio:focus-visible) {
+    outline: 2px solid var(--color-ocean);
+    outline-offset: 3px;
+  }
+
+  .volunteer-event-card:has(.volunteer-event-card__radio:disabled) {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .volunteer-event-card__radio {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
+    accent-color: var(--color-ocean);
+    cursor: inherit;
+  }
+
+  .volunteer-event-card__radio:focus-visible {
+    outline: none;
+  }
+
+  .volunteer-event-card__text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .volunteer-event-card__name {
+    display: block;
+    font-weight: 700;
+    color: var(--color-night);
+  }
+
+  .volunteer-event-card__points {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.88rem;
+    color: var(--color-ocean);
+  }
+
+  .volunteer-event-card__status {
+    flex-shrink: 0;
+    border-radius: 999px;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .volunteer-event-card__status--active {
+    background: rgb(236 253 245);
+    color: #065f46;
+  }
+
+  .volunteer-event-card__status--upcoming {
+    background: rgb(239 246 255);
+    color: #1e3a8a;
+  }
+
+  .volunteer-event-card__status--ended,
+  .volunteer-event-card__status--inactive {
+    background: rgb(254 242 242);
+    color: #7f1d1d;
+  }
+
+  .volunteer-confirm,
+  .volunteer-result {
+    border-radius: 1rem;
+    border: 1.5px solid rgb(48 88 115 / 0.16);
+    background: rgb(255 255 255 / 0.92);
+    padding: 1.15rem 1.2rem;
+  }
+
+  .volunteer-confirm__body,
+  .volunteer-result,
+  .volunteer-result__body {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .volunteer-result__summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+
+  .volunteer-result__summary > div {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .volunteer-confirm__verified {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-weight: 650;
+    color: #065f46;
+  }
+
+  .volunteer-confirm__verified svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex: none;
+  }
+
+  .volunteer-confirm__dietary {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(180 83 9 / 0.3);
+    background: rgb(255 251 235);
+    padding: 0.6rem 0.75rem;
+  }
+
+  .volunteer-confirm__name,
+  .volunteer-result__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.55rem;
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--color-night);
+  }
+
+  .volunteer-confirm__facts {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0;
+  }
+
+  .volunteer-confirm__facts dt {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgb(48 88 115 / 0.72);
+  }
+
+  .volunteer-confirm__facts dd {
+    margin: 0.15rem 0 0;
+    font-size: 1.05rem;
+    font-weight: 650;
+    color: var(--color-night);
+  }
+
+  .volunteer-confirm__actions,
+  .volunteer-result__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  @media (min-width: 640px) {
+    .volunteer-confirm__actions,
+    .volunteer-result__actions {
+      flex-flow: row wrap;
+    }
+
+    .volunteer-confirm__actions > button,
+    .volunteer-result__actions > button {
+      flex: 1 1 9rem;
+    }
+  }
+
+  .volunteer-result--success {
+    border-color: rgb(4 120 87 / 0.28);
+    background: rgb(236 253 245 / 0.92);
+  }
+
+  .volunteer-result--duplicate {
+    border-color: rgb(180 83 9 / 0.28);
+    background: rgb(255 251 235 / 0.95);
+  }
+
+  .volunteer-result--error {
+    border-color: rgb(185 28 28 / 0.28);
+    background: rgb(254 242 242 / 0.95);
+  }
+
+  .volunteer-result__badge {
+    display: inline-flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.8);
+  }
+
+  .volunteer-result--success .volunteer-result__badge {
+    color: #065f46;
+  }
+
+  .volunteer-result--duplicate .volunteer-result__badge {
+    color: #92400e;
+  }
+
+  .volunteer-result--error .volunteer-result__badge {
+    color: #7f1d1d;
+  }
+
+  .volunteer-result__message {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.45;
+    color: var(--color-night);
+  }
+
+  .volunteer-back-link {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    font-size: 0.95rem;
+    font-weight: 650;
+    text-decoration: none;
+    color: var(--color-ocean);
+  }
+
+  @media (min-width: 768px) {
+    .volunteer-camera__viewport {
+      aspect-ratio: 4 / 3;
+      max-height: min(52dvh, 26rem);
+    }
+
+    .volunteer-action-grid {
+      gap: 0.85rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .volunteer-action-card,
+    .volunteer-event-card,
+    .volunteer-event-summary__item {
+      transition: none;
+    }
+
+    .volunteer-action-card:active {
+      transform: none;
+    }
+  }
+}

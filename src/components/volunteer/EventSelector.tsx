@@ -1,39 +1,57 @@
 import type { VolunteerScanOptions } from "../../convex/adminApi";
+import { eventStatus } from "../../../shared/admin/volunteerRules";
+import { useNow } from "../../hooks/useNow";
 
 type AssignedEvent = VolunteerScanOptions["events"][number];
 
-/** Assigned active events as large radio cards. Point values come from the server and cannot be edited. */
+const STATUS_LABEL = {
+  active: "Active",
+  upcoming: "Upcoming",
+  ended: "Ended",
+  inactive: "Switched off",
+} as const;
+
+/** Assigned active events as large selectable cards. Point values come from the server. */
 export function EventSelector({
   events,
   selectedEventId,
   onSelect,
+  locked = false,
 }: {
   events: readonly AssignedEvent[];
   selectedEventId: string | null;
   onSelect: (eventId: AssignedEvent["eventId"]) => void;
+  /** When true (e.g. during confirmation), selection cannot change. */
+  locked?: boolean;
 }) {
+  const now = useNow();
+
   return (
-    <fieldset className="space-y-3">
-      <legend className="mb-2 text-lg font-semibold text-night">Choose your event</legend>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <fieldset className="volunteer-event-selector" disabled={locked}>
+      <legend className="volunteer-section-title">Choose your event</legend>
+      <div className="volunteer-event-selector__list" role="presentation">
         {events.map((event) => {
           const selected = event.eventId === selectedEventId;
+          const status = eventStatus({ ...event, active: true }, now);
           return (
-            <label
-              key={event.eventId}
-              className={`admin-card flex min-h-16 cursor-pointer items-center gap-4 p-4 ${selected ? "ring-2 ring-ocean" : ""}`}
-            >
+            <label key={event.eventId} className="volunteer-event-card">
               <input
                 type="radio"
                 name="scan-event"
-                className="h-6 w-6 flex-none accent-ocean"
+                className="volunteer-event-card__radio"
                 value={event.eventId}
                 checked={selected}
+                disabled={locked}
                 onChange={() => onSelect(event.eventId)}
               />
-              <span className="min-w-0">
-                <span className="block text-lg font-semibold text-night">{event.name}</span>
-                <span className="block text-base text-ocean">{event.pointsAwarded} points per participant</span>
+              <span className="volunteer-event-card__text">
+                <span className="volunteer-event-card__name">{event.name}</span>
+                <span className="volunteer-event-card__points">
+                  {event.pointsAwarded} points per participant
+                </span>
+              </span>
+              <span className={`volunteer-event-card__status volunteer-event-card__status--${status}`}>
+                {STATUS_LABEL[status]}
               </span>
             </label>
           );

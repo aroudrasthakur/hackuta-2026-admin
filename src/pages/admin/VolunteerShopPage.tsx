@@ -4,6 +4,7 @@ import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { ShopItemThumb } from "../../components/shop/ShopItemThumb";
 import { QrScanner, type ScanSource } from "../../components/volunteer/QrScanner";
 import { ScanResult } from "../../components/volunteer/ScanResult";
+import { ScanSteps } from "../../components/volunteer/ScanSteps";
 import { LoadingState } from "../../components/states/LoadingState";
 import { useQuery } from "../../convex/reactBindings";
 import {
@@ -30,30 +31,11 @@ function stepIndex(state: ShopWorkflowState) {
   return 0;
 }
 
-function ScanSteps({ current }: { current: number }) {
-  return (
-    <ol aria-label="Purchase progress" className="grid grid-cols-4 gap-2 text-center text-sm font-semibold">
-      {STEPS.map((label, index) => (
-        <li
-          key={label}
-          aria-current={index === current ? "step" : undefined}
-          className={`border-t-4 pt-1 uppercase tracking-wide ${index === current ? "border-night text-night" : index < current ? "border-ocean text-ocean" : "border-sand text-muted"}`}
-        >
-          {label}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 /** Live balance; falls back to the scanned value while loading. */
 function CustomerCard({ customer, points }: { customer: ShopCustomerInfo; points: number }) {
   return (
     <section aria-label="Participant" className="shop-customer">
-      <div className="min-w-0">
-        <p className="shop-customer__label">Participant</p>
-        <h2 className="shop-customer__name">{customer.name}</h2>
-      </div>
+      <h2 className="shop-customer__name min-w-0">{customer.name}</h2>
       <p className="shop-customer__points"><strong>{formatPoints(points)}</strong><span>points</span></p>
     </section>
   );
@@ -80,7 +62,7 @@ function ItemPicker({ items, maxQuantity, selection, onSelect }: {
   if (items.length === 0) return <p className="admin-callout text-base">No items are for sale right now. Ask an administrator to add or activate items.</p>;
   return (
     <>
-      <h2 className="text-sm font-bold uppercase tracking-widest text-night">Choose an item</h2>
+      <h2 className="volunteer-section-title">Choose an item</h2>
       <ul className="grid gap-2">
         {items.map((item) => {
           const soldOut = item.stockQuantity === 0;
@@ -160,7 +142,7 @@ function ShopWorkflow() {
 
   return (
     <div className="space-y-5">
-      <ScanSteps current={stepIndex(state)} />
+      <ScanSteps steps={STEPS} current={stepIndex(state)} label="Purchase progress" />
       {state.step === "scan" ? <QrScanner mode="badge" onScan={(value: string, source: ScanSource) => { setCameraPreferred(source === "camera"); void scan(value); }} autoStart={cameraPreferred} /> : null}
       {state.step === "resolving" ? (
         <div className="space-y-3">
@@ -180,7 +162,7 @@ function ShopWorkflow() {
           {catalog === undefined ? <LoadingState message="Loading the shop…" /> : (
             <ItemPicker items={items} maxQuantity={catalog.maxQuantity} selection={state.selection} onSelect={select} />
           )}
-          <div className="flex flex-col gap-3">
+          <div className="volunteer-confirm__actions">
             <button type="button" className={scanPrimaryButtonClass} disabled={!state.selection || live === null || !items.some((item) => item.itemId === state.selection?.itemId)} onClick={review}>Review purchase</button>
             <button type="button" className={scanSecondaryButtonClass} onClick={reset}>Cancel</button>
           </div>
@@ -195,7 +177,7 @@ function ShopWorkflow() {
         const blocked = preview && preview.status !== "ok";
         return (
           <section aria-labelledby="shop-review-heading" className="shop-panel">
-            <h2 id="shop-review-heading" ref={headingRef} tabIndex={-1} className="text-sm font-bold uppercase tracking-widest text-night">Review purchase</h2>
+            <h2 id="shop-review-heading" ref={headingRef} tabIndex={-1} className="volunteer-section-title">Review purchase</h2>
             <div className="shop-item-cell">
               <ShopItemThumb imageUrl={item?.imageUrl ?? null} />
               <div><strong>{item?.name ?? "Selected item"}</strong>{ready ? <span>{formatPoints(ready.stockQuantity)} in stock{ready.flashSaleId ? " · sale price" : ""}</span> : null}</div>
@@ -217,7 +199,7 @@ function ShopWorkflow() {
             {noStock && ready ? <div role="alert" className="admin-callout admin-callout--alert text-base"><p className="font-semibold">Not enough stock</p><p>Only {formatPoints(ready.stockQuantity)} left. Lower the quantity or pick another item.</p></div> : null}
             {blocked ? <div role="alert" className="admin-callout admin-callout--alert text-base"><p className="font-semibold">This purchase can't go ahead</p><p>The item or participant is no longer available. Go back and choose again.</p></div> : null}
             {state.error ? <Notice outcome={state.error} /> : ready && !short && !noStock ? <p className="text-base">Hand over the item after you confirm. The points come off right away.</p> : null}
-            <div className="flex flex-col gap-3">
+            <div className="volunteer-confirm__actions">
               <button
                 type="button"
                 className={scanConfirmButtonClass}
@@ -249,10 +231,10 @@ function ShopWorkflow() {
 /** Volunteer shop sales. The route guard already requires `canRedeemShop`. */
 export function VolunteerShopPage() {
   return (
-    <section aria-labelledby="shop-scan-heading" className="mx-auto max-w-2xl space-y-6">
+    <section aria-labelledby="shop-scan-heading" className="volunteer-ops volunteer-scan-shell space-y-6">
       <AdminPageHeader id="shop-scan-heading" title="Shop redemption" description="Scan the participant's badge, choose their item, then confirm the purchase." />
       <ShopWorkflow />
-      <Link className="inline-block py-3 font-semibold" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link>
+      <Link className="volunteer-back-link" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link>
     </section>
   );
 }
