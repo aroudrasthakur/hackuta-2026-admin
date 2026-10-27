@@ -48,6 +48,7 @@ export function AdminLayout() {
     { to: ADMIN_ROUTES.events, label: "Events", icon: "events" as const },
     { to: ADMIN_ROUTES.meals, label: "Meals", icon: "food" as const },
     { to: ADMIN_ROUTES.shop, label: "Shop", icon: "shop" as const },
+    { to: ADMIN_ROUTES.scan, label: "Scan", icon: "checkIn" as const },
   ];
   const permittedTabs = tabs.filter(({ to }) => staff && canAccessStaffRoute(to, staff, options) === true);
   const grants = staff?.role === "volunteer"
@@ -115,7 +116,7 @@ export function AdminLayout() {
         <nav aria-label={staff?.role === "volunteer" ? "Volunteer" : "Admin"} className="admin-section-nav mx-auto max-w-6xl px-4 pt-5">
           <ul className="admin-section-list">
             {permittedTabs.map(({ to, label, icon }) => (
-              <li key={to}><AdminSectionLink to={to} icon={icon} active={pathname === to || ((to === ADMIN_ROUTES.applications || to === ADMIN_ROUTES.volunteers) && pathname.startsWith(`${to}/`))}>
+              <li key={to}><AdminSectionLink to={to} icon={icon} active={pathname === to || ((to === ADMIN_ROUTES.applications || to === ADMIN_ROUTES.volunteers || (staff?.role !== "volunteer" && to === ADMIN_ROUTES.scan)) && pathname.startsWith(`${to}/`))}>
                 {label}
               </AdminSectionLink></li>
             ))}

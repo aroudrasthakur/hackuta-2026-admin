@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { E2E_BADGES, E2E_EVENTS, E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
+import { E2E_ADMIN, E2E_BADGES, E2E_EVENTS, E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { installQrCamera, qrCodeSvg, scanQr, showQrToCamera } from "./fixtures/qrCamera";
 import { setMealScenario } from "./fixtures/meals";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
@@ -264,5 +264,33 @@ test.describe("volunteer camera without permission", () => {
     await expect(page.getByRole("alert")).toContainText("ask an organizer for help");
     await expect(page.getByRole("button", { name: "Try camera again" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Use manual entry" })).toHaveCount(0);
+  });
+});
+
+test.describe("admin QR scanner", () => {
+  test.use({ permissions: ["camera"] });
+  test.beforeEach(({ page }) => installQrCamera(page));
+
+  test("lets an administrator access all four scan workflows without volunteer assignments", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/admin/login");
+    await page.getByLabel("Email").fill(E2E_ADMIN.email);
+    await page.getByLabel("Password", { exact: true }).fill(E2E_ADMIN.password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await setMealScenario(page, "serving");
+
+    const adminNav = page.getByRole("navigation", { name: "Admin" });
+    await adminNav.getByRole("link", { name: "Scan", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Participant check-in/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Food distribution/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Event points/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Shop redemption/ })).toBeVisible();
+
+    await page.getByRole("link", { name: /Participant check-in/ }).click();
+    await enterRegistration(page, E2E_QR_TOKENS.arrival);
+    await enterBadge(page, E2E_BADGES.unused);
+    await page.getByRole("button", { name: "Confirm check-in" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toBeVisible();
   });
 });

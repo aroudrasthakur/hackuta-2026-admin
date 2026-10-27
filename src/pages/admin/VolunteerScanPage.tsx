@@ -180,7 +180,7 @@ function FoodMealScanner() {
 /** Volunteer scanner for check-in, food, or event points. Route guards already require the matching access. */
 export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) {
   const page = PAGES[workflow];
-  const options = useVolunteerAccess();
+  const options = useVolunteerAccess(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const [choosingEvent, setChoosingEvent] = useState(false);
   const [mealRetry, setMealRetry] = useState(0);
@@ -189,12 +189,13 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
   if (!options) return <LoadingState message="Loading your scan access…" />;
 
   const points = page.purpose === "point_scan";
+  const noActiveEvents = points && options.events.length === 0;
   const requestedEventId = searchParams.get("event");
   const selectedEvent = points
     ? options.events.find((event) => event.eventId === requestedEventId) ??
       (requestedEventId === null && options.events.length === 1 ? options.events[0] : undefined)
     : undefined;
-  const showPicker = points && (!selectedEvent || (choosingEvent && !phaseLocked));
+  const showPicker = points && !noActiveEvents && (!selectedEvent || (choosingEvent && !phaseLocked));
 
   return (
     <section aria-labelledby={`${workflow}-scan-heading`} className="volunteer-ops volunteer-scan-shell space-y-6">
@@ -235,6 +236,11 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
         >
           <FoodMealScanner />
         </ErrorBoundary>
+      ) : noActiveEvents ? (
+        <EmptyState
+          title="No active events"
+          description="No active events are available right now. Activate or create an event on the Events page to award points."
+        />
       ) : points && !selectedEvent ? (
         <p className="admin-callout text-base">Choose an event to start scanning.</p>
       ) : showPicker ? null : (

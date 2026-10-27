@@ -375,16 +375,30 @@ describe("throttling and sessions", () => {
     expect(await logs(t)).toEqual([]);
   });
 
-  it("throws for missing and non-volunteer sessions before writing anything", async () => {
+  it("throws for missing and reviewer sessions before writing anything, and allows admins without assignments", async () => {
     const t = createConvexTest();
-    const { eventId } = await seedAwardScene(t);
+    const { eventId, participantId } = await seedAwardScene(t);
+    const reviewer = await seedStaff(t, { role: "reviewer" });
     const admin = await seedStaff(t, { role: "admin" });
     const calls = (sessionToken: string) => [
       t.mutation(foodCheckInParticipantRef, { sessionToken, qrCodeToken: QR_TOKEN }),
       t.mutation(awardEventPointsRef, { sessionToken, qrCodeToken: QR_TOKEN, eventId }),
     ];
-    for (const call of calls(admin.sessionToken)) await expectAdminErrorCode(call, "VOLUNTEER_ONLY");
+    for (const call of calls(reviewer.sessionToken)) await expectAdminErrorCode(call, "VOLUNTEER_ONLY");
     for (const call of calls("missing")) await expectAdminErrorCode(call, "NOT_AUTHENTICATED");
     expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual([]);
+
+    const mealPeriodId = await seedMealPeriod(t, admin.adminId);
+    expect(await t.mutation(foodCheckInParticipantRef, {
+      sessionToken: admin.sessionToken, qrCodeToken: QR_TOKEN, mealPeriodId,
+    })).toEqual({ status: "success", redeemedAt: NOW, meal: { mealPeriodId, name: "Lunch" } });
+    expect(await t.mutation(awardEventPointsRef, {
+      sessionToken: admin.sessionToken, qrCodeToken: QR_TOKEN, eventId,
+    })).toEqual({ status: "success", pointsAwarded: 10 });
+    const actionLogs = await logs(t);
+    expect(actionLogs).toEqual([
+      expect.objectContaining({ actorAdminId: admin.adminId, participantId, action: "food_check_in", mealPeriodId }),
+      expect.objectContaining({ actorAdminId: admin.adminId, participantId, action: "point_scan", eventId, pointsDelta: 10 }),
+    ]);
   });
 });

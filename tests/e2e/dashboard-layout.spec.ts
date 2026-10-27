@@ -15,7 +15,7 @@ test("keeps page headers and role navigation usable at every dashboard width", a
     await navigation.getByRole("link", { name, exact: true }).click();
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
     await expect(navigation.locator('[aria-current="page"]')).toHaveText(name);
-    await expect(navigation.getByRole("link")).toHaveCount(7);
+    await expect(navigation.getByRole("link")).toHaveCount(8);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await reviewScreenshot(page, `${name.toLowerCase().replaceAll(" ", "-")}-1440.png`, testInfo);
   }
@@ -23,7 +23,7 @@ test("keeps page headers and role navigation usable at every dashboard width", a
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText("Applications");
-    await expect(navigation.getByRole("link")).toHaveCount(7);
+    await expect(navigation.getByRole("link")).toHaveCount(8);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width === 375) await reviewScreenshot(page, "applications-375.png", testInfo);
   }
