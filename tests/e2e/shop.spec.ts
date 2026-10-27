@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
+import { E2E_BADGES, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { E2E_ADMIN, signInOrganizer, signInOrganizerOnLoginPage, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
@@ -24,8 +24,8 @@ async function signInShopVolunteer(page: Page) {
 }
 
 async function lookUp(page: Page, token: string) {
-  await page.getByLabel("Or enter the participant's code").fill(token);
-  await page.getByRole("button", { name: "Look up participant" }).click();
+  await page.getByLabel("Or enter the badge code").fill(token);
+  await page.getByRole("button", { name: "Look up badge" }).click();
 }
 
 async function expectNoHorizontalScroll(page: Page) {
@@ -97,7 +97,7 @@ test.describe("volunteer shop purchase", () => {
     await page.getByRole("navigation", { name: "Volunteer" }).getByRole("link", { name: "Shop", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Shop redemption" })).toBeVisible();
 
-    await lookUp(page, E2E_QR_TOKENS.ready);
+    await lookUp(page, E2E_BADGES.ready);
     const customer = page.getByRole("region", { name: "Participant" });
     await expect(customer).toContainText("Riley Ready");
     await expect(customer).toContainText("1,250");
@@ -123,7 +123,7 @@ test.describe("volunteer shop purchase", () => {
     await reviewScreenshot(page, "test-results/shop-volunteer-duplicate-mobile.png");
 
     await page.getByRole("button", { name: "Scan next" }).click();
-    await lookUp(page, E2E_QR_TOKENS.ready);
+    await lookUp(page, E2E_BADGES.ready);
     await expect(customer).toContainText("650");
     await page.getByRole("button", { name: /Mechanical keyboard/ }).click();
     await page.getByRole("button", { name: "Review purchase" }).click();

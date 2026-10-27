@@ -7,6 +7,8 @@ export const VOLUNTEER_ACTION_LABELS: Record<VolunteerActionLogRow["action"], st
   admin_adjust: "Points adjusted",
   shop_purchase: "Shop purchase",
   shop_refund: "Shop refund",
+  badge_assigned: "Badge assigned",
+  badge_replaced: "Badge replaced",
 };
 
 export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = {

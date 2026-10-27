@@ -3,11 +3,11 @@ import type { GenericId } from "convex/values";
 import { adminError } from "../../shared/admin/errors";
 import {
   awardOutcome,
-  checkInOutcome,
+  checkedInOutcome,
+  checkInStepOutcome,
   foodOutcome,
   formatScanTime,
   INVALID_QR_OUTCOME,
-  normalizeQrToken,
   previewOutcome,
   scanErrorOutcome,
   scanFailureOutcome,
@@ -15,7 +15,6 @@ import {
   withScanTimeout,
 } from "../../src/lib/scanResults";
 
-const token = "ab".repeat(32);
 const eventId = "event-1" as GenericId<"events">;
 const meal = { mealPeriodId: "meal-1" as GenericId<"mealPeriods">, name: "Lunch" };
 const at = Date.UTC(2026, 9, 25, 15, 30);
@@ -24,17 +23,6 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-});
-
-describe("normalizeQrToken", () => {
-  it("accepts 64 hex characters, forgiving whitespace and case", () => {
-    expect(normalizeQrToken(token)).toBe(token);
-    expect(normalizeQrToken(` ${token.toUpperCase().slice(0, 32)}\n${token.slice(32)} `)).toBe(token);
-  });
-
-  it.each(["", "abc", "g".repeat(64), `${token}a`, "https://example.com"])("rejects %j", (value) => {
-    expect(normalizeQrToken(value)).toBeNull();
-  });
 });
 
 describe("withScanTimeout", () => {
@@ -88,11 +76,17 @@ describe("previewOutcome", () => {
     }
   });
 
+  it("explains each badge-only rejection distinctly", () => {
+    const statuses = ["registration_qr_replaced", "badge_retired", "participant_not_checked_in", "badge_not_assigned"] as const;
+    const titles = statuses.map((status) => {
+      const outcome = previewOutcome({ status });
+      expect(outcome).toBe(scanFailureOutcome(status));
+      return outcome?.title;
+    });
+    expect(new Set(titles).size).toBe(statuses.length);
+  });
+
   it("reports duplicates before confirmation", () => {
-    expect(previewOutcome({ status: "ok", purpose: "check_in", participant: { name: "Sam", checkedIn: true, checkedInAt: at } }))
-      .toEqual({ tone: "duplicate", title: "Already checked in", detail: `Sam already checked in at ${formatScanTime(at)}. Nothing was changed.` });
-    expect(previewOutcome({ status: "ok", purpose: "check_in", participant: { name: "Sam", checkedIn: true, checkedInAt: null } })?.detail)
-      .toBe("Sam already checked in. Nothing was changed.");
     expect(previewOutcome({
       status: "ok",
       purpose: "food_check_in",
@@ -109,7 +103,6 @@ describe("previewOutcome", () => {
   });
 
   it("continues to confirmation for actionable previews", () => {
-    expect(previewOutcome({ status: "ok", purpose: "check_in", participant: { name: "Sam", checkedIn: false, checkedInAt: null } })).toBeNull();
     expect(previewOutcome({
       status: "ok",
       purpose: "food_check_in",
@@ -127,11 +120,20 @@ describe("previewOutcome", () => {
 });
 
 describe("operation outcomes", () => {
-  it("describes check-in results", () => {
-    expect(checkInOutcome({ status: "success", checkedInAt: at }, "Sam")).toEqual({ tone: "success", title: "Checked in", detail: "Sam is checked in." });
-    expect(checkInOutcome({ status: "already_checked_in", checkedInAt: at }, "Sam").tone).toBe("duplicate");
-    for (const status of ["qr_not_found", "participant_not_eligible", "not_authorized", "rate_limited"] as const) {
-      expect(checkInOutcome({ status }, "Sam")).toBe(scanFailureOutcome(status));
+  it("describes check-in step results", () => {
+    expect(checkedInOutcome("Sam")).toMatchObject({ tone: "success", title: "Checked in", detail: expect.stringContaining("Sam is checked in with their badge") });
+    expect(checkInStepOutcome({ status: "already_checked_in", participant: { name: "Sam", checkedInAt: at } }))
+      .toEqual({ tone: "duplicate", title: "Already checked in", detail: `Sam already checked in at ${formatScanTime(at)}. Nothing was changed.` });
+    expect(checkInStepOutcome({ status: "already_checked_in", participant: { name: "Sam", checkedInAt: null } }).detail)
+      .toBe("Sam already checked in. Nothing was changed.");
+    expect(checkInStepOutcome({ status: "registration_qr_used", participant: { name: "Sam", checkedInAt: at } })).toMatchObject({
+      tone: "error", title: "Registration QR already used", detail: expect.stringContaining(`Sam already checked in at ${formatScanTime(at)}`),
+    });
+    for (const status of [
+      "qr_not_found", "participant_not_eligible", "not_authorized", "rate_limited",
+      "badge_invalid", "badge_is_registration", "badge_in_use", "badge_retired",
+    ] as const) {
+      expect(checkInStepOutcome({ status })).toBe(scanFailureOutcome(status));
     }
   });
 
@@ -159,6 +161,6 @@ describe("operation outcomes", () => {
   });
 
   it("has a dedicated invalid QR message", () => {
-    expect(INVALID_QR_OUTCOME).toMatchObject({ tone: "error", title: "Not a participant QR code" });
+    expect(INVALID_QR_OUTCOME).toMatchObject({ tone: "error", title: "Not a badge QR code" });
   });
 });

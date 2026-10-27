@@ -43,7 +43,7 @@ vi.mock("../../src/components/volunteer/QrScanner", () => ({
   ),
 }));
 
-const token = "ab".repeat(32);
+const token = "HACKUTA-BADGE-0001";
 const customer = { participantId: "p1", name: "Riley Ready", points: 1250 };
 const catalogItem = (overrides: Record<string, unknown>) => ({
   itemId: "tee", name: "HackUTA 2026 T-shirt", description: "", imageUrl: null, unitPointsCost: 300, basePointsCost: 400,
@@ -135,7 +135,7 @@ describe("VolunteerShopPage", () => {
   it("sells an item once with the server price and shows the receipt", async () => {
     await render();
     expect(text()).toContain("Shop redemption");
-    await scan(token.toUpperCase(), "camera");
+    await scan(` ${token}\n`, "camera");
     expect(mocks.resolve).toHaveBeenCalledWith({ sessionToken: "session", qrCodeToken: token, purpose: "shop" });
     expect(container.querySelector("[aria-label=Participant]")?.textContent).toContain("Riley Ready1,250points");
     expect(button("Review purchase").disabled).toBe(true);
@@ -255,8 +255,14 @@ describe("VolunteerShopPage", () => {
 
   it("ends the flow for bad codes, failed lookups, and unexpected errors", async () => {
     await render();
-    await scan("nope");
-    expect(text()).toContain("Not a participant QR code");
+    await scan("x".repeat(257));
+    expect(text()).toContain("Not a badge QR code");
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    await click("Scan next");
+
+    mocks.resolve.mockResolvedValueOnce({ status: "registration_qr_replaced" });
+    await scan("ab".repeat(32));
+    expect(text()).toContain("Registration QR no longer works");
     await click("Scan next");
 
     mocks.resolve.mockResolvedValueOnce({ status: "self_purchase_denied" });

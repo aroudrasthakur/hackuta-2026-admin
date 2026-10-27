@@ -75,7 +75,7 @@ describe("listParticipants", () => {
     const result = await t.query(api.listParticipants, { sessionToken, paginationOpts: page });
     expect(result.page).toEqual([{
       participantId: accepted.participantId, name: "Taylor Student", email: "taylor@example.com",
-      points: 30, checkedInAt: 100, foodCheckedInAt: 200,
+      points: 30, checkedInAt: 100, foodCheckedInAt: 200, badgeAssigned: false,
       volunteer: { adminId: volunteerId.adminId, active: true },
     }]);
     expect(result).toMatchObject({ isDone: true, scanned: 3 });

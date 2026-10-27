@@ -51,6 +51,7 @@ File: [`convex/schema.ts`](schema.ts)
 | `admins` | Admin | **Yes** — does not exist in register repo |
 | `applicationReviewLogs` | Admin | **Yes** — append-only reviewer/admin activity history |
 | `participants` | Admin | **Yes** — one row per accepted application (check-in identity; see [participants columns](#participants-columns)) |
+| `retiredBadgeTokens` | Admin | **Yes** — hashes of replaced badges, so they never work again (see [Badges](#badges)) |
 | `mealPeriods` | Admin | **Yes** — custom meal names, serving windows, availability, and creator |
 | `mealRedemptions` | Admin | **Yes** — authoritative per-participant per-meal collection history |
 | `adminAuthAccounts` | Admin | **Yes** — organizer password hashes (separate from applicant auth) |
@@ -77,13 +78,25 @@ All register-owned blocks must remain identical to [`schema.reference.ts`](../sc
 | `authUserId` | `Id<"users">` | Applicant Convex Auth user (reused from registration) |
 | `acceptedAt` | `number` | Acceptance timestamp (ms) |
 | `acceptedBy` | `Id<"admins">` | Staff admin who confirmed acceptance |
-| `qrCodeToken` | `string` | Check-in QR identity (256-bit hex) |
+| `qrCodeToken` | `string` | The one active scan identity (`by_qr_token`). The registration token (256-bit hex) until check-in, then the assigned badge value |
+| `registrationQrCodeToken` | `string` (optional) | Original registration token, kept after badge assignment so a rescan can be explained (`by_registration_qr_token`). Never accepted for food, points, or the shop |
+| `badgeQrCodeToken` | `string` (optional) | Preprinted badge value exactly as scanned (trimmed). Equal to `qrCodeToken` whenever set (`by_badge_qr_token`) |
+| `badgeAssignedAt` | `number` (optional) | When the current badge was assigned |
+| `badgeAssignedBy` | `Id<"admins">` (optional) | Volunteer (door check-in) or admin (replacement) who assigned the current badge |
 | `foodRestriction` | `string` (optional) | Snapshot from the linked application’s `dietaryRestrictions`, `otherDietaryRestrictions`, and `allergyDetails` at participant creation |
-| `checkedInAt` | `number` (optional) | General hackathon door check-in |
+| `checkedInAt` | `number` (optional) | General hackathon door check-in. New check-ins set it together with the badge fields in one mutation |
 | `foodCheckedInAt` | `number` (optional) | Legacy single-use food check-in; preserve historical values when switching to meal redemptions |
 | `points` | `number` (optional, then required) | Cached point balance; new accepts start at `0` |
 | `createdAt` | `number` | Row creation time |
 | `updatedAt` | `number` | Last update time |
+
+### Badges
+
+Badge QR codes are preprinted and supplied externally; the backend never generates them. `admin/badgeCheckIn:checkInWithBadge` assigns one at the door, and `admin/badgeAdmin:assignParticipantBadge` lets an admin replace one (or assign one to a participant checked in before badges). Both run in one mutation that rechecks every rule, moves the registration token into `registrationQrCodeToken` (first assignment only), and sets `qrCodeToken`, `badgeQrCodeToken`, `badgeAssignedAt`, and `badgeAssignedBy`. A badge must not match any participant's `qrCodeToken`, `badgeQrCodeToken`, or `registrationQrCodeToken`, or a retired badge. Convex indexes do not enforce uniqueness; the reads and the write share one serializable transaction, so concurrent assignments of one badge leave exactly one holder.
+
+`retiredBadgeTokens` (admin-owned) records replaced badges so they can never be reused or scanned again: `tokenHash` (SHA-256 hex of the badge value, never the raw value), `participantId`, `retiredBy` (`Id<"admins">`), and `retiredAt`, indexed `by_token_hash`. Points, awards, meal redemptions, and purchases reference `participantId`, so a replacement keeps all history.
+
+Existing participants are not migrated. Rows checked in before badges keep their registration token as `qrCodeToken` with no badge fields; scans return `badge_not_assigned` until an admin assigns one.
 
 `points` stays optional until `admin/pointsBackfill:backfillParticipantPoints` is deployed from hackuta-2026-profile and run until `isDone`. A later schema change can make `points` required only after that backfill finishes. Deploying `points` as required while any participant row omits it fails the Convex push.
 

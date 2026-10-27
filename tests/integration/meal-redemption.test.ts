@@ -22,7 +22,7 @@ async function scene() {
   const applicant = await seedApplicant(t, { review: { status: "accepted" } });
   const participantId = await t.run((ctx) => ctx.db.insert("participants", {
     applicationId: applicant.applicationId, authUserId: applicant.userId, acceptedBy: admin.adminId,
-    acceptedAt: 1, qrCodeToken: QR, foodRestriction: "Vegan; peanut allergy", foodCheckedInAt: 42,
+    acceptedAt: 1, qrCodeToken: QR, badgeQrCodeToken: QR, checkedInAt: 7, foodRestriction: "Vegan; peanut allergy", foodCheckedInAt: 42,
     points: 30, createdAt: 1, updatedAt: 1,
   }));
   const mealPeriodId = await seedMealPeriod(t, admin.adminId);

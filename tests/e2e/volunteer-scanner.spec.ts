@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { E2E_EVENTS, E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
+import { E2E_BADGES, E2E_EVENTS, E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { qrCodeSvg, showQrToCamera } from "./fixtures/qrCamera";
 import { setMealScenario } from "./fixtures/meals";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
@@ -25,62 +25,126 @@ async function openTab(page: Page, name: "Check-in" | "Food" | "Points") {
   await page.getByRole("navigation", { name: "Volunteer" }).getByRole("link", { name, exact: true }).click();
 }
 
-async function lookUp(page: Page, token: string) {
-  await page.getByLabel("Or enter the participant's code").fill(token);
-  await page.getByRole("button", { name: "Look up participant" }).click();
+async function enterRegistration(page: Page, token: string) {
+  await page.getByLabel("Or enter the registration code").fill(token);
+  await page.getByRole("button", { name: "Look up registration" }).click();
+}
+
+async function enterBadge(page: Page, badge: string) {
+  await page.getByLabel("Or enter the badge code").fill(badge);
+  await page.getByRole("button", { name: "Look up badge" }).click();
 }
 
 async function expectNoHorizontalScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }
 
-test.describe("volunteer QR scanner", () => {
-  test("checks a participant in after confirmation and explains repeat scans", async ({ page }) => {
+const currentStep = (page: Page) => page.getByRole("list", { name: "Scan progress" }).locator('[aria-current="step"]');
+
+test.describe("volunteer badge check-in", () => {
+  test("verifies the registration, assigns a badge on confirm, and retires the registration QR", async ({ page }) => {
     await signInScanVolunteer(page);
     await openTab(page, "Check-in");
     await expect(page.getByRole("heading", { name: "Participant check-in", exact: true })).toBeVisible();
+    await expect(currentStep(page)).toHaveText("1. Registration QR");
+    await expect(page.locator('[data-scan-mode="registration"]')).toContainText("Scan the registration QR");
 
-    await lookUp(page, "not-a-code");
-    await expect(page.getByRole("alert")).toContainText("isn't a valid participant code");
+    await enterRegistration(page, E2E_BADGES.unused);
+    await expect(page.getByRole("alert")).toContainText("isn't a registration code");
 
-    await lookUp(page, E2E_QR_TOKENS.ready);
-    const confirmation = page.getByRole("region", { name: "Riley Ready" });
-    await expect(confirmation).toContainText("Not checked in yet");
-    await expect(confirmation).not.toContainText("Dietary");
-    await expect(page.getByRole("heading", { name: "Riley Ready" })).toBeFocused();
+    await enterRegistration(page, E2E_QR_TOKENS.arrival);
+    await expect(page.getByRole("heading", { name: "Avery Arrival" })).toBeFocused();
+    await expect(page.getByText("Registration verified · not checked in yet")).toBeVisible();
+    await expect(currentStep(page)).toHaveText("2. Badge QR");
+    await expect(page.locator('[data-scan-mode="badge"]')).toContainText("Scan the badge QR");
+    await expectNoHorizontalScroll(page);
+    await reviewScreenshot(page, "test-results/scanner-check-in-badge-step-mobile.png");
+
+    await enterBadge(page, E2E_QR_TOKENS.arrival);
+    await expect(page.getByRole("alert")).toContainText("That's the registration QR again");
+    await enterBadge(page, E2E_BADGES.ready);
+    await expect(page.getByRole("alert")).toContainText("Badge already assigned");
+    await enterBadge(page, E2E_BADGES.retired);
+    await expect(page.getByRole("alert")).toContainText("Badge deactivated");
+
+    await enterBadge(page, E2E_BADGES.unused);
+    await expect(currentStep(page)).toHaveText("3. Confirm");
+    await expect(page.getByText("Scanned and unused, ready to assign")).toBeVisible();
+    await expect(page.getByText(E2E_BADGES.unused)).toHaveCount(0);
     await expectNoHorizontalScroll(page);
     await reviewScreenshot(page, "test-results/scanner-check-in-confirm-mobile.png");
 
     await page.getByRole("button", { name: "Confirm check-in" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toContainText("Riley Ready is checked in.");
+    await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toContainText("Avery Arrival is checked in with their badge");
     await expect(page.getByRole("button", { name: "Scan next" })).toBeFocused();
     await reviewScreenshot(page, "test-results/scanner-check-in-success-mobile.png");
 
     await page.getByRole("button", { name: "Scan next" }).click();
-    await lookUp(page, E2E_QR_TOKENS.ready);
-    await expect(page.getByRole("status").filter({ hasText: "Already checked in" })).toContainText("Nothing was changed.");
+    await enterRegistration(page, E2E_QR_TOKENS.arrival);
+    await expect(page.getByRole("alert")).toContainText("Registration QR already used");
     await expect(page.getByRole("button", { name: "Confirm check-in" })).toHaveCount(0);
 
     for (const [token, message] of [
       [E2E_QR_TOKENS.unknown, "Participant not found"],
       [E2E_QR_TOKENS.ineligible, "Participant not eligible"],
+      [E2E_QR_TOKENS.legacy, "Already checked in"],
     ] as const) {
       await page.getByRole("button", { name: "Scan next" }).click();
-      await lookUp(page, token);
-      await expect(page.getByRole("alert")).toContainText(message);
+      await enterRegistration(page, token);
+      await expect(page.getByRole("region", { name: "Scan result" })).toContainText(message);
     }
     await expectNoHorizontalScroll(page);
   });
 
-  test("shows dietary information only while confirming food", async ({ page }) => {
+  test("goes back a step or starts over without saving anything", async ({ page }) => {
+    await signInScanVolunteer(page);
+    await openTab(page, "Check-in");
+    await enterRegistration(page, E2E_QR_TOKENS.arrival);
+    await enterBadge(page, E2E_BADGES.unused);
+    await page.getByRole("button", { name: "Back: scan a different badge" }).click();
+    await expect(currentStep(page)).toHaveText("2. Badge QR");
+    await page.getByRole("button", { name: "Back: scan a different registration" }).click();
+    await expect(currentStep(page)).toHaveText("1. Registration QR");
+    await expect(page.getByText("Avery Arrival")).toHaveCount(0);
+
+    await enterRegistration(page, E2E_QR_TOKENS.arrival);
+    await enterBadge(page, E2E_BADGES.unused);
+    await page.getByRole("button", { name: "Start over" }).click();
+    await expect(currentStep(page)).toHaveText("1. Registration QR");
+
+    await enterRegistration(page, E2E_QR_TOKENS.arrival);
+    await expect(page.getByRole("heading", { name: "Avery Arrival" })).toBeVisible();
+  });
+
+  test("keeps the confirmation and offers a retry while offline", async ({ page, context }) => {
+    await signInScanVolunteer(page);
+    await openTab(page, "Check-in");
+    await enterRegistration(page, E2E_QR_TOKENS.arrival);
+    await enterBadge(page, E2E_BADGES.unusedSecond);
+    await context.setOffline(true);
+    await page.getByRole("button", { name: "Confirm check-in" }).click();
+    await expect(page.getByRole("alert")).toContainText("Connection problem");
+    await context.setOffline(false);
+    await page.getByRole("button", { name: "Try again: confirm check-in" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toBeVisible();
+  });
+});
+
+test.describe("volunteer badge scans", () => {
+  test("shows dietary information only while confirming food, and only for a badge", async ({ page }) => {
     await signInScanVolunteer(page);
     await openTab(page, "Food");
-    await lookUp(page, E2E_QR_TOKENS.ready);
+    await enterBadge(page, E2E_QR_TOKENS.ready);
+    await expect(page.getByRole("alert")).toContainText("Registration QR no longer works");
+    await expect(page.getByText("Vegetarian; Allergies: peanuts")).toHaveCount(0);
+    await page.getByRole("button", { name: "Scan next" }).click();
+
+    await enterBadge(page, E2E_BADGES.ready);
     await expect(page.getByText("Vegetarian; Allergies: peanuts")).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByText("Vegetarian; Allergies: peanuts")).toHaveCount(0);
 
-    await lookUp(page, E2E_QR_TOKENS.ready);
+    await enterBadge(page, E2E_BADGES.ready);
     await expect(page.getByText("Not redeemed yet")).toBeVisible();
     await expectNoHorizontalScroll(page);
     await reviewScreenshot(page, "test-results/scanner-food-confirm-mobile.png");
@@ -90,16 +154,11 @@ test.describe("volunteer QR scanner", () => {
     await expect(page.getByText("Vegetarian; Allergies: peanuts")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Scan next" }).click();
-    await lookUp(page, E2E_QR_TOKENS.ready);
+    await enterBadge(page, E2E_BADGES.ready);
     await expect(page.getByRole("status").filter({ hasText: "Food Already Collected" })).toContainText("already received their food for Lunch.");
-
-    await openTab(page, "Check-in");
-    await lookUp(page, E2E_QR_TOKENS.ready);
-    await expect(page.getByRole("heading", { name: "Riley Ready" })).toBeVisible();
-    await expect(page.getByText(/Vegetarian|Dietary/)).toHaveCount(0);
   });
 
-  test("awards the selected event's fixed points and clears state on event change", async ({ page }) => {
+  test("awards the selected event's fixed points by badge and clears state on event change", async ({ page }) => {
     await signInScanVolunteer(page);
     await openTab(page, "Points");
     await expect(page.getByText("Choose an event to start scanning.")).toBeVisible();
@@ -108,12 +167,18 @@ test.describe("volunteer QR scanner", () => {
     await expect(page).toHaveURL(new RegExp(`event=${E2E_EVENTS.workshop.eventId}`));
     await expect(page.getByText(`${E2E_EVENTS.workshop.pointsAwarded} points`).first()).toBeVisible();
 
-    await lookUp(page, E2E_QR_TOKENS.ready);
-    await page.getByRole("button", { name: `Award ${E2E_EVENTS.workshop.pointsAwarded} points` }).click();
-    await expect(page.getByRole("alert")).toContainText("Not checked in yet");
+    for (const [value, message] of [
+      [E2E_QR_TOKENS.arrival, "Not checked in yet"],
+      [E2E_QR_TOKENS.legacy, "No badge assigned"],
+      [E2E_BADGES.retired, "Badge deactivated"],
+      [E2E_QR_TOKENS.checkedIn, "Registration QR no longer works"],
+    ] as const) {
+      await enterBadge(page, value);
+      await expect(page.getByRole("region", { name: "Scan result" })).toContainText(message);
+      await page.getByRole("button", { name: "Scan next" }).click();
+    }
 
-    await page.getByRole("button", { name: "Scan next" }).click();
-    await lookUp(page, E2E_QR_TOKENS.checkedIn);
+    await enterBadge(page, E2E_BADGES.checkedIn);
     await expect(page.getByRole("region", { name: "Morgan Present" })).toContainText(E2E_EVENTS.workshop.name);
     await expectNoHorizontalScroll(page);
     await reviewScreenshot(page, "test-results/scanner-points-confirm-mobile.png");
@@ -121,26 +186,14 @@ test.describe("volunteer QR scanner", () => {
     await page.getByRole("button", { name: "Change event" }).click();
     await expect(page.getByRole("region", { name: "Morgan Present" })).toHaveCount(0);
     await page.getByRole("radio", { name: new RegExp(E2E_EVENTS.panel.name) }).click();
-    await lookUp(page, E2E_QR_TOKENS.checkedIn);
+    await enterBadge(page, E2E_BADGES.checkedIn);
     await expect(page.getByRole("status").filter({ hasText: "Points already awarded" })).toContainText(E2E_EVENTS.panel.name);
 
     await page.getByRole("button", { name: "Change event" }).click();
     await page.getByRole("radio", { name: new RegExp(E2E_EVENTS.workshop.name) }).click();
-    await lookUp(page, E2E_QR_TOKENS.checkedIn);
+    await enterBadge(page, E2E_BADGES.checkedIn);
     await page.getByRole("button", { name: `Award ${E2E_EVENTS.workshop.pointsAwarded} points` }).click();
     await expect(page.getByRole("status").filter({ hasText: "25 points awarded" })).toContainText("Morgan Present received 25 points");
-  });
-
-  test("keeps the confirmation and offers a retry while offline", async ({ page, context }) => {
-    await signInScanVolunteer(page);
-    await openTab(page, "Check-in");
-    await lookUp(page, E2E_QR_TOKENS.ready);
-    await context.setOffline(true);
-    await page.getByRole("button", { name: "Confirm check-in" }).click();
-    await expect(page.getByRole("alert")).toContainText("Connection problem");
-    await context.setOffline(false);
-    await page.getByRole("button", { name: /Try again/ }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toBeVisible();
   });
 });
 
@@ -155,7 +208,7 @@ test.describe("volunteer camera scanner", () => {
     expect(await video.evaluate((element: HTMLVideoElement) => element.srcObject)).toBeNull();
 
     await page.getByRole("button", { name: "Scan with camera" }).click();
-    await expect(page.getByRole("status")).toHaveText("Point the camera at the participant's QR code.", { timeout: 15_000 });
+    await expect(page.getByRole("status")).toHaveText("Point the camera at the registration QR on the participant's phone.", { timeout: 15_000 });
     await expect(video).toBeVisible();
     await expectNoHorizontalScroll(page);
     await reviewScreenshot(page, "test-results/scanner-camera-mobile.png");
@@ -172,7 +225,7 @@ test.describe("volunteer camera scanner", () => {
     expect(await page.evaluate(() => (window as unknown as { scanTracks: MediaStreamTrack[] }).scanTracks.every((track) => track.readyState === "ended"))).toBe(true);
 
     await page.getByRole("button", { name: "Scan with camera" }).click();
-    await expect(page.getByRole("status")).toHaveText("Point the camera at the participant's QR code.", { timeout: 15_000 });
+    await expect(page.getByRole("status")).toHaveText("Point the camera at the registration QR on the participant's phone.", { timeout: 15_000 });
     await video.evaluate((element: HTMLVideoElement) => {
       (window as unknown as { scanTracks: MediaStreamTrack[] }).scanTracks = (element.srcObject as MediaStream).getTracks();
     });
@@ -185,22 +238,20 @@ test.describe("volunteer camera scanner", () => {
 test.describe("volunteer camera decoding", () => {
   test.use({ permissions: ["camera"] });
 
-  test("reads a participant QR code, stops the camera, and waits for confirmation", async ({ page }) => {
-    await showQrToCamera(page, await qrCodeSvg(E2E_QR_TOKENS.ready));
+  test("reads a registration QR, then refuses the same code as a badge", async ({ page }) => {
+    await showQrToCamera(page, await qrCodeSvg(E2E_QR_TOKENS.arrival));
     await signInScanVolunteer(page);
     await openTab(page, "Check-in");
     await page.getByRole("button", { name: "Scan with camera" }).click();
 
-    await expect(page.getByRole("heading", { name: "Riley Ready" })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("button", { name: "Confirm check-in" })).toBeEnabled();
-    await expect(page.getByText("Checked in", { exact: true })).toHaveCount(0);
-    expect(await page.evaluate(() => (window as unknown as { scanTracks: MediaStreamTrack[] }).scanTracks.every((track) => track.readyState === "ended"))).toBe(true);
+    await expect(page.getByRole("heading", { name: "Avery Arrival" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-scan-mode="badge"]')).toBeVisible();
+    await expect(page.getByRole("alert")).toContainText("That's the registration QR again", { timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Confirm check-in" })).toHaveCount(0);
 
+    await enterBadge(page, E2E_BADGES.unused);
     await page.getByRole("button", { name: "Confirm check-in" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toBeVisible();
-
-    await page.getByRole("button", { name: "Scan next" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Already checked in" })).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -211,7 +262,7 @@ test.describe("volunteer camera without permission", () => {
     await page.getByRole("button", { name: "Scan with camera" }).click();
     await expect(page.getByRole("alert")).toContainText("Camera access is blocked");
     await expect(page.getByRole("button", { name: "Try camera again" })).toBeVisible();
-    await lookUp(page, E2E_QR_TOKENS.ready);
-    await expect(page.getByRole("heading", { name: "Riley Ready" })).toBeVisible();
+    await enterRegistration(page, E2E_QR_TOKENS.arrival);
+    await expect(page.getByRole("heading", { name: "Avery Arrival" })).toBeVisible();
   });
 });

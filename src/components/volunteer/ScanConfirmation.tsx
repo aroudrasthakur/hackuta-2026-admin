@@ -4,8 +4,7 @@ import { scanConfirmButtonClass, scanSecondaryButtonClass } from "../../lib/scan
 
 function confirmLabel(preview: ScanPreview) {
   if (preview.purpose === "point_scan") return `Award ${preview.event.pointsAwarded} points`;
-  if (preview.purpose === "food_check_in") return "Confirm food given";
-  return "Confirm check-in";
+  return "Confirm food given";
 }
 
 /**
@@ -38,12 +37,6 @@ export function ScanConfirmation({
       </div>
 
       <dl className="grid gap-3 text-lg">
-        {preview.purpose === "check_in" ? (
-          <div>
-            <dt className="admin-meta__label">Check-in status</dt>
-            <dd className="font-semibold text-night">Not checked in yet</dd>
-          </div>
-        ) : null}
         {preview.purpose === "food_check_in" ? (
           <>
             <div>

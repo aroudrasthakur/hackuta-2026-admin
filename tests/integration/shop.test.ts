@@ -66,6 +66,8 @@ async function seedShop(options: { points?: number; status?: string } = {}) {
       acceptedAt: 1,
       acceptedBy: admin.adminId,
       qrCodeToken: QR_TOKEN,
+      badgeQrCodeToken: QR_TOKEN,
+      checkedInAt: 1,
       points: options.points ?? 100,
       createdAt: 1,
       updatedAt: 1,

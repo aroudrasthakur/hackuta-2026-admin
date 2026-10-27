@@ -2,9 +2,9 @@ import { useCallback, useRef, useState } from "react";
 import type { GenericId } from "convex/values";
 import { useMutation } from "../convex/reactBindings";
 import { purchaseShopItemRef, resolveQrForScanRef } from "../convex/adminApi";
+import { normalizeBadgeQr } from "../../shared/admin/qrValues";
 import {
   INVALID_QR_OUTCOME,
-  normalizeQrToken,
   previewOutcome,
   scanErrorOutcome,
   scanFailureOutcome,
@@ -30,8 +30,8 @@ export type ShopWorkflowState =
   | { step: "result"; outcome: ScanOutcome; receipt: ShopReceipt | null; customer: ShopCustomerInfo | null };
 
 /**
- * Scan → choose → review → result for shop sales. The scanned QR token stays
- * in a ref and is sent again with the purchase, which re-checks everything on
+ * Badge scan → choose → review → result for shop sales. The scanned badge value
+ * stays in a ref and is sent again with the purchase, which re-checks everything on
  * the server. One idempotency key is made when Review opens and reused for
  * every retry of that purchase, so a double tap or a lost response never
  * charges twice. Scan next clears the token and the key.
@@ -54,7 +54,7 @@ export function useShopWorkflow() {
 
   const scan = useCallback(async (rawValue: string) => {
     if (busyRef.current || tokenRef.current) return;
-    const token = normalizeQrToken(rawValue);
+    const token = normalizeBadgeQr(rawValue);
     if (!token) return finish(INVALID_QR_OUTCOME);
     if (!sessionToken) return finish(scanFailureOutcome("session_expired"));
     busyRef.current = true;

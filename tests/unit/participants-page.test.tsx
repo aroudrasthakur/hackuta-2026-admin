@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
+  assignParticipantBadgeRef,
   getParticipantDetailsRef,
   listParticipantsRef,
   promoteParticipantToVolunteerRef,
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   promote: vi.fn(),
   revoke: vi.fn(),
   restore: vi.fn(),
+  assignBadge: vi.fn(),
   loadMore: vi.fn(),
 }));
 
@@ -41,6 +43,7 @@ const row: ParticipantRow = {
   points: 20,
   checkedInAt: null,
   foodCheckedInAt: null,
+  badgeAssigned: false,
   volunteer: null,
 };
 
@@ -56,6 +59,7 @@ function detail(overrides: Partial<ParticipantDetails> = {}): ParticipantDetails
     checkedInAt: null,
     foodCheckedInAt: null,
     awards: [],
+    badge: null,
     volunteer: null,
     ...overrides,
   };
@@ -123,11 +127,13 @@ beforeEach(() => {
   }));
   mocks.revoke.mockReset().mockResolvedValue({ ok: true });
   mocks.restore.mockReset().mockResolvedValue({ ok: true });
+  mocks.assignBadge.mockReset().mockResolvedValue({ ok: true, replaced: true, assignedAt: 2 });
   mocks.useMutation.mockReset().mockImplementation((ref) => {
     if (ref === setParticipantPointsRef) return mocks.setPoints;
     if (ref === promoteParticipantToVolunteerRef) return mocks.promote;
     if (ref === revokeVolunteerRef) return mocks.revoke;
     if (ref === restoreVolunteerRef) return mocks.restore;
+    if (ref === assignParticipantBadgeRef) return mocks.assignBadge;
     throw new Error("Unexpected mutation reference");
   });
   vi.spyOn(HTMLDialogElement.prototype, "showModal").mockImplementation(function (this: HTMLDialogElement) {
@@ -162,7 +168,8 @@ function button(name: string) {
 function field(label: string) {
   const labels = Array.from(container.querySelectorAll("label"));
   const parent = labels.find((element) => element.textContent?.includes(label));
-  return parent?.querySelector("input, textarea, select") as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | undefined;
+  const target = parent?.htmlFor ? container.querySelector(`[id="${parent.htmlFor}"]`) : parent?.querySelector("input, textarea, select");
+  return target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | undefined;
 }
 
 async function click(name: string) {
@@ -278,6 +285,61 @@ describe("ParticipantsPage", () => {
     await click("Close");
     expect(container.querySelector("dialog[open]")).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("replaces a badge with a reason without ever showing badge values", async () => {
+    currentDetails = detail({
+      checkedInAt: 1_735_689_600_000,
+      badge: { assignedAt: 1_735_689_700_000, assignedBy: { adminId: "admin-2" as never, name: "Desk Volunteer" } },
+    });
+    await render();
+    await openDetails();
+    expect(container.textContent).toContain("by Desk Volunteer");
+    await click("Replace badge");
+    expect(container.textContent).toContain("current badge stops working immediately");
+    await fill("Or enter the badge code", " HACKUTA-BADGE-0777 ");
+    await click("Look up badge");
+    expect(container.textContent).toContain("New badge scanned");
+    expect(container.textContent).not.toContain("HACKUTA-BADGE-0777");
+
+    await fill("Reason", "   ");
+    await click("Confirm badge replacement");
+    expect(mocks.assignBadge).not.toHaveBeenCalled();
+    await fill("Reason", " Badge lost ");
+    await click("Confirm badge replacement");
+    expect(mocks.assignBadge).toHaveBeenCalledWith({
+      sessionToken: "session-token",
+      participantId: row.participantId,
+      badgeQrCodeToken: " HACKUTA-BADGE-0777 ",
+      reason: "Badge lost",
+      expectedBadgeAssignedAt: 1_735_689_700_000,
+    });
+    expect(container.textContent).toContain("Badge replaced.");
+    expect(container.textContent).toContain("old badge no longer works");
+  });
+
+  it("asks for the badge again when the server rejects it", async () => {
+    currentDetails = detail({ checkedInAt: 5 });
+    mocks.assignBadge.mockRejectedValueOnce(adminError("BADGE_IN_USE"));
+    await render();
+    await openDetails();
+    expect(container.textContent).toContain("Checked in without a badge");
+    await click("Assign badge");
+    await fill("Or enter the badge code", "HACKUTA-BADGE-0002");
+    await click("Look up badge");
+    await fill("Reason", "Checked in before badges");
+    await click("Confirm badge assignment");
+    expect(mocks.assignBadge).toHaveBeenCalledWith(expect.objectContaining({ expectedBadgeAssignedAt: null }));
+    expect(container.querySelector('[role="alert"]')?.textContent).toBeTruthy();
+    expect(button("Look up badge")).toBeDefined();
+  });
+
+  it("offers no badge change before check-in", async () => {
+    await render();
+    await openDetails();
+    expect(container.textContent).toContain("A badge is assigned at the check-in desk");
+    expect(button("Assign badge")).toBeUndefined();
+    expect(button("Replace badge")).toBeUndefined();
   });
 
   it("validates point balances and reasons without submitting invalid values", async () => {
