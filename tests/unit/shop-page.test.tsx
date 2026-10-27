@@ -10,7 +10,6 @@ import {
   cancelFlashSaleRef,
   createFlashSaleRef,
   createShopItemRef,
-  generateShopImageUploadUrlRef,
   listFlashSalesRef,
   listInventoryAdjustmentsRef,
   listShopItemsAdminRef,
@@ -219,7 +218,7 @@ describe("Items tab", () => {
     expect(text()).toContain("4 of 5 items");
     expect(text()).toContain("On sale");
     expect(container.querySelector(".shop-price__was")?.textContent).toBe("400");
-    expect(container.querySelector("img[src='https://img.test/tee.png']")).not.toBeNull();
+    expect(text()).toContain("Soft tee");
 
     await type("Search items", "sticker");
     expect(text()).toContain("1 of 5 items");
@@ -297,25 +296,13 @@ describe("Items tab", () => {
     expect(container.querySelector("dialog")).toBeNull();
   });
 
-  it("adds an item with an uploaded image", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ storageId: "storage-1" }))));
-    URL.createObjectURL = vi.fn(() => "blob:preview");
-    URL.revokeObjectURL = vi.fn();
-    mutation(generateShopImageUploadUrlRef).mockResolvedValue("https://upload.test");
+  it("adds an item through the form", async () => {
     mutation(createShopItemRef).mockResolvedValue({ itemId: "new" });
     await render();
     await click("Add item");
     await submit(container.querySelector("dialog form"));
     expect(text()).toContain("Enter a name.");
     expect(text()).toContain("Enter a whole number of 1 point or more.");
-
-    const image = field("Image");
-    Object.defineProperty(image, "files", { value: [new File(["x"], "big.bmp", { type: "image/bmp" })], configurable: true });
-    await act(async () => image.dispatchEvent(new Event("change", { bubbles: true })));
-    expect(text()).toContain("Choose a PNG, JPEG, WebP, or GIF image");
-    Object.defineProperty(image, "files", { value: [new File(["x"], "tee.png", { type: "image/png" })], configurable: true });
-    await act(async () => image.dispatchEvent(new Event("change", { bubbles: true })));
-    expect(container.querySelector("dialog img")?.getAttribute("src")).toBe("blob:preview");
 
     await type("Name", "  Bucket hat ");
     await type("Description", "Sun hat");
@@ -330,43 +317,23 @@ describe("Items tab", () => {
     await act(async () => field("Feature this item").click());
     await type("Status", "archived");
     await submit(container.querySelector("dialog form"));
-    expect(fetch).toHaveBeenCalledWith("https://upload.test", expect.objectContaining({ method: "POST", headers: { "Content-Type": "image/png" } }));
     expect(mutation(createShopItemRef)).toHaveBeenCalledWith({
       sessionToken: "session", name: "Bucket hat", description: "Sun hat", pointsCost: 250, featured: true, lowStockThreshold: null,
-      imageStorageId: "storage-1", stockQuantity: 6, active: false,
+      stockQuantity: 6, active: false,
     });
     expect(mutation(setShopItemStatusRef)).toHaveBeenCalledWith({ sessionToken: "session", itemId: "new", status: "archived" });
     expect(text()).toContain("Bucket hat added.");
   });
 
-  it("reports a failed image upload", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 500 })));
-    URL.createObjectURL = vi.fn(() => "blob:preview");
-    URL.revokeObjectURL = vi.fn();
-    await render();
-    await click("Add item");
-    const image = field("Image");
-    Object.defineProperty(image, "files", { value: [new File(["x"], "tee.png", { type: "image/png" })], configurable: true });
-    await act(async () => image.dispatchEvent(new Event("change", { bubbles: true })));
-    await type("Name", "Hat");
-    await type("Price (points)", "10");
-    await submit(container.querySelector("dialog form"));
-    expect(container.querySelector("dialog [role=alert]")?.textContent).toContain("The image didn't upload");
-    await click("Cancel");
-    expect(container.querySelector("dialog")).toBeNull();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
-  });
-
-  it("edits an item, removes its image, and changes its status", async () => {
+  it("edits an item and changes its status", async () => {
     await render();
     await click("Edit HackUTA 2026 T-shirt");
     expect(field("Current stock").disabled).toBe(true);
-    await click("Remove image");
     await type("Price (points)", "450");
     await type("Status", "inactive");
     await submit(container.querySelector("dialog form"));
     expect(mutation(updateShopItemRef)).toHaveBeenCalledWith({
-      sessionToken: "session", itemId: "tee", name: "HackUTA 2026 T-shirt", description: "Soft tee", pointsCost: 450, featured: true, lowStockThreshold: 5, imageStorageId: null,
+      sessionToken: "session", itemId: "tee", name: "HackUTA 2026 T-shirt", description: "Soft tee", pointsCost: 450, featured: true, lowStockThreshold: 5,
     });
     expect(mutation(setShopItemStatusRef)).toHaveBeenCalledWith({ sessionToken: "session", itemId: "tee", status: "inactive" });
     expect(text()).toContain("HackUTA 2026 T-shirt saved.");

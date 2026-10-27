@@ -57,7 +57,7 @@ export function ShopDialog({
           <h2 id={titleId}>{title}</h2>
           {description ? <p>{description}</p> : null}
         </div>
-        <span aria-hidden="true" className="shop-meander shop-meander--sm" />
+        <span aria-hidden="true" className="admin-meander admin-meander--sm" />
         <div className="shop-dialog__body">{children}</div>
         <div className="shop-dialog__foot">{footer}</div>
       </form>

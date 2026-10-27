@@ -125,7 +125,7 @@ describe("admin shop items", () => {
     const list = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken });
     expect(list.items).toMatchObject([{
       itemId, name: "Sticker pack", pointsCost: 20, effectivePointsCost: 20, stockQuantity: 7,
-      stockStatus: "in_stock", status: "active", featured: false, imageUrl: null,
+      stockStatus: "in_stock", status: "active", featured: false,
     }]);
     const adjustments = await shop.t.query(listInventoryAdjustmentsRef, {
       sessionToken: shop.admin.sessionToken, paginationOpts: { numItems: 10, cursor: null }, itemId,
@@ -180,7 +180,8 @@ describe("admin shop items", () => {
     const itemId = await createItem(shop, { name: "Hat", pointsCost: 5, stockQuantity: 0 });
     await shop.t.run((ctx) => ctx.db.patch(itemId, { imageStorageId: text }));
     const list = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken });
-    expect(list.items[0]?.imageUrl).toEqual(expect.any(String));
+    expect(list.items[0]).not.toHaveProperty("imageUrl");
+    expect(await shop.t.run((ctx) => ctx.db.get(itemId))).toMatchObject({ imageStorageId: text });
 
     await expectAdminErrorCode(shop.t.mutation(updateShopItemRef, { ...base, itemId, imageStorageId: text }), "INVALID_SHOP_IMAGE");
     await shop.t.mutation(updateShopItemRef, { ...base, itemId, imageStorageId: null });

@@ -144,14 +144,48 @@
     outline-offset: 3px;
   }
 
+  /* Greek-key band shared by page headers and shop dialogs. */
+  .admin-meander {
+    display: block;
+    height: 20px;
+    background: currentColor;
+    color: var(--color-ink);
+    opacity: 0.4;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20' viewBox='0 0 40 20'%3E%3Cpath d='M0 18h40M4 18V2h30v12H16V8h10v3' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") repeat-x center / 40px 20px;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20' viewBox='0 0 40 20'%3E%3Cpath d='M0 18h40M4 18V2h30v12H16V8h10v3' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") repeat-x center / 40px 20px;
+  }
+  .admin-meander--flip { transform: scaleY(-1); }
+  .admin-meander--sm { height: 12px; -webkit-mask-size: 24px 12px; mask-size: 24px 12px; }
+
+  /* Page header tablet: clay panel, pillar art, and a meander base. */
+  .admin-frieze {
+    position: relative;
+    overflow: hidden;
+    border: 1.5px solid rgb(26 58 82 / 0.28);
+    background: var(--color-clay);
+  }
+  .admin-frieze__art {
+    position: absolute;
+    top: -1.25rem;
+    right: -1rem;
+    width: auto;
+    height: 15rem;
+    opacity: 0.32;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+  .admin-frieze .admin-page-title { font-size: clamp(2.2rem, 5vw, 3rem); line-height: 1; }
+  @media (max-width: 640px) { .admin-frieze__art { opacity: 0.16; } }
+
   .admin-page-header {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding-bottom: 1.25rem;
-    border-bottom: 1px solid var(--color-border);
+    padding: 1.5rem clamp(1rem, 3vw, 2rem) 1.25rem;
   }
   .admin-page-header__copy { min-width: 0; flex: 1 1 16rem; }
   .admin-page-header__description {

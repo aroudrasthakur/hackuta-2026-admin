@@ -1,52 +1,5 @@
 /* Event shop: HackUTA 2026 pottery tablets (square edges, meander bands, pill buttons) on the admin palette. */
 @layer components {
-  .shop-meander {
-    display: block;
-    height: 20px;
-    background: currentColor;
-    color: var(--color-ink);
-    opacity: 0.4;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20' viewBox='0 0 40 20'%3E%3Cpath d='M0 18h40M4 18V2h30v12H16V8h10v3' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") repeat-x center / 40px 20px;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20' viewBox='0 0 40 20'%3E%3Cpath d='M0 18h40M4 18V2h30v12H16V8h10v3' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") repeat-x center / 40px 20px;
-  }
-  .shop-meander--flip { transform: scaleY(-1); }
-  .shop-meander--sm { height: 12px; -webkit-mask-size: 24px 12px; mask-size: 24px 12px; }
-  .shop-meander--light { color: var(--color-clay); opacity: 0.45; }
-
-  .shop-frieze {
-    position: relative;
-    overflow: hidden;
-    border: 1.5px solid rgb(26 58 82 / 0.28);
-    background: var(--color-clay);
-  }
-  .shop-frieze__art {
-    position: absolute;
-    top: -1.25rem;
-    right: -1rem;
-    width: auto;
-    height: 15rem;
-    opacity: 0.32;
-    mix-blend-mode: multiply;
-    pointer-events: none;
-  }
-  .shop-frieze .admin-page-header {
-    position: relative;
-    z-index: 1;
-    border-bottom: 0;
-    padding: 1.5rem clamp(1rem, 3vw, 2rem) 1.25rem;
-  }
-  .shop-frieze .admin-page-title { font-size: clamp(2.2rem, 5vw, 3rem); line-height: 1; }
-  .shop-eyebrow {
-    display: block;
-    margin-bottom: 0.35rem;
-    color: var(--color-ocean);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-  }
-  @media (max-width: 640px) { .shop-frieze__art { opacity: 0.16; } }
-
   /* Tabs after the event site's schedule tablet tabs. */
   .shop-tabs { display: flex; flex-wrap: wrap; gap: 0.75rem; }
   .shop-tab {
@@ -118,10 +71,19 @@
   }
 
   .shop-table-scroll { overflow-x: auto; background: #fffaf2; }
-  .shop-table { min-width: 60rem; }
+  .shop-table { min-width: 52rem; }
+  .shop-table--items { min-width: 56rem; }
   .shop-table thead { background: transparent; border-bottom: 1.5px solid rgb(26 58 82 / 0.28); color: var(--color-ocean); letter-spacing: 0.12em; }
   .shop-table tbody tr:is(:hover, :focus-within) { background: color-mix(in srgb, var(--color-clay) 55%, #fffaf2); }
-  .shop-item-cell { display: flex; align-items: center; gap: 0.75rem; min-width: 14rem; }
+  .shop-table__name { min-width: 8rem; max-width: 14rem; color: var(--color-night); font-weight: 700; }
+  .shop-table__description { min-width: 10rem; max-width: 18rem; font-size: 0.875rem; line-height: 1.4; vertical-align: top; }
+  .shop-table__price,
+  .shop-table__stock,
+  .shop-table__status,
+  .shop-table__sale { white-space: nowrap; vertical-align: middle; }
+  .shop-table__inventory { min-width: 11rem; vertical-align: middle; }
+  .shop-table__edit { vertical-align: middle; }
+  .shop-item-cell { display: flex; align-items: center; gap: 0.75rem; min-width: 10rem; }
   .shop-item-cell strong { display: block; color: var(--color-night); }
   .shop-item-cell span { color: var(--color-muted); font-size: 0.8125rem; }
   .shop-thumb {

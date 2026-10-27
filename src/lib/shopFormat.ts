@@ -29,6 +29,14 @@ export const ITEM_STATUS: Record<ShopItemAdminRow["status"], { label: string; to
   archived: { label: "Archived", tone: "neutral" },
 };
 
+/** Sellable state for the admin table: active items with no stock read as sold out. */
+export function itemListingStatus(item: Pick<ShopItemAdminRow, "status" | "stockStatus">) {
+  if (item.status === "active" && item.stockStatus === "out") {
+    return { label: "Sold out", tone: "negative" as const };
+  }
+  return ITEM_STATUS[item.status];
+}
+
 export const SALE_STATUS: Record<FlashSaleRow["status"], { label: string; tone: StatusTone }> = {
   live: { label: "Live", tone: "positive" },
   scheduled: { label: "Scheduled", tone: "info" },

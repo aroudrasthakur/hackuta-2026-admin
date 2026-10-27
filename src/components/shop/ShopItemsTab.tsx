@@ -8,13 +8,13 @@ import {
 } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { usePriceClock, useWatchPriceChange } from "../../hooks/usePriceClock";
-import { formatPoints, ITEM_STATUS, STOCK_STATUS } from "../../lib/shopFormat";
+import { formatPoints, itemListingStatus, STOCK_STATUS } from "../../lib/shopFormat";
 import { reportUserFacingError } from "../../lib/userFacingError";
 import { AdminStatusBadge } from "../AdminStatusBadge";
 import { EmptyState } from "../states/EmptyState";
 import { LoadingState } from "../states/LoadingState";
 import { ShopItemForm } from "./ShopItemForm";
-import { ShopItemThumb, ShopPrice } from "./ShopItemThumb";
+import { ShopPrice } from "./ShopPrice";
 import { ShopVolunteersPanel } from "./ShopVolunteersPanel";
 import { StockAdjustDialog } from "./StockAdjustDialog";
 
@@ -149,37 +149,52 @@ export function ShopItemsTab() {
             <div className="p-4"><EmptyState title="No shop items yet" description="Add the first item to open the shop." /></div>
           ) : (
             <div className="shop-table-scroll">
-              <table className="admin-table shop-table">
+              <table className="admin-table shop-table shop-table--items">
                 <thead>
-                  <tr><th scope="col">Item</th><th scope="col">Price</th><th scope="col">Available</th><th scope="col">Stock</th><th scope="col">Status</th><th scope="col">Featured</th><th scope="col">Inventory</th><th scope="col"><span className="sr-only">Edit</span></th></tr>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Available</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Flash sale</th>
+                    <th scope="col">Featured</th>
+                    <th scope="col">Inventory</th>
+                    <th scope="col"><span className="sr-only">Edit</span></th>
+                  </tr>
                 </thead>
                 <tbody>
                   {rows.length === 0 ? (
-                    <tr><td colSpan={8} className="py-8 text-center text-muted">No items match.</td></tr>
+                    <tr><td colSpan={9} className="py-8 text-center text-muted">No items match.</td></tr>
                   ) : rows.map((item) => {
                     const busy = busyItem === item.itemId;
+                    const listing = itemListingStatus(item);
                     return (
                       <tr key={item.itemId}>
-                        <th scope="row" className="font-normal">
-                          <div className="shop-item-cell">
-                            <ShopItemThumb imageUrl={item.imageUrl} />
-                            <div className="min-w-0"><strong>{item.name}</strong>{item.description ? <span>{item.description}</span> : null}</div>
-                          </div>
-                        </th>
-                        <td>
+                        <th scope="row" className="shop-table__name font-normal">{item.name}</th>
+                        <td className="shop-table__description text-muted">{item.description || "—"}</td>
+                        <td className="shop-table__price">
                           <ShopPrice pointsCost={item.pointsCost} effectivePointsCost={item.effectivePointsCost} />
-                          {item.flashSaleId ? <div className="mt-1"><AdminStatusBadge className="admin-badge--sale">On sale</AdminStatusBadge></div> : null}
                         </td>
-                        <td className="text-base font-bold tabular-nums text-night">{formatPoints(item.stockQuantity)}</td>
-                        <td><AdminStatusBadge tone={STOCK_STATUS[item.stockStatus].tone}>{STOCK_STATUS[item.stockStatus].label}</AdminStatusBadge></td>
-                        <td><AdminStatusBadge tone={ITEM_STATUS[item.status].tone}>{ITEM_STATUS[item.status].label}</AdminStatusBadge></td>
+                        <td className="shop-table__stock">
+                          <span className="text-base font-bold tabular-nums text-night">{formatPoints(item.stockQuantity)}</span>
+                          {item.stockStatus === "low" ? (
+                            <div className="mt-1"><AdminStatusBadge tone={STOCK_STATUS.low.tone}>{STOCK_STATUS.low.label}</AdminStatusBadge></div>
+                          ) : null}
+                        </td>
+                        <td className="shop-table__status">
+                          <AdminStatusBadge tone={listing.tone}>{listing.label}</AdminStatusBadge>
+                        </td>
+                        <td className="shop-table__sale">
+                          {item.flashSaleId ? <AdminStatusBadge className="admin-badge--sale">On sale</AdminStatusBadge> : <span className="text-muted">—</span>}
+                        </td>
                         <td>
                           <button type="button" className="shop-star" aria-pressed={item.featured} aria-label={`Feature ${item.name}`} disabled={busy} onClick={() => toggleFeatured(item)}>
                             <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z" /></svg>
                           </button>
                         </td>
-                        <td>
-                          <div className="flex items-center gap-2">
+                        <td className="shop-table__inventory">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="shop-stepper">
                               <button type="button" aria-label={`Remove one ${item.name}`} disabled={busy || item.stockQuantity === 0} onClick={() => quickAdjust(item, -1)}>−</button>
                               <span className="shop-stepper__value" aria-label={`${item.name} stock`}>{item.stockQuantity}</span>
@@ -188,7 +203,9 @@ export function ShopItemsTab() {
                             <button type="button" className="shop-pill shop-pill--sm" aria-label={`Adjust stock for ${item.name}`} onClick={() => setEditing({ kind: "adjust", item })}>Adjust</button>
                           </div>
                         </td>
-                        <td><button type="button" className="shop-pill shop-pill--sm shop-pill--ghost" aria-label={`Edit ${item.name}`} onClick={() => setEditing({ kind: "edit", item })}>Edit</button></td>
+                        <td className="shop-table__edit">
+                          <button type="button" className="shop-pill shop-pill--sm shop-pill--ghost" aria-label={`Edit ${item.name}`} onClick={() => setEditing({ kind: "edit", item })}>Edit</button>
+                        </td>
                       </tr>
                     );
                   })}

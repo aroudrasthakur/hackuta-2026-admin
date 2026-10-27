@@ -87,10 +87,11 @@
     color: var(--color-ink);
   }
 
+  /* Pinned to the viewport so long pages scroll over a still sky. */
   .sign-in-storm {
     --storm: 0;
     --sky-haze: 1;
-    position: absolute;
+    position: fixed;
     inset: 0;
     pointer-events: none;
     overflow: hidden;
