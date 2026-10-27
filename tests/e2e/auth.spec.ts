@@ -10,7 +10,7 @@ test.describe("organizer authentication", () => {
     for (const path of ["/admin/applications", "/admin/decision-emails", "/admin/applications/e2e-app-unreviewed", "/admin/participants", "/admin/volunteers", "/admin/meals", "/admin/scan/food", "/admin/scan/points"]) {
       await page.goto(path);
       await expect(page).toHaveURL(/\/admin\/scan$/);
-      await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
       await expect(page.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
     }
     await signOutOrganizer(page);
@@ -69,7 +69,7 @@ test.describe("organizer authentication", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "Participant check-in", exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Back to volunteer dashboard" }).click();
-    await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await reviewScreenshot(page, "test-results/volunteer-dashboard-mobile.png");
   });

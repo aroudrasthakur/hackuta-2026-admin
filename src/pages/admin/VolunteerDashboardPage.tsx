@@ -1,61 +1,122 @@
 import { Link } from "react-router-dom";
-import { EmptyState } from "../../components/states/EmptyState";
+import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { LoadingState } from "../../components/states/LoadingState";
+import { VolunteerActionCard } from "../../components/volunteer/VolunteerActionCard";
+import { EventStatusBadge } from "../../components/admin/EventStatusBadge";
+import { SectionIcon } from "../../components/SectionIcon";
 import { useVolunteerAccess } from "../../hooks/useVolunteerAccess";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { useNow } from "../../hooks/useNow";
 import { canAccessStaffRoute } from "../../lib/staffRouteAccess";
 import { ADMIN_ROUTES } from "../../types/routes";
-import { AdminPageHeader } from "../../components/AdminPageHeader";
-import { EventStatusBadge } from "../../components/admin/EventStatusBadge";
-import { SectionIcon } from "../../components/SectionIcon";
-import { reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
+
+function greetingFor(now: number) {
+  const hour = new Date(now).getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+const ACTIONS = [
+  {
+    to: ADMIN_ROUTES.scanCheckIn,
+    title: "Participant check-in",
+    icon: "checkIn",
+    description: "Scan their registration QR, hand over a badge, and confirm.",
+  },
+  {
+    to: ADMIN_ROUTES.scanFood,
+    title: "Food distribution",
+    icon: "food",
+    description: "Scan a badge, check dietary notes, and record the meal.",
+  },
+  {
+    to: ADMIN_ROUTES.scanPoints,
+    title: "Event points",
+    icon: "points",
+    description: "Scan a badge to award points for your assigned events.",
+  },
+  {
+    to: ADMIN_ROUTES.scanShop,
+    title: "Shop redemption",
+    icon: "shop",
+    description: "Scan a badge and sell shop items for points.",
+  },
+] as const;
 
 export function VolunteerDashboardPage() {
   const { staff } = useAdminAuth();
   const options = useVolunteerAccess();
   const now = useNow();
-  const header = <AdminPageHeader id="volunteer-dashboard-heading" title="Volunteer dashboard" description={`${staff ? `Welcome, ${staff.name}. ` : ""}Your assigned responsibilities and scan actions appear here as access changes.`} />;
-  if (!staff || !options) return <div className="space-y-6">{header}<LoadingState layout="rows" message="Loading your responsibilities…" /></div>;
-  const actions = [
-    { to: ADMIN_ROUTES.scanCheckIn, title: "Participant check-in", icon: "checkIn" as const, description: "Welcome participants and check their arrival status." },
-    { to: ADMIN_ROUTES.scanFood, title: "Food", icon: "food" as const, description: "Check meal redemption and dietary information." },
-    { to: ADMIN_ROUTES.scanPoints, title: "Points", icon: "points" as const, description: "View your assigned events for point scans." },
-    { to: ADMIN_ROUTES.scanShop, title: "Shop redemption", icon: "shop" as const, description: "Scan a participant, then sell shop items for their points." },
-  ].filter(({ to }) => canAccessStaffRoute(to, staff, options) === true);
+  const firstName = staff?.name?.trim().split(/\s+/)[0] || "Volunteer";
+
+  if (!staff || !options) {
+    return (
+      <div className="space-y-6">
+        <AdminPageHeader id="volunteer-dashboard-heading" title="Volunteer dashboard" />
+        <LoadingState layout="rows" message="Loading your responsibilities…" />
+      </div>
+    );
+  }
+
+  const actions = ACTIONS.filter(({ to }) => canAccessStaffRoute(to, staff, options) === true);
 
   return (
-    <div className="space-y-8">
-      {header}
+    <div className="volunteer-dashboard space-y-8">
+      <AdminPageHeader
+        id="volunteer-dashboard-heading"
+        title={`${greetingFor(now)}, ${firstName}`}
+        description="Choose a responsibility to start scanning."
+      />
+
       {actions.length ? (
-        <section aria-label="Available scan actions" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {actions.map(({ to, title, icon, description }) => (
-            <Link key={to} to={to} className="admin-card admin-action-card block space-y-2 p-6">
-              <span className="admin-state__icon"><SectionIcon name={icon} /></span>
-              <h2 className="text-lg font-semibold text-ink">{title}</h2>
-              <p className="text-sm text-mist">{description}</p>
-              <span className="inline-block py-2 text-sm font-semibold">Open {title.toLowerCase()} →</span>
-            </Link>
-          ))}
-        </section>
-      ) : (
-        <EmptyState title="No responsibilities assigned yet" description="Ask an administrator to grant check-in, food, shop, or event access. Your assignments will appear here automatically." />
-      )}
-      <section aria-labelledby="assigned-events">
-        <h2 id="assigned-events" className="admin-card__title mb-3">Assigned events</h2>
-        <p className="mb-4 text-sm text-mist">Listed events are switched on and available for point scans. Scheduled times are for reference.</p>
-        {options.events.length ? (
-          <ul className="grid gap-4 sm:grid-cols-2">
-            {options.events.map((event) => (
-              <li key={event.eventId} className="admin-card space-y-2 p-5">
-                <h3 className="font-semibold text-ink">{event.name}</h3>
-                <div className="flex flex-wrap items-center gap-2 text-sm"><span>{event.pointsAwarded} points</span><EventStatusBadge event={{ ...event, active: true }} now={now} /></div>
-                <p className="text-sm text-mist"><time dateTime={new Date(event.startsAt).toISOString()}>{new Date(event.startsAt).toLocaleString()}</time> – <time dateTime={new Date(event.endsAt).toISOString()}>{new Date(event.endsAt).toLocaleString()}</time></p>
-                <Link className={reviewSecondaryButtonClass} to={`${ADMIN_ROUTES.scanPoints}?event=${encodeURIComponent(event.eventId)}`}>Open points for {event.name} →</Link>
+        <section aria-labelledby="volunteer-responsibilities">
+          <h2 id="volunteer-responsibilities" className="volunteer-section-title">Your responsibilities</h2>
+          <ul className="volunteer-action-grid">
+            {actions.map(({ to, title, icon, description }) => (
+              <li key={to}>
+                <VolunteerActionCard to={to} title={title} description={description} icon={<SectionIcon name={icon} />} />
               </li>
             ))}
           </ul>
-        ) : <p className="text-sm text-mist">No active events assigned. Contact an administrator if you need event access.</p>}
+        </section>
+      ) : (
+        <div className="volunteer-callout" role="status">
+          <h2 className="volunteer-callout__title">No responsibilities assigned yet</h2>
+          <p>
+            Your account doesn't include check-in, food, shop, or points access yet. Ask an organizer to assign
+            responsibilities; they'll appear here automatically.
+          </p>
+        </div>
+      )}
+
+      <section aria-labelledby="assigned-events-heading">
+        <h2 id="assigned-events-heading" className="volunteer-section-title">Assigned events</h2>
+        <p className="volunteer-dashboard__hint">
+          {options.events.length
+            ? "Events you can award points for. Times are for reference only."
+            : "No events assigned. Contact an administrator if you need event access."}
+        </p>
+        {options.events.length ? (
+          <ul className="volunteer-event-summary">
+            {options.events.map((event) => (
+              <li key={event.eventId}>
+                <Link
+                  className="volunteer-event-summary__item"
+                  to={`${ADMIN_ROUTES.scanPoints}?event=${encodeURIComponent(event.eventId)}`}
+                  aria-label={`Scan points for ${event.name}, ${event.pointsAwarded} points`}
+                >
+                  <span className="volunteer-event-summary__name">{event.name}</span>
+                  <span className="volunteer-event-summary__meta">
+                    <span>{event.pointsAwarded} pts</span>
+                    <EventStatusBadge event={{ ...event, active: true }} now={now} />
+                    <span aria-hidden="true" className="volunteer-action-card__chevron">→</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
     </div>
   );

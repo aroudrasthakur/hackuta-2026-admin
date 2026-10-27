@@ -6,6 +6,7 @@ import { scanConfirmButtonClass, scanSecondaryButtonClass } from "../../lib/scan
 import { QrScanner, type ScanMode, type ScanSource } from "./QrScanner";
 import { ScanResult } from "./ScanResult";
 import { ScanSteps } from "./ScanSteps";
+import { SuccessIcon } from "./VolunteerIcons";
 
 const STEPS = ["Registration QR", "Badge QR", "Confirm"] as const;
 
@@ -37,11 +38,10 @@ const MODE_LABELS: Record<ScanMode, { title: string; where: string; className: s
   },
 };
 
-function ScanModeBanner({ mode, step }: { mode: ScanMode; step: number }) {
+function ScanModeBanner({ mode }: { mode: ScanMode }) {
   const label = MODE_LABELS[mode];
   return (
     <div className={`rounded-2xl border-2 p-4 ${label.className}`} data-scan-mode={mode}>
-      <p className="text-sm font-semibold uppercase tracking-wide">Step {step} of 3</p>
       <p className="text-2xl font-bold">{label.title}</p>
       <p className="text-base">{label.where}</p>
     </div>
@@ -62,11 +62,15 @@ function ParticipantCard({ name, children }: { name: string; children?: ReactNod
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), []);
   return (
-    <section aria-labelledby="check-in-participant" className="admin-card space-y-2 p-5">
-      <p className="text-sm font-semibold uppercase tracking-wide text-ocean">Participant</p>
-      <h2 id="check-in-participant" ref={headingRef} tabIndex={-1} className="text-3xl font-bold text-night">{name}</h2>
-      <p className="text-base font-semibold text-emerald-800">Registration verified · not checked in yet</p>
-      {children}
+    <section aria-labelledby="check-in-participant" className="volunteer-confirm">
+      <div className="volunteer-confirm__body">
+        <h2 id="check-in-participant" ref={headingRef} tabIndex={-1} className="volunteer-confirm__name">{name}</h2>
+        <p className="volunteer-confirm__verified">
+          <SuccessIcon aria-hidden="true" />
+          Registration verified · not checked in yet
+        </p>
+        {children}
+      </div>
     </section>
   );
 }
@@ -90,7 +94,7 @@ export function CheckInWorkflow() {
 
       {state.step === "registration" ? (
         <>
-          <ScanModeBanner mode="registration" step={1} />
+          <ScanModeBanner mode="registration" />
           <p className="text-base text-ocean">This only looks them up. Nothing is saved until you confirm.</p>
           <StepError error={state.error} />
           <QrScanner key="registration" mode="registration" onScan={onScan(scanRegistration)} autoStart={cameraPreferred} />
@@ -107,11 +111,11 @@ export function CheckInWorkflow() {
       {state.step === "badge" ? (
         <>
           <ParticipantCard name={state.participant.name} />
-          <ScanModeBanner mode="badge" step={2} />
+          <ScanModeBanner mode="badge" />
           <p className="text-base text-ocean">Hand {state.participant.name} an unused badge, then scan the code printed on it.</p>
           <StepError error={state.error} />
           <QrScanner key="badge" mode="badge" onScan={onScan(scanBadge)} autoStart={cameraPreferred} />
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="volunteer-confirm__actions">
             <button type="button" className={scanSecondaryButtonClass} onClick={back}>Back: scan a different registration</button>
             <button type="button" className={scanSecondaryButtonClass} onClick={restart}>Start over</button>
           </div>
@@ -129,10 +133,10 @@ export function CheckInWorkflow() {
       {state.step === "confirm" ? (
         <>
           <ParticipantCard name={state.participant.name}>
-            <dl className="grid gap-3 pt-2 text-lg">
+            <dl className="volunteer-confirm__facts">
               <div>
-                <dt className="admin-meta__label">Badge</dt>
-                <dd className="font-semibold text-night">Scanned and unused, ready to assign</dd>
+                <dt>Badge</dt>
+                <dd>Scanned and unused, ready to assign</dd>
               </div>
             </dl>
           </ParticipantCard>
@@ -141,7 +145,7 @@ export function CheckInWorkflow() {
             and they'll use the badge for food, points, and the shop.
           </p>
           <StepError error={state.error} />
-          <div className="flex flex-col gap-3">
+          <div className="volunteer-confirm__actions">
             <button
               type="button"
               className={scanConfirmButtonClass}
@@ -151,14 +155,12 @@ export function CheckInWorkflow() {
             >
               {state.submitting ? "Checking in…" : state.error ? "Try again: confirm check-in" : "Confirm check-in"}
             </button>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button type="button" className={scanSecondaryButtonClass} onClick={back} disabled={state.submitting}>
-                Back: scan a different badge
-              </button>
-              <button type="button" className={scanSecondaryButtonClass} onClick={restart} disabled={state.submitting}>
-                Start over
-              </button>
-            </div>
+            <button type="button" className={scanSecondaryButtonClass} onClick={back} disabled={state.submitting}>
+              Back: scan a different badge
+            </button>
+            <button type="button" className={scanSecondaryButtonClass} onClick={restart} disabled={state.submitting}>
+              Start over
+            </button>
           </div>
         </>
       ) : null}

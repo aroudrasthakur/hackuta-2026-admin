@@ -263,7 +263,6 @@
 
   /* Volunteer scanner: high contrast, large targets. */
   .shop-customer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; background: var(--color-night); color: var(--color-light); }
-  .shop-customer__label { color: var(--color-mist); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
   .shop-customer__name { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
   .shop-customer__points { text-align: right; }
   .shop-customer__points strong { display: block; font-size: 2.2rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }

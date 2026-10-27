@@ -117,14 +117,14 @@ describe("staff route policy", () => {
 
 describe("protected staff screens", () => {
   it.each([
-    [ADMIN_ROUTES.scan, "Volunteer dashboard"],
+    [ADMIN_ROUTES.scan, /Good (morning|afternoon|evening),/],
     [ADMIN_ROUTES.scanCheckIn, "Participant check-in"],
-    [ADMIN_ROUTES.scanFood, "Food"],
-    [ADMIN_ROUTES.scanPoints, "Points"],
+    [ADMIN_ROUTES.scanFood, "Food distribution"],
+    [ADMIN_ROUTES.scanPoints, "Event points"],
   ])("opens an authorized direct link to %s", async (route, heading) => {
     await render(route);
     expect(path()).toBe(route);
-    expect(container.querySelector("h1")?.textContent).toBe(heading);
+    expect(container.querySelector("h1")?.textContent).toMatch(heading);
     expect(links()).toEqual(["Dashboard", "Check-in", "Food", "Points"]);
   });
 
@@ -182,7 +182,7 @@ describe("protected staff screens", () => {
     expect(container.querySelector("h1")).toBeNull();
     options = allOptions;
     await render(ADMIN_ROUTES.scanPoints);
-    expect(container.querySelector("h1")?.textContent).toBe("Points");
+    expect(container.querySelector("h1")?.textContent).toBe("Event points");
   });
 
   it("waits on the dashboard for assignment loading", async () => {
@@ -302,7 +302,7 @@ describe("protected staff screens", () => {
 
     await render(ADMIN_ROUTES.login);
     expect(path()).toBe(route);
-    expect(container.querySelector("h1")?.textContent).toBe("Points");
+    expect(container.querySelector("h1")?.textContent).toBe("Event points");
   });
 
   it("fails closed when a profile is missing despite an authenticated flag", async () => {

@@ -16,7 +16,7 @@ async function signInScanVolunteer(page: Page) {
   await page.getByLabel("Email").fill(E2E_SCAN_VOLUNTEER.email);
   await page.getByLabel("Password", { exact: true }).fill(E2E_SCAN_VOLUNTEER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Volunteer dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
   await setMealScenario(page, "serving");
 }
 
@@ -183,12 +183,15 @@ test.describe("volunteer badge scans", () => {
     await expectNoHorizontalScroll(page);
     await reviewScreenshot(page, "test-results/scanner-points-confirm-mobile.png");
 
+    // Event switching is locked while a participant confirmation is open.
+    await page.getByRole("button", { name: "Cancel" }).click();
     await page.getByRole("button", { name: "Change event" }).click();
     await expect(page.getByRole("region", { name: "Morgan Present" })).toHaveCount(0);
     await page.getByRole("radio", { name: new RegExp(E2E_EVENTS.panel.name) }).click();
     await enterBadge(page, E2E_BADGES.checkedIn);
     await expect(page.getByRole("status").filter({ hasText: "Points already awarded" })).toContainText(E2E_EVENTS.panel.name);
 
+    await page.getByRole("button", { name: "Scan next" }).click();
     await page.getByRole("button", { name: "Change event" }).click();
     await page.getByRole("radio", { name: new RegExp(E2E_EVENTS.workshop.name) }).click();
     await enterBadge(page, E2E_BADGES.checkedIn);
@@ -230,7 +233,7 @@ test.describe("volunteer camera scanner", () => {
       (window as unknown as { scanTracks: MediaStreamTrack[] }).scanTracks = (element.srcObject as MediaStream).getTracks();
     });
     await openTab(page, "Food");
-    await expect(page.getByRole("heading", { name: "Food", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Food distribution", exact: true })).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { scanTracks: MediaStreamTrack[] }).scanTracks.every((track) => track.readyState === "ended"))).toBe(true);
   });
 });

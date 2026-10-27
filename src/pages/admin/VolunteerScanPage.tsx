@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { GenericId } from "convex/values";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
@@ -32,12 +32,12 @@ const PAGES: Record<ScanWorkflowName, { purpose: ScanPurpose | null; title: stri
   },
   food: {
     purpose: "food_check_in",
-    title: "Food",
+    title: "Food distribution",
     lead: "Scan the participant's badge, check dietary restrictions, then confirm food distribution.",
   },
   points: {
     purpose: "point_scan",
-    title: "Points",
+    title: "Event points",
     lead: "Choose your event, scan the participant's badge, then confirm the award.",
   },
 };
@@ -51,12 +51,20 @@ function stepIndex(state: ScanWorkflowState) {
 }
 
 /** One scan → confirm → result loop. Keyed by purpose and event so a change clears all participant state. */
-function ScanWorkflow({ purpose, eventId, mealPeriodId, onConfirming, onReset }: {
+function ScanWorkflow({ purpose, eventId, mealPeriodId, onConfirming, onReset, onPhaseChange }: {
   purpose: ScanPurpose; eventId?: GenericId<"events">; mealPeriodId?: GenericId<"mealPeriods">;
   onConfirming?: () => void; onReset?: () => void;
+  onPhaseChange?: (locked: boolean) => void;
 }) {
   const { state, scan, confirm, reset } = useScanWorkflow(purpose, eventId, mealPeriodId);
   const [cameraPreferred, setCameraPreferred] = useState(false);
+  const locked =
+    state.step === "confirm" || state.step === "result" || state.step === "resolving";
+
+  useEffect(() => {
+    onPhaseChange?.(locked);
+    return () => onPhaseChange?.(false);
+  }, [locked, onPhaseChange]);
 
   const onScan = (rawValue: string, source: ScanSource) => {
     setCameraPreferred(source === "camera");
@@ -83,7 +91,9 @@ function ScanWorkflow({ purpose, eventId, mealPeriodId, onConfirming, onReset }:
           onCancel={resetWorkflow}
         />
       ) : null}
-      {state.step === "result" ? <ScanResult outcome={state.outcome} onScanNext={resetWorkflow} /> : null}
+      {state.step === "result" ? (
+        <ScanResult outcome={state.outcome} onScanNext={resetWorkflow} />
+      ) : null}
     </div>
   );
 }
@@ -95,6 +105,7 @@ function FoodMealScanner() {
   const now = useMealClock(meals);
   const [searchParams, setSearchParams] = useSearchParams();
   const [choosing, setChoosing] = useState(false);
+  const [phaseLocked, setPhaseLocked] = useState(false);
   // A confirmed request may already have committed. Keep its response visible
   // through availability changes until the volunteer acknowledges the result.
   const [confirmedMeal, setConfirmedMeal] = useState<VolunteerMealPeriod | null>(null);
@@ -103,30 +114,66 @@ function FoodMealScanner() {
   const requested = searchParams.get("meal");
   const selected = confirmedMeal ?? available.find((meal) => meal.mealPeriodId === requested) ??
     (requested === null && available.length === 1 ? available[0] : undefined);
-  if (available.length === 0 && !confirmedMeal) return <EmptyState title="No meals available" description="No meal is being served right now. Availability will update when serving begins or an administrator changes the schedule." />;
-  if (!selected || choosing) return <>
-    {requested && !selected && <p role="status" className="admin-callout">The selected meal is no longer available. Choose a meal to continue.</p>}
-    <fieldset className="space-y-3">
-      <legend className="mb-2 text-lg font-semibold text-night">Choose your meal</legend>
-      {available.map((meal) => <label key={meal.mealPeriodId} className="admin-card flex min-h-16 cursor-pointer items-center gap-4 p-4">
-        <input type="radio" name="scan-meal" className="h-6 w-6 flex-none accent-ocean" checked={selected?.mealPeriodId === meal.mealPeriodId}
-          onChange={() => { setChoosing(false); setSearchParams({ meal: meal.mealPeriodId }, { replace: true }); }} />
-        <span className="min-w-0"><span className="block text-lg font-semibold text-night">{meal.name}</span>
-          <span className="block text-base text-ocean">Serving until {new Date(meal.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></span>
-      </label>)}
-    </fieldset>
-    {choosing && selected && <button type="button" className={scanSecondaryButtonClass} onClick={() => setChoosing(false)}>Keep {selected.name}</button>}
-  </>;
+  if (available.length === 0 && !confirmedMeal) {
+    return <EmptyState title="No meals available" description="No meal is being served right now. Availability will update when serving begins or an administrator changes the schedule." />;
+  }
+  if (!selected || (choosing && !phaseLocked)) {
+    return <>
+      {requested && !selected && <p role="status" className="admin-callout">The selected meal is no longer available. Choose a meal to continue.</p>}
+      <fieldset className="volunteer-event-selector" disabled={phaseLocked}>
+        <legend className="volunteer-section-title">Choose your meal</legend>
+        <div className="volunteer-event-selector__list" role="presentation">
+        {available.map((meal) => (
+          <label key={meal.mealPeriodId} className="volunteer-event-card">
+            <input
+              type="radio"
+              name="scan-meal"
+              className="volunteer-event-card__radio"
+              checked={selected?.mealPeriodId === meal.mealPeriodId}
+              onChange={() => {
+                setChoosing(false);
+                setSearchParams({ meal: meal.mealPeriodId }, { replace: true });
+              }}
+            />
+            <span className="volunteer-event-card__text">
+              <span className="volunteer-event-card__name">{meal.name}</span>
+              <span className="volunteer-event-card__points">
+                Serving until {new Date(meal.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </span>
+            </span>
+          </label>
+        ))}
+        </div>
+      </fieldset>
+      {choosing && selected && (
+        <button type="button" className={scanSecondaryButtonClass} onClick={() => setChoosing(false)}>
+          Keep {selected.name}
+        </button>
+      )}
+    </>;
+  }
   return <>
-    <div className="admin-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-lg"><span className="block text-sm font-semibold uppercase tracking-wide text-ocean">Serving meal</span>
-        <span className="text-2xl font-semibold text-night">{selected.name}</span></p>
-      {available.length > 1 && !confirmedMeal && <button type="button" className={scanSecondaryButtonClass} onClick={() => setChoosing(true)}>Change meal</button>}
+    <div className="volunteer-selected-context">
+      <p>
+        <span className="volunteer-selected-context__kicker">Serving meal</span>
+        <span className="volunteer-selected-context__title">{selected.name}</span>
+      </p>
+      {available.length > 1 && !confirmedMeal && !phaseLocked ? (
+        <button type="button" className={scanSecondaryButtonClass} onClick={() => setChoosing(true)}>
+          Change meal
+        </button>
+      ) : null}
     </div>
     {confirmedMeal && !available.some((meal) => meal.mealPeriodId === selected.mealPeriodId) &&
       <p role="status" className="admin-callout">This meal is no longer available for new scans. The collection result will remain here until you continue.</p>}
-    <ScanWorkflow key={`${selected.mealPeriodId}:${selected.name}:${selected.startsAt}:${selected.endsAt}:${selected.updatedAt}`}
-      purpose="food_check_in" mealPeriodId={selected.mealPeriodId} onConfirming={() => setConfirmedMeal(selected)} onReset={() => setConfirmedMeal(null)} />
+    <ScanWorkflow
+      key={`${selected.mealPeriodId}:${selected.name}:${selected.startsAt}:${selected.endsAt}:${selected.updatedAt}`}
+      purpose="food_check_in"
+      mealPeriodId={selected.mealPeriodId}
+      onConfirming={() => setConfirmedMeal(selected)}
+      onReset={() => setConfirmedMeal(null)}
+      onPhaseChange={setPhaseLocked}
+    />
   </>;
 }
 
@@ -137,6 +184,7 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
   const [searchParams, setSearchParams] = useSearchParams();
   const [choosingEvent, setChoosingEvent] = useState(false);
   const [mealRetry, setMealRetry] = useState(0);
+  const [phaseLocked, setPhaseLocked] = useState(false);
 
   if (!options) return <LoadingState message="Loading your scan access…" />;
 
@@ -146,16 +194,17 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
     ? options.events.find((event) => event.eventId === requestedEventId) ??
       (requestedEventId === null && options.events.length === 1 ? options.events[0] : undefined)
     : undefined;
-  const showPicker = points && (!selectedEvent || choosingEvent);
+  const showPicker = points && (!selectedEvent || (choosingEvent && !phaseLocked));
 
   return (
-    <section aria-labelledby={`${workflow}-scan-heading`} className="mx-auto max-w-2xl space-y-6">
+    <section aria-labelledby={`${workflow}-scan-heading`} className="volunteer-ops volunteer-scan-shell space-y-6">
       <AdminPageHeader id={`${workflow}-scan-heading`} title={page.title} description={page.lead} />
 
       {showPicker ? (
         <EventSelector
           events={options.events}
           selectedEventId={selectedEvent?.eventId ?? null}
+          locked={phaseLocked}
           onSelect={(eventId) => {
             setChoosingEvent(false);
             setSearchParams({ event: eventId }, { replace: true });
@@ -163,13 +212,13 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
         />
       ) : null}
       {points && selectedEvent && !showPicker ? (
-        <div className="admin-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-lg">
-            <span className="block text-sm font-semibold uppercase tracking-wide text-ocean">Scanning for</span>
-            <span className="font-semibold text-night">{selectedEvent.name}</span>
-            <span className="text-ocean"> · {selectedEvent.pointsAwarded} points</span>
+        <div className="volunteer-selected-context">
+          <p>
+            <span className="volunteer-selected-context__kicker">Scanning for</span>
+            <span className="volunteer-selected-context__title">{selectedEvent.name}</span>
+            <span className="volunteer-selected-context__meta"> · {selectedEvent.pointsAwarded} points</span>
           </p>
-          {options.events.length > 1 ? (
+          {options.events.length > 1 && !phaseLocked ? (
             <button type="button" className={scanSecondaryButtonClass} onClick={() => setChoosingEvent(true)}>
               Change event
             </button>
@@ -177,17 +226,27 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
         </div>
       ) : null}
 
-      {page.purpose === null ? <CheckInWorkflow /> : workflow === "food" ? <ErrorBoundary key={mealRetry} fallback={<QueryErrorState title="Unable to load available meals" onRetry={() => setMealRetry((value) => value + 1)} />}><FoodMealScanner /></ErrorBoundary> : points && !selectedEvent ? (
+      {page.purpose === null ? (
+        <CheckInWorkflow />
+      ) : workflow === "food" ? (
+        <ErrorBoundary
+          key={mealRetry}
+          fallback={<QueryErrorState title="Unable to load available meals" onRetry={() => setMealRetry((value) => value + 1)} />}
+        >
+          <FoodMealScanner />
+        </ErrorBoundary>
+      ) : points && !selectedEvent ? (
         <p className="admin-callout text-base">Choose an event to start scanning.</p>
       ) : showPicker ? null : (
         <ScanWorkflow
           key={`${page.purpose}:${selectedEvent?.eventId ?? ""}`}
           purpose={page.purpose}
           {...(selectedEvent ? { eventId: selectedEvent.eventId } : {})}
+          onPhaseChange={setPhaseLocked}
         />
       )}
 
-      <Link className="inline-block py-3 font-semibold" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link>
+      <Link className="volunteer-back-link" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link>
     </section>
   );
 }

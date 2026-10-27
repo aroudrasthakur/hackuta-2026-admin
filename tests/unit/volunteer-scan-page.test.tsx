@@ -168,7 +168,7 @@ describe("check-in workflow", () => {
     expect(currentStep()).toBe("1. Registration QR");
     expect(scannerMode()).toBe("registration");
     expect(bannerMode()).toBe("registration");
-    expect(text()).toContain("Step 1 of 3");
+    expect(text()).toContain("Scan the registration QR");
 
     mocks.resolveRegistration.mockResolvedValueOnce(registrationOk);
     await scan(` ${registration.toUpperCase()} `, "camera");
@@ -448,6 +448,9 @@ describe("food workflow", () => {
     await act(async () => container.querySelector<HTMLInputElement>('input[name="scan-meal"]')!.click());
     expect(container.querySelector("output")?.textContent).toContain("meal=meal-lunch");
     await scan(); expect(text()).toContain("Vegan");
+    // Event/meal switching is locked during confirmation to avoid mixed-up awards.
+    expect(button("Change meal")).toBeUndefined();
+    await click("Cancel");
     await click("Change meal"); expect(text()).not.toContain("Sam Lee");
     await act(async () => container.querySelectorAll<HTMLInputElement>('input[name="scan-meal"]')[1]!.click());
     expect(text()).toContain("Snack"); expect(text()).not.toContain("Vegan"); expect(mocks.food).not.toHaveBeenCalled();
@@ -554,6 +557,9 @@ describe("points workflow", () => {
     await render("points", `/admin/scan/points?event=${workshop.eventId}`);
     await scan();
     expect(text()).toContain("Sam Lee");
+    // Keep the selected event fixed while confirming a participant.
+    expect(button("Change event")).toBeUndefined();
+    await click("Cancel");
     await click("Change event");
     expect(text()).not.toContain("Sam Lee");
     await act(async () => container.querySelector<HTMLInputElement>(`input[value="${panel.eventId}"]`)!.click());
