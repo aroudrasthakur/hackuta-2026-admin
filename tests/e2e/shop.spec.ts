@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { E2E_BADGES, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { E2E_ADMIN, signInOrganizer, signInOrganizerOnLoginPage, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
+import { installQrCamera, scanQr } from "./fixtures/qrCamera";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 async function openShop(page: Page) {
@@ -15,6 +16,7 @@ async function openSection(page: Page, name: "Items" | "Flash sales" | "History"
 }
 
 async function signInShopVolunteer(page: Page) {
+  await installQrCamera(page);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/admin/login");
   await page.getByLabel("Email").fill(E2E_SCAN_VOLUNTEER.email);
@@ -23,10 +25,7 @@ async function signInShopVolunteer(page: Page) {
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
 }
 
-async function lookUp(page: Page, token: string) {
-  await page.getByLabel("Or enter the badge code").fill(token);
-  await page.getByRole("button", { name: "Look up badge" }).click();
-}
+const lookUp = scanQr;
 
 async function expectNoHorizontalScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -92,6 +91,8 @@ test.describe("admin shop", () => {
 });
 
 test.describe("volunteer shop purchase", () => {
+  test.use({ permissions: ["camera"] });
+
   test("charges once, explains a duplicate, blocks a short balance, and allows a refund", async ({ page }) => {
     await signInShopVolunteer(page);
     await page.getByRole("navigation", { name: "Volunteer" }).getByRole("link", { name: "Shop", exact: true }).click();

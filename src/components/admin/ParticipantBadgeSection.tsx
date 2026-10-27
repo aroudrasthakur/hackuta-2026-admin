@@ -109,7 +109,7 @@ export function ParticipantBadgeSection({ sessionToken, participantId, name, che
             </p>
           ) : null}
           {scanned === null ? (
-            <QrScanner mode="badge" onScan={(value) => { if (normalizeBadgeQr(value)) { setScanned(value); setError(null); } }} />
+            <QrScanner mode="badge" allowManualEntry onScan={(value) => { if (normalizeBadgeQr(value)) { setScanned(value); setError(null); } }} />
           ) : (
             <form className="space-y-4" onSubmit={(event) => void submit(event)}>
               <p role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">

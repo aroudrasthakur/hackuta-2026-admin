@@ -2,9 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { E2E_BADGES, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
 import { E2E_ADMIN, signInOrganizerOnLoginPage, signOutOrganizer } from "./fixtures/auth";
 import { setMealScenario } from "./fixtures/meals";
+import { installQrCamera, scanQr } from "./fixtures/qrCamera";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
+test.use({ permissions: ["camera"] });
+
 async function start(page: Page) {
+  await installQrCamera(page);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/admin/login");
   await page.getByLabel("Email").fill(E2E_SCAN_VOLUNTEER.email);
@@ -15,8 +19,7 @@ async function start(page: Page) {
   await page.getByRole("navigation").getByRole("link", { name: "Food", exact: true }).click();
 }
 async function scan(page: Page, token: string = E2E_BADGES.ready) {
-  await page.getByLabel("Or enter the badge code").fill(token);
-  await page.getByRole("button", { name: "Look up badge" }).click();
+  await scanQr(page, token);
 }
 
 test("collects once per meal, preserves legacy eligibility, and automatically moves to the next serving window", async ({ page }, info) => {
@@ -45,7 +48,7 @@ test("collects once per meal, preserves legacy eligibility, and automatically mo
 
 test("requires a meal choice when multiple periods are available and clears private confirmation details on a switch", async ({ page }) => {
   await start(page); await setMealScenario(page, "multiple");
-  await expect(page.getByRole("button", { name: "Look up badge" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Scan with camera" })).toHaveCount(0);
   await page.getByRole("radio", { name: /Lunch/ }).click(); await scan(page);
   await expect(page.getByText("Vegetarian; Allergies: peanuts")).toBeVisible();
   // Meal switching is locked while a participant confirmation is open.

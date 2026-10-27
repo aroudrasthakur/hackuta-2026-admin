@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { E2E_BADGES, E2E_EVENTS, E2E_QR_TOKENS, E2E_SCAN_VOLUNTEER } from "../../shared/admin/e2e/credentials";
-import { qrCodeSvg, showQrToCamera } from "./fixtures/qrCamera";
+import { installQrCamera, qrCodeSvg, scanQr, showQrToCamera } from "./fixtures/qrCamera";
 import { setMealScenario } from "./fixtures/meals";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
@@ -25,15 +25,8 @@ async function openTab(page: Page, name: "Check-in" | "Food" | "Points") {
   await page.getByRole("navigation", { name: "Volunteer" }).getByRole("link", { name, exact: true }).click();
 }
 
-async function enterRegistration(page: Page, token: string) {
-  await page.getByLabel("Or enter the registration code").fill(token);
-  await page.getByRole("button", { name: "Look up registration" }).click();
-}
-
-async function enterBadge(page: Page, badge: string) {
-  await page.getByLabel("Or enter the badge code").fill(badge);
-  await page.getByRole("button", { name: "Look up badge" }).click();
-}
+const enterRegistration = scanQr;
+const enterBadge = scanQr;
 
 async function expectNoHorizontalScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -42,6 +35,9 @@ async function expectNoHorizontalScroll(page: Page) {
 const currentStep = (page: Page) => page.getByRole("list", { name: "Scan progress" }).locator('[aria-current="step"]');
 
 test.describe("volunteer badge check-in", () => {
+  test.use({ permissions: ["camera"] });
+  test.beforeEach(({ page }) => installQrCamera(page));
+
   test("verifies the registration, assigns a badge on confirm, and retires the registration QR", async ({ page }) => {
     await signInScanVolunteer(page);
     await openTab(page, "Check-in");
@@ -50,7 +46,7 @@ test.describe("volunteer badge check-in", () => {
     await expect(page.locator('[data-scan-mode="registration"]')).toContainText("Scan the registration QR");
 
     await enterRegistration(page, E2E_BADGES.unused);
-    await expect(page.getByRole("alert")).toContainText("isn't a registration code");
+    await expect(page.getByRole("alert")).toContainText("Not a registration QR");
 
     await enterRegistration(page, E2E_QR_TOKENS.arrival);
     await expect(page.getByRole("heading", { name: "Avery Arrival" })).toBeFocused();
@@ -131,6 +127,9 @@ test.describe("volunteer badge check-in", () => {
 });
 
 test.describe("volunteer badge scans", () => {
+  test.use({ permissions: ["camera"] });
+  test.beforeEach(({ page }) => installQrCamera(page));
+
   test("shows dietary information only while confirming food, and only for a badge", async ({ page }) => {
     await signInScanVolunteer(page);
     await openTab(page, "Food");
@@ -223,7 +222,7 @@ test.describe("volunteer camera scanner", () => {
     });
     expect(tracks).toBeGreaterThan(0);
 
-    await page.getByRole("button", { name: "Stop camera and enter code" }).click();
+    await page.getByRole("button", { name: "Stop camera" }).click();
     await expect(video).toBeHidden();
     expect(await page.evaluate(() => (window as unknown as { scanTracks: MediaStreamTrack[] }).scanTracks.every((track) => track.readyState === "ended"))).toBe(true);
 
@@ -251,21 +250,19 @@ test.describe("volunteer camera decoding", () => {
     await expect(page.locator('[data-scan-mode="badge"]')).toBeVisible();
     await expect(page.getByRole("alert")).toContainText("That's the registration QR again", { timeout: 15_000 });
     await expect(page.getByRole("button", { name: "Confirm check-in" })).toHaveCount(0);
-
-    await enterBadge(page, E2E_BADGES.unused);
-    await page.getByRole("button", { name: "Confirm check-in" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toBeVisible();
   });
 });
 
 test.describe("volunteer camera without permission", () => {
-  test("explains blocked camera access and keeps manual entry available", async ({ page }) => {
+  test("explains blocked camera access without offering typed codes", async ({ page }) => {
     await signInScanVolunteer(page);
     await openTab(page, "Check-in");
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Paste code" })).toHaveCount(0);
     await page.getByRole("button", { name: "Scan with camera" }).click();
     await expect(page.getByRole("alert")).toContainText("Camera access is blocked");
+    await expect(page.getByRole("alert")).toContainText("ask an organizer for help");
     await expect(page.getByRole("button", { name: "Try camera again" })).toBeVisible();
-    await enterRegistration(page, E2E_QR_TOKENS.arrival);
-    await expect(page.getByRole("heading", { name: "Avery Arrival" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Use manual entry" })).toHaveCount(0);
   });
 });

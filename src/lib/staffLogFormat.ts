@@ -21,7 +21,7 @@ export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = 
   volunteer_restored: "Access restored",
   volunteer_revoked: "Access revoked",
   volunteer_password_reset: "Password reset",
-  volunteer_capabilities_updated: "Scan permissions changed",
+  volunteer_capabilities_updated: "Volunteer access changed",
   event_created: "Event created",
   event_updated: "Event updated",
   event_active_changed: "Event status changed",
@@ -33,11 +33,17 @@ export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = 
   flash_sale_cancelled: "Flash sale cancelled",
 };
 
-export function volunteerPermissions(volunteer: { canCheckIn: boolean; canFoodCheckIn: boolean }) {
+/** Short names of the scan permissions a volunteer has, in a fixed order. */
+export function volunteerPermissionList(volunteer: { canCheckIn: boolean; canFoodCheckIn: boolean; canRedeemShop?: boolean }) {
   return [
     volunteer.canCheckIn ? "Check-in" : null,
     volunteer.canFoodCheckIn ? "Food" : null,
-  ].filter(Boolean).join(", ") || "None";
+    volunteer.canRedeemShop ? "Shop" : null,
+  ].filter((name): name is string => name !== null);
+}
+
+export function volunteerPermissions(volunteer: { canCheckIn: boolean; canFoodCheckIn: boolean; canRedeemShop?: boolean }) {
+  return volunteerPermissionList(volunteer).join(", ") || "None";
 }
 
 export function formatLogTime(timestamp: number) {

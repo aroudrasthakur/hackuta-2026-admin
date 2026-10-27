@@ -15,6 +15,7 @@ import {
   type ParticipantRow,
 } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
+import { volunteerPermissions } from "../../lib/staffLogFormat";
 import { reportUserFacingError } from "../../lib/userFacingError";
 import {
   reviewDangerButtonClass,
@@ -331,8 +332,6 @@ function ParticipantsPageContent() {
   const [promoting, setPromoting] = useState(false);
   const [staffEmail, setStaffEmail] = useState("");
   const [initialPassword, setInitialPassword] = useState("");
-  const [canCheckIn, setCanCheckIn] = useState(false);
-  const [canFoodCheckIn, setCanFoodCheckIn] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [busy, setBusy] = useState<"points" | "promote" | "volunteer" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -399,8 +398,6 @@ function ParticipantsPageContent() {
     if (!details) return;
     setStaffEmail(details.email ?? "");
     setInitialPassword("");
-    setCanCheckIn(false);
-    setCanFoodCheckIn(false);
     setError(null);
     setNotice(null);
     setPromoting(true);
@@ -470,12 +467,10 @@ function ParticipantsPageContent() {
         email: staffEmail.trim(),
         name: details.name,
         password: initialPassword,
-        canCheckIn,
-        canFoodCheckIn,
       });
       setInitialPassword("");
       setPromoting(false);
-      setNotice(`Volunteer staff account created for ${result.email}.`);
+      setNotice(`Volunteer staff account created for ${result.email}. They start with no access; use Manage access to grant it.`);
     } catch (caught) {
       setError(reportUserFacingError(
         "Unable to promote participant",
@@ -593,14 +588,11 @@ function ParticipantsPageContent() {
                           <p className="break-all text-sm text-ocean">{details.volunteer.name} · {details.volunteer.email}</p>
                           <p className="mt-2"><StatusBadge positive={details.volunteer.active}>{details.volunteer.active ? "Active" : "Inactive"}</StatusBadge></p>
                         </div>
-                        <Link className={`${reviewSecondaryButtonClass} no-underline`} to={ADMIN_ROUTES.volunteers} onClick={closeDetails}>
-                          Volunteer management
+                        <Link className={`${reviewSecondaryButtonClass} no-underline`} to={ADMIN_ROUTES.volunteerDetail(details.volunteer.adminId)} onClick={closeDetails}>
+                          Manage access
                         </Link>
                       </div>
-                      <p className="mt-3 text-sm text-ocean">Capabilities: {[
-                        details.volunteer.canCheckIn ? "Check-in" : null,
-                        details.volunteer.canFoodCheckIn ? "Food redemption" : null,
-                      ].filter(Boolean).join(", ") || "None assigned"}</p>
+                      <p className="mt-3 text-sm text-ocean">Access: {volunteerPermissions(details.volunteer) === "None" ? "None yet" : volunteerPermissions(details.volunteer)}</p>
                       {!confirmRevoke ? (
                         details.volunteer.active ? (
                           <button type="button" disabled={busy !== null} className={`${reviewDangerButtonClass} mt-4`} onClick={() => setConfirmRevoke(true)}>
@@ -700,17 +692,9 @@ function ParticipantsPageContent() {
                         />
                       </label>
                       <p id="participant-password-help" className="text-sm text-ocean">{PASSWORD_REQUIREMENTS_MESSAGE}</p>
-                      <fieldset className="space-y-2">
-                        <legend className="text-sm font-semibold text-night">Staff capabilities</legend>
-                        <label className="flex min-h-11 items-center gap-2 text-sm text-night">
-                          <input type="checkbox" checked={canCheckIn} onChange={(event) => setCanCheckIn(event.target.checked)} />
-                          Can check participants in
-                        </label>
-                        <label className="flex min-h-11 items-center gap-2 text-sm text-night">
-                          <input type="checkbox" checked={canFoodCheckIn} onChange={(event) => setCanFoodCheckIn(event.target.checked)} />
-                          Can redeem participant food
-                        </label>
-                      </fieldset>
+                      <p className="admin-callout text-sm">
+                        New volunteers start with no access. After creating the account, grant check-in, food, shop, or event points from their volunteer page.
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         <button type="submit" disabled={busy !== null} className={reviewPrimaryButtonClass}>
                           {busy === "promote" ? "Creating account…" : "Confirm promotion"}

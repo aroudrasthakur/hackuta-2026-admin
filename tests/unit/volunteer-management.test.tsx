@@ -64,6 +64,7 @@ function volunteer(overrides: Partial<VolunteerRow> = {}): VolunteerRow {
     participant: null,
     canCheckIn: true,
     canFoodCheckIn: false,
+    canRedeemShop: false,
     events: [{ eventId: workshopId, name: "Workshop", active: true }],
     createdAt: 1,
     updatedAt: 1,
@@ -212,8 +213,14 @@ async function fill(label: string, value: string) {
   });
 }
 
-async function toggle(label: string) {
-  await act(async () => (field(label) as HTMLInputElement).click());
+function switchFor(label: string) {
+  const element = container.querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label}"]`);
+  if (!element) throw new Error(`Missing switch ${label}`);
+  return element;
+}
+
+async function flip(label: string) {
+  await act(async () => switchFor(label).click());
 }
 
 async function submit(form: Element | null) {
@@ -225,6 +232,7 @@ describe("log formatting", () => {
   it("summarizes permissions and point changes", () => {
     expect(volunteerPermissions({ canCheckIn: true, canFoodCheckIn: true })).toBe("Check-in, Food");
     expect(volunteerPermissions({ canCheckIn: false, canFoodCheckIn: false })).toBe("None");
+    expect(volunteerPermissions({ canCheckIn: false, canFoodCheckIn: false, canRedeemShop: true })).toBe("Shop");
     expect(formatPointsDelta(5)).toBe("+5");
     expect(formatPointsDelta(-3)).toBe("-3");
     expect(formatPointsDelta(null)).toBe("—");
@@ -315,23 +323,25 @@ describe("VolunteerDetailPage", () => {
     const save = mutation(setVolunteerEventAccessRef, async () => ({ ok: true, added: 1, removed: 1 }));
     await renderDetail();
     expect(button("Save event assignments")?.disabled).toBe(true);
-    expect(field("Workshop").closest("label")?.textContent).toBe("Workshop · 25 pointsActive");
-    expect(field("Panel").closest("label")?.textContent).toBe("Panel · 10 pointsSwitched off");
-    await toggle("Panel");
-    await toggle("Workshop");
+    expect(text()).toContain("1 of 2 events assigned");
+    expect(switchFor("Assign Workshop").closest("li")?.textContent).toBe("WorkshopActive25 points per participantOn");
+    expect(switchFor("Assign Panel").closest("li")?.textContent).toBe("PanelSwitched off10 points per participantOff");
+    await flip("Assign Panel");
+    await flip("Assign Workshop");
+    expect(text()).toContain("Unsaved changes");
     await submit(container.querySelector('form[aria-labelledby="volunteer-events-heading"]'));
     expect(save).toHaveBeenCalledWith({ sessionToken: "session-token", volunteerAdminId: volunteerId, eventIds: [panelId] });
     currentVolunteer = volunteer({ events: [{ eventId: panelId, name: "Panel", active: false }] });
     await renderDetail();
     expect(text()).toContain("Event assignments saved (1 added, 1 removed).");
-    expect((field("Panel") as HTMLInputElement).checked).toBe(true);
+    expect(switchFor("Assign Panel").getAttribute("aria-checked")).toBe("true");
     expect(button("Save event assignments")?.disabled).toBe(true);
   });
 
   it("reports assignment failures and links to Events when none exist", async () => {
     mutation(setVolunteerEventAccessRef, async () => { throw adminError("ACCOUNT_INACTIVE"); });
     await renderDetail();
-    await toggle("Panel");
+    await flip("Assign Panel");
     await submit(container.querySelector('form[aria-labelledby="volunteer-events-heading"]'));
     expect(container.querySelector('[role="alert"]')?.textContent).toBe(ADMIN_ERROR_MESSAGES.ACCOUNT_INACTIVE);
 
@@ -342,20 +352,47 @@ describe("VolunteerDetailPage", () => {
     expect(text()).toContain("Restore this volunteer's access before assigning new events.");
   });
 
-  it("saves scan permissions and reports failures", async () => {
+  it("shows every volunteer action with a clear on/off state and saves them together", async () => {
     const save = mutation(setVolunteerCapabilitiesRef, async () => ({ ok: true, changed: true }));
     await renderDetail();
-    await toggle("Can redeem participant food");
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    const row = (label: string) => switchFor(label).closest("li")?.textContent;
+    expect(row("Participant check-in")).toContain("Allowed");
+    expect(row("Participant check-in")).toMatch(/On$/);
+    expect(row("Food distribution")).toContain("Not allowed");
+    expect(row("Shop redemption")).toMatch(/Not allowed.*Off$/);
+    expect(text()).toContain("Event pointsAllowed for 1 event");
+    expect(button("Save access")?.disabled).toBe(true);
+
+    await flip("Food distribution");
+    await flip("Shop redemption");
+    expect(row("Food distribution")).toContain("Allowed after saving");
+    expect(text()).toContain("Unsaved changes");
     await submit(container.querySelector('form[aria-labelledby="volunteer-permissions-heading"]'));
-    expect(save).toHaveBeenCalledWith({ sessionToken: "session-token", volunteerAdminId: volunteerId, canCheckIn: true, canFoodCheckIn: true });
-    currentVolunteer = volunteer({ canFoodCheckIn: true });
+    expect(save).toHaveBeenCalledWith({
+      sessionToken: "session-token", volunteerAdminId: volunteerId, canCheckIn: true, canFoodCheckIn: true, canRedeemShop: true,
+    });
+    currentVolunteer = volunteer({ canFoodCheckIn: true, canRedeemShop: true });
     await renderDetail();
-    expect(text()).toContain("Scan permissions saved.");
+    expect(text()).toContain("Volunteer access saved.");
+    expect(text()).toContain("Can currentlyCheck-inFoodShopPoints: 1 event");
 
     save.mockRejectedValueOnce(new Error("offline"));
-    await toggle("Can check participants in");
+    await flip("Participant check-in");
+    expect(row("Participant check-in")).toContain("Removed after saving");
     await submit(container.querySelector('form[aria-labelledby="volunteer-permissions-heading"]'));
-    expect(text()).toContain("Scan permissions were not changed. Please try again.");
+    expect(text()).toContain("Volunteer access was not changed. Please try again.");
+  });
+
+  it("shows a new volunteer with no access and locks switches while revoked", async () => {
+    currentVolunteer = volunteer({ canCheckIn: false, events: [] });
+    await renderDetail();
+    expect(text()).toContain("Can currentlyNo access yet");
+    expect(text()).toContain("Event pointsNot allowed");
+    currentVolunteer = volunteer({ active: false });
+    await renderDetail();
+    expect(switchFor("Participant check-in").disabled).toBe(true);
+    expect(text()).toContain("Restore this volunteer's account before changing their access.");
   });
 
   it("revokes after confirmation and restores", async () => {
@@ -381,13 +418,13 @@ describe("VolunteerDetailPage", () => {
   it("summarizes permission history and paginates it", async () => {
     paginated.set(listStaffConfigLogsRef, {
       results: [
-        configLog({ action: "volunteer_capabilities_updated", details: { after: { canCheckIn: false, canFoodCheckIn: true } } }),
+        configLog({ action: "volunteer_capabilities_updated", details: { before: { canCheckIn: true, canFoodCheckIn: false }, after: { canCheckIn: false, canFoodCheckIn: true } } }),
         configLog({ logId: "config-2" as StaffConfigLogRow["logId"], action: "volunteer_revoked", details: null }),
       ],
       status: "CanLoadMore",
     });
     await renderDetail();
-    expect(text()).toContain("Scan permissions changed by Ada Admin · Now: Food");
+    expect(text()).toContain("Volunteer access changed by Ada Admin · Check-in off, Food on");
     expect(text()).toContain("Access revoked by Ada Admin");
     await click("Load more history");
     expect(mocks.loadMore).toHaveBeenCalledWith(10);
