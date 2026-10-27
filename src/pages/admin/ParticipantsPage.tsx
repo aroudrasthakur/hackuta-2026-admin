@@ -622,8 +622,9 @@ function ParticipantsPageContent() {
                     </section>
                   )}
 
+                  <div className="flex flex-wrap gap-3">
                   {editingPoints ? (
-                    <form className="space-y-4 rounded-xl border border-sand bg-white/70 p-4" onSubmit={(event) => void submitPoints(event)}>
+                    <form className="w-full min-w-0 basis-full space-y-4 rounded-xl border border-sand bg-white/70 p-4" onSubmit={(event) => void submitPoints(event)}>
                       <h3 className="font-semibold text-night">Edit points</h3>
                       <p className="text-sm text-ocean">Current balance: <strong>{details.points}</strong></p>
                       <label className="admin-field">
@@ -669,7 +670,7 @@ function ParticipantsPageContent() {
                   )}
 
                   {promoting ? (
-                    <form className="space-y-4 rounded-xl border border-sand bg-white/70 p-4" onSubmit={(event) => void submitPromotion(event)}>
+                    <form className="w-full min-w-0 basis-full space-y-4 rounded-xl border border-sand bg-white/70 p-4" onSubmit={(event) => void submitPromotion(event)}>
                       <h3 className="font-semibold text-night">Promote to Volunteer</h3>
                       <p className="text-sm text-ocean">
                         Create a separate staff account for <strong>{details.name}</strong>. This password is for staff sign-in and is separate from participant login credentials.
@@ -707,6 +708,7 @@ function ParticipantsPageContent() {
                       Promote to Volunteer
                     </button>
                   ) : null}
+                  </div>
 
                   {details.awards.length > 0 ? (
                     <section aria-label="Event point awards" className="space-y-2">
