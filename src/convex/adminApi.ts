@@ -18,11 +18,9 @@ import type {
   setDecisionEmailHold,
 } from "../../convex/admin/decisionEmailQueue";
 import type { listMyScanOptions, resolveQrForScan, listActiveMealPeriods, resolveQrForMeal, redeemMeal } from "../../convex/admin/volunteerScan";
-import type {
-  awardEventPoints,
-  checkInParticipant,
-  foodCheckInParticipant,
-} from "../../convex/admin/volunteerOperations";
+import type { awardEventPoints, foodCheckInParticipant } from "../../convex/admin/volunteerOperations";
+import type * as badgeCheckIn from "../../convex/admin/badgeCheckIn";
+import type * as badgeAdmin from "../../convex/admin/badgeAdmin";
 import type {
   createEvent,
   getEvent,
@@ -201,20 +199,43 @@ export const redeemMealRef = adminModuleRef<
 
 type VolunteerOperations = ApiFromModules<{
   ops: {
-    checkInParticipant: typeof checkInParticipant;
     foodCheckInParticipant: typeof foodCheckInParticipant;
     awardEventPoints: typeof awardEventPoints;
   };
 }>["ops"];
-export type CheckInResult = FunctionReturnType<VolunteerOperations["checkInParticipant"]>;
 export type FoodCheckInResult = FunctionReturnType<VolunteerOperations["foodCheckInParticipant"]>;
 export type AwardEventPointsResult = FunctionReturnType<VolunteerOperations["awardEventPoints"]>;
 
-export const checkInParticipantRef = adminModuleRef<
+type BadgeCheckIn = ApiFromModules<{ checkIn: typeof badgeCheckIn }>["checkIn"];
+export type RegistrationCheckInPreview = FunctionReturnType<BadgeCheckIn["resolveRegistrationForCheckIn"]>;
+export type BadgeCheckInPreview = FunctionReturnType<BadgeCheckIn["resolveBadgeForCheckIn"]>;
+export type CheckInWithBadgeResult = FunctionReturnType<BadgeCheckIn["checkInWithBadge"]>;
+
+export const resolveRegistrationForCheckInRef = adminModuleRef<
   "mutation",
-  FunctionArgs<VolunteerOperations["checkInParticipant"]>,
-  CheckInResult
->("admin/volunteerOperations:checkInParticipant");
+  FunctionArgs<BadgeCheckIn["resolveRegistrationForCheckIn"]>,
+  RegistrationCheckInPreview
+>("admin/badgeCheckIn:resolveRegistrationForCheckIn");
+
+export const resolveBadgeForCheckInRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<BadgeCheckIn["resolveBadgeForCheckIn"]>,
+  BadgeCheckInPreview
+>("admin/badgeCheckIn:resolveBadgeForCheckIn");
+
+export const checkInWithBadgeRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<BadgeCheckIn["checkInWithBadge"]>,
+  CheckInWithBadgeResult
+>("admin/badgeCheckIn:checkInWithBadge");
+
+type BadgeAdmin = ApiFromModules<{ badges: typeof badgeAdmin }>["badges"];
+
+export const assignParticipantBadgeRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<BadgeAdmin["assignParticipantBadge"]>,
+  FunctionReturnType<BadgeAdmin["assignParticipantBadge"]>
+>("admin/badgeAdmin:assignParticipantBadge");
 
 export const foodCheckInParticipantRef = adminModuleRef<
   "mutation",

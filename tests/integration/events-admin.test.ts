@@ -56,7 +56,7 @@ async function scanSetup(t: ConvexTestInstance, actorAdminId: GenericId<"admins"
     await ctx.db.insert("volunteerEventAccess", { volunteerAdminId: volunteer.adminId, eventId, grantedBy: actorAdminId, createdAt: 1 });
     return ctx.db.insert("participants", {
       applicationId, authUserId: userId, acceptedBy: actorAdminId, acceptedAt: 1,
-      qrCodeToken: QR_TOKEN, points: 0, checkedInAt: 1, createdAt: 1, updatedAt: 1,
+      qrCodeToken: QR_TOKEN, badgeQrCodeToken: QR_TOKEN, points: 0, checkedInAt: 1, createdAt: 1, updatedAt: 1,
     });
   });
   const award = () => t.mutation(awardEventPointsRef, { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, eventId });

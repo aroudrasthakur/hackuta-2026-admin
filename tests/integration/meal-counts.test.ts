@@ -37,7 +37,7 @@ async function legacyMeal(historySize: number) {
     }
     await ctx.db.insert("participants", {
       applicationId: applicant.applicationId, authUserId: applicant.userId, acceptedBy: admin.adminId,
-      acceptedAt: 1, qrCodeToken: "ab".repeat(32), createdAt: 1, updatedAt: 1,
+      acceptedAt: 1, qrCodeToken: "ab".repeat(32), badgeQrCodeToken: "ab".repeat(32), checkedInAt: 1, createdAt: 1, updatedAt: 1,
     });
   });
   const meals = () => t.query(listMealPeriodsRef, { sessionToken: admin.sessionToken });
@@ -132,7 +132,7 @@ describe("meal served counts", () => {
     await s.t.run(async (ctx) => {
       for (const qrCodeToken of tokens) await ctx.db.insert("participants", {
         applicationId: s.applicant.applicationId, authUserId: s.applicant.userId,
-        acceptedBy: s.admin.adminId, acceptedAt: 1, qrCodeToken, createdAt: 1, updatedAt: 1,
+        acceptedBy: s.admin.adminId, acceptedAt: 1, qrCodeToken, badgeQrCodeToken: qrCodeToken, checkedInAt: 1, createdAt: 1, updatedAt: 1,
       });
     });
     const results = await Promise.all(tokens.map((qrCodeToken) =>

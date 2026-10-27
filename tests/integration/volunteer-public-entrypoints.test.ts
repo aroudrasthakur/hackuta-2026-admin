@@ -51,7 +51,10 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "volunteerScan.ts", exportName: "listMyScanOptions", guard: "requireVolunteerAccess" },
   { file: "volunteerScan.ts", exportName: "resolveQrForScan", guard: "requireVolunteerAccess" },
   ...["listActiveMealPeriods", "resolveQrForMeal", "redeemMeal"].map((exportName) => ({ file: "volunteerScan.ts", exportName, guard: "requireVolunteerAccess" })),
-  { file: "volunteerOperations.ts", exportName: "checkInParticipant", guard: "requireVolunteerAccess" },
+  ...["resolveRegistrationForCheckIn", "resolveBadgeForCheckIn", "checkInWithBadge"].map((exportName) => ({
+    file: "badgeCheckIn.ts", exportName, guard: "requireVolunteerAccess",
+  })),
+  { file: "badgeAdmin.ts", exportName: "assignParticipantBadge", guard: "requireAdminRole" },
   { file: "volunteerOperations.ts", exportName: "foodCheckInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "awardEventPoints", guard: "requireVolunteerAccess" },
   ...[

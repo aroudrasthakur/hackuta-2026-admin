@@ -8,13 +8,15 @@ import { adminError } from "../../shared/admin/errors";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
   awardEventPointsRef,
-  checkInParticipantRef,
+  checkInWithBadgeRef,
   redeemMealRef,
   resolveQrForMealRef,
   listActiveMealPeriodsRef,
   type VolunteerMealPeriod,
   listMyScanOptionsRef,
+  resolveBadgeForCheckInRef,
   resolveQrForScanRef,
+  resolveRegistrationForCheckInRef,
   type VolunteerScanOptions,
 } from "../../src/convex/adminApi";
 import { useScanWorkflow } from "../../src/hooks/useScanWorkflow";
@@ -25,6 +27,8 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   resolve: vi.fn(),
   resolveMeal: vi.fn(),
+  resolveRegistration: vi.fn(),
+  resolveBadge: vi.fn(),
   checkIn: vi.fn(),
   food: vi.fn(),
   award: vi.fn(),
@@ -35,7 +39,9 @@ vi.mock("../../src/convex/reactBindings", () => ({
   useQuery: mocks.query,
   useMutation: (ref: unknown) => {
     if (ref === resolveQrForScanRef) return mocks.resolve;
-    if (ref === checkInParticipantRef) return mocks.checkIn;
+    if (ref === resolveRegistrationForCheckInRef) return mocks.resolveRegistration;
+    if (ref === resolveBadgeForCheckInRef) return mocks.resolveBadge;
+    if (ref === checkInWithBadgeRef) return mocks.checkIn;
     if (ref === redeemMealRef) return mocks.food;
     if (ref === resolveQrForMealRef) return mocks.resolveMeal;
     if (ref === awardEventPointsRef) return mocks.award;
@@ -44,14 +50,16 @@ vi.mock("../../src/convex/reactBindings", () => ({
 }));
 
 vi.mock("../../src/components/volunteer/QrScanner", () => ({
-  QrScanner: ({ onScan, autoStart }: { onScan: (value: string, source: "manual" | "camera") => void; autoStart?: boolean }) => (
-    <div data-testid="scanner" data-autostart={String(autoStart)}>
+  QrScanner: ({ mode, onScan, autoStart }: { mode: string; onScan: (value: string, source: "manual" | "camera") => void; autoStart?: boolean }) => (
+    <div data-testid="scanner" data-mode={mode} data-autostart={String(autoStart)}>
       <button type="button" onClick={() => onScan(mocks.scan.value, mocks.scan.source)}>Simulate scan</button>
     </div>
   ),
 }));
 
-const token = "ab".repeat(32);
+const token = "HACKUTA-BADGE-0042";
+const registration = "ab".repeat(32);
+const badge = "HACKUTA-BADGE-0001";
 const workshop = { eventId: "event-workshop" as GenericId<"events">, name: "Workshop", pointsAwarded: 25, startsAt: 1, endsAt: 2 };
 const panel = { eventId: "event-panel" as GenericId<"events">, name: "Panel", pointsAwarded: 10, startsAt: 3, endsAt: 4 };
 let options: VolunteerScanOptions | undefined;
@@ -114,8 +122,6 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const checkInPreview = { status: "ok", purpose: "check_in", participant: { name: "Sam Lee", checkedIn: false, checkedInAt: null } };
-
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   options = { canCheckIn: true, canFoodCheckIn: true, events: [workshop, panel] };
@@ -125,7 +131,7 @@ beforeEach(() => {
     expect(ref).toBe(listMyScanOptionsRef);
     return options;
   });
-  for (const mock of [mocks.resolve, mocks.resolveMeal, mocks.checkIn, mocks.food, mocks.award]) mock.mockReset();
+  for (const mock of [mocks.resolve, mocks.resolveMeal, mocks.resolveRegistration, mocks.resolveBadge, mocks.checkIn, mocks.food, mocks.award]) mock.mockReset();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -138,154 +144,227 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+const registrationOk = { status: "ok", participant: { name: "Sam Lee" } };
+const scannerMode = () => container.querySelector('[data-testid="scanner"]')?.getAttribute("data-mode");
+const bannerMode = () => container.querySelector("[data-scan-mode]")?.getAttribute("data-scan-mode");
+const alertText = () => container.querySelector('[role="alert"]')?.textContent;
+
+async function reachBadgeStep() {
+  mocks.resolveRegistration.mockResolvedValueOnce(registrationOk);
+  await scan(registration);
+}
+
+async function reachConfirmStep() {
+  await reachBadgeStep();
+  mocks.resolveBadge.mockResolvedValueOnce(registrationOk);
+  await scan(badge);
+}
+
 describe("check-in workflow", () => {
-  it("resolves, waits for confirmation, then checks in", async () => {
-    mocks.resolve.mockResolvedValue(checkInPreview);
+  it("verifies the registration, then the badge, and checks in only on confirm", async () => {
     mocks.checkIn.mockResolvedValue({ status: "success", checkedInAt: 1 });
     await render("check-in");
     expect(container.querySelector("h1")?.textContent).toBe("Participant check-in");
-    expect(currentStep()).toBe("1. Scan");
+    expect(currentStep()).toBe("1. Registration QR");
+    expect(scannerMode()).toBe("registration");
+    expect(bannerMode()).toBe("registration");
+    expect(text()).toContain("Step 1 of 3");
 
-    await scan(token.toUpperCase(), "camera");
-    expect(mocks.resolve).toHaveBeenCalledWith({ sessionToken: "session", qrCodeToken: token, purpose: "check_in" });
-    expect(mocks.checkIn).not.toHaveBeenCalled();
-    expect(currentStep()).toBe("2. Confirm");
-    expect(container.querySelector("h2")?.textContent).toBe("Sam Lee");
+    mocks.resolveRegistration.mockResolvedValueOnce(registrationOk);
+    await scan(` ${registration.toUpperCase()} `, "camera");
+    expect(mocks.resolveRegistration).toHaveBeenCalledWith({ sessionToken: "session", registrationQrCodeToken: registration });
+    expect(currentStep()).toBe("2. Badge QR");
+    expect(scannerMode()).toBe("badge");
+    expect(bannerMode()).toBe("badge");
+    expect(container.querySelector('[data-testid="scanner"]')?.getAttribute("data-autostart")).toBe("true");
     expect(document.activeElement?.textContent).toBe("Sam Lee");
-    expect(text()).toContain("Not checked in yet");
-    expect(text()).not.toContain("Dietary");
+    expect(text()).toContain("Registration verified · not checked in yet");
+
+    mocks.resolveBadge.mockResolvedValueOnce(registrationOk);
+    await scan(`${badge}\n`);
+    expect(mocks.resolveBadge).toHaveBeenCalledWith({ sessionToken: "session", registrationQrCodeToken: registration, badgeQrCodeToken: badge });
+    expect(currentStep()).toBe("3. Confirm");
+    expect(mocks.checkIn).not.toHaveBeenCalled();
+    expect(text()).not.toContain(badge);
+    expect(text()).not.toContain(registration);
 
     await click("Confirm check-in");
-    expect(mocks.checkIn).toHaveBeenCalledWith({ sessionToken: "session", qrCodeToken: token });
-    expect(currentStep()).toBe("3. Done");
+    expect(mocks.checkIn).toHaveBeenCalledWith({ sessionToken: "session", registrationQrCodeToken: registration, badgeQrCodeToken: badge });
     expect(result()?.getAttribute("role")).toBe("status");
-    expect(result()?.textContent).toContain("Sam Lee is checked in.");
+    expect(result()?.textContent).toContain("Sam Lee is checked in with their badge");
+    expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(0);
     expect(document.activeElement?.textContent).toBe("Scan next");
 
     await click("Scan next");
-    expect(container.querySelector('[data-testid="scanner"]')?.getAttribute("data-autostart")).toBe("true");
+    expect(currentStep()).toBe("1. Registration QR");
+    expect(scannerMode()).toBe("registration");
   });
 
-  it("explains an existing check-in without offering confirmation", async () => {
-    mocks.resolve.mockResolvedValue({ status: "ok", purpose: "check_in", participant: { name: "Sam Lee", checkedIn: true, checkedInAt: 1 } });
+  it("rejects the wrong kind of code on each step without contacting the server", async () => {
     await render("check-in");
-    await scan();
-    expect(result()?.textContent).toContain("Already checked in");
-    expect(button("Confirm check-in")).toBeUndefined();
-    await click("Scan next");
-    expect(container.querySelector('[data-testid="scanner"]')?.getAttribute("data-autostart")).toBe("false");
-  });
+    await scan(badge);
+    expect(alertText()).toContain("Not a registration QR");
+    expect(mocks.resolveRegistration).not.toHaveBeenCalled();
+    expect(currentStep()).toBe("1. Registration QR");
 
-  it("rejects codes that are not participant tokens without contacting the server", async () => {
-    await render("check-in");
-    await scan("https://example.com/not-a-token", "camera");
-    expect(mocks.resolve).not.toHaveBeenCalled();
-    expect(result()?.getAttribute("role")).toBe("alert");
-    expect(result()?.textContent).toContain("Not a participant QR code");
+    await reachBadgeStep();
+    await scan(registration.toUpperCase());
+    expect(alertText()).toContain("That's the registration QR again");
+    await scan("x".repeat(257));
+    expect(alertText()).toContain("Badge not recognized");
+    expect(mocks.resolveBadge).not.toHaveBeenCalled();
+    expect(text()).toContain("Sam Lee");
   });
 
   it.each([
-    ["qr_not_found", "Participant not found"],
-    ["participant_not_eligible", "Participant not eligible"],
-    ["not_authorized", "Permission required"],
-    ["rate_limited", "Too many scans"],
-  ])("explains a %s lookup", async (status, title) => {
-    mocks.resolve.mockResolvedValue({ status });
+    [{ status: "already_checked_in", participant: { name: "Sam Lee", checkedInAt: 1 } }, "Already checked in"],
+    [{ status: "registration_qr_used", participant: { name: "Sam Lee", checkedInAt: 1 } }, "Registration QR already used"],
+    [{ status: "qr_not_found" }, "Participant not found"],
+    [{ status: "participant_not_eligible" }, "Participant not eligible"],
+    [{ status: "not_authorized" }, "Permission required"],
+  ])("ends the flow for a registration lookup %j", async (response, title) => {
+    mocks.resolveRegistration.mockResolvedValue(response);
     await render("check-in");
-    await scan();
+    await scan(registration);
     expect(result()?.textContent).toContain(title);
+    expect(button("Confirm check-in")).toBeUndefined();
+    await click("Scan next");
+    expect(scannerMode()).toBe("registration");
+  });
+
+  it("keeps the registration step after a rate limit", async () => {
+    mocks.resolveRegistration.mockResolvedValue({ status: "rate_limited" });
+    await render("check-in");
+    await scan(registration);
+    expect(alertText()).toContain("Too many scans");
+    expect(scannerMode()).toBe("registration");
+  });
+
+  it.each([
+    ["badge_in_use", "Badge already assigned"],
+    ["badge_is_registration", "That's a registration QR"],
+    ["badge_retired", "Badge deactivated"],
+    ["badge_invalid", "Badge not recognized"],
+    ["rate_limited", "Too many scans"],
+  ])("asks for another badge after %s", async (status, title) => {
+    await render("check-in");
+    await reachBadgeStep();
+    mocks.resolveBadge.mockResolvedValueOnce({ status });
+    await scan(badge);
+    expect(alertText()).toContain(title);
+    expect(scannerMode()).toBe("badge");
+    expect(text()).toContain("Sam Lee");
+    expect(mocks.checkIn).not.toHaveBeenCalled();
   });
 
   it.each([
     [adminError("NOT_AUTHENTICATED"), "Session expired"],
     [adminError("VOLUNTEER_ONLY"), "Permission required"],
     [new ScanNetworkError(), "Connection problem"],
-  ])("explains a failed lookup (%s)", async (error, title) => {
-    mocks.resolve.mockRejectedValue(error);
+  ])("explains a failed registration lookup (%s)", async (error, title) => {
+    mocks.resolveRegistration.mockRejectedValue(error);
     await render("check-in");
-    await scan();
+    await scan(registration);
     expect(result()?.textContent).toContain(title);
+  });
+
+  it("goes back one step at a time and starts over without keeping values", async () => {
+    await render("check-in");
+    await reachConfirmStep();
+    await click("Back: scan a different badge");
+    expect(currentStep()).toBe("2. Badge QR");
+    expect(text()).toContain("Sam Lee");
+    await click("Back: scan a different registration");
+    expect(currentStep()).toBe("1. Registration QR");
+    expect(text()).not.toContain("Sam Lee");
+
+    await reachConfirmStep();
+    await click("Start over");
+    expect(currentStep()).toBe("1. Registration QR");
+    expect(button("Confirm check-in")).toBeUndefined();
+    expect(text()).not.toContain("Sam Lee");
   });
 
   it("ignores a lookup that finishes after the volunteer cancels", async () => {
     const pending = deferred<unknown>();
-    mocks.resolve.mockReturnValue(pending.promise);
+    mocks.resolveRegistration.mockReturnValue(pending.promise);
     await render("check-in");
-    await scan();
-    expect(text()).toContain("Looking up participant");
+    await scan(registration);
+    expect(text()).toContain("Looking up registration");
     expect(container.querySelector('[data-testid="scanner"]')).toBeNull();
     await click("Cancel");
-    expect(container.querySelector('[data-testid="scanner"]')).not.toBeNull();
-    await act(async () => pending.resolve(checkInPreview));
-    expect(container.querySelector('[data-testid="scanner"]')).not.toBeNull();
+    expect(scannerMode()).toBe("registration");
+    await act(async () => pending.resolve(registrationOk));
+    expect(scannerMode()).toBe("registration");
     expect(text()).not.toContain("Sam Lee");
   });
 
-  it("ignores a failed lookup after cancel", async () => {
-    let reject!: (error: unknown) => void;
-    mocks.resolve.mockReturnValue(new Promise((_, fail) => { reject = fail; }));
+  it("cancels a badge check and keeps the participant", async () => {
+    const pending = deferred<unknown>();
     await render("check-in");
-    await scan();
+    await reachBadgeStep();
+    mocks.resolveBadge.mockReturnValueOnce(pending.promise);
+    await scan(badge);
+    expect(text()).toContain("Checking badge");
     await click("Cancel");
-    await act(async () => reject(new ScanNetworkError()));
-    expect(result()).toBeNull();
+    await act(async () => pending.resolve(registrationOk));
+    expect(currentStep()).toBe("2. Badge QR");
+    expect(text()).toContain("Sam Lee");
   });
 
   it("submits a confirmation once while it is pending", async () => {
-    mocks.resolve.mockResolvedValue(checkInPreview);
     const pending = deferred<unknown>();
     mocks.checkIn.mockReturnValue(pending.promise);
     await render("check-in");
-    await scan();
+    await reachConfirmStep();
     await click("Confirm check-in");
-    const saving = button("Saving…")!;
+    const saving = button("Checking in…")!;
     expect(saving.disabled).toBe(true);
     expect(saving.getAttribute("aria-busy")).toBe("true");
-    expect(button("Cancel")!.disabled).toBe(true);
+    expect(button("Start over")!.disabled).toBe(true);
+    expect(button("Back: scan a different badge")!.disabled).toBe(true);
     await act(async () => saving.click());
     await act(async () => saving.click());
     expect(mocks.checkIn).toHaveBeenCalledTimes(1);
-    await act(async () => pending.resolve({ status: "already_checked_in", checkedInAt: 1 }));
+    await act(async () => pending.resolve({ status: "already_checked_in", participant: { name: "Sam Lee", checkedInAt: 1 } }));
     expect(result()?.textContent).toContain("Already checked in");
   });
 
   it("keeps the confirmation for a retry after a rate limit or network failure", async () => {
-    mocks.resolve.mockResolvedValue(checkInPreview);
     mocks.checkIn
       .mockResolvedValueOnce({ status: "rate_limited" })
       .mockRejectedValueOnce(new ScanNetworkError())
       .mockResolvedValueOnce({ status: "success", checkedInAt: 1 });
     await render("check-in");
-    await scan();
+    await reachConfirmStep();
     await click("Confirm check-in");
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Too many scans");
-    await click(/^Try again/);
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Connection problem");
-    await click(/^Try again/);
+    expect(alertText()).toContain("Too many scans");
+    await click("Try again: confirm check-in");
+    expect(alertText()).toContain("Connection problem");
+    await click("Try again: confirm check-in");
     expect(result()?.textContent).toContain("Checked in");
     expect(mocks.checkIn).toHaveBeenCalledTimes(3);
   });
 
+  it("returns to the badge step when the badge was taken before confirming", async () => {
+    mocks.checkIn.mockResolvedValueOnce({ status: "badge_in_use" });
+    await render("check-in");
+    await reachConfirmStep();
+    await click("Confirm check-in");
+    expect(currentStep()).toBe("2. Badge QR");
+    expect(alertText()).toContain("Badge already assigned");
+  });
+
   it("ends the flow when confirmation reports an expired session or revoked access", async () => {
-    mocks.resolve.mockResolvedValue(checkInPreview);
     mocks.checkIn.mockRejectedValueOnce(adminError("NOT_AUTHENTICATED")).mockResolvedValueOnce({ status: "not_authorized" });
     await render("check-in");
-    await scan();
+    await reachConfirmStep();
     await click("Confirm check-in");
     expect(result()?.textContent).toContain("Session expired");
     await click("Scan next");
-    await scan();
+    await reachConfirmStep();
     await click("Confirm check-in");
     expect(result()?.textContent).toContain("Permission required");
-  });
-
-  it("drops the participant when the volunteer cancels confirmation", async () => {
-    mocks.resolve.mockResolvedValue(checkInPreview);
-    await render("check-in");
-    await scan();
-    await click("Cancel");
-    expect(text()).not.toContain("Sam Lee");
-    expect(currentStep()).toBe("1. Scan");
   });
 
   it("shows a loading state until scan access loads", async () => {
@@ -514,7 +593,7 @@ describe("points workflow", () => {
   });
 });
 
-function WorkflowHarness({ purpose, eventId }: { purpose: "check_in" | "point_scan" | "food_check_in"; eventId?: GenericId<"events"> }) {
+function WorkflowHarness({ purpose, eventId }: { purpose: "point_scan" | "food_check_in"; eventId?: GenericId<"events"> }) {
   const { state, scan: runScan, confirm } = useScanWorkflow(purpose, eventId);
   return (
     <>
@@ -544,21 +623,23 @@ describe("useScanWorkflow guards", () => {
   });
 
   it("requires a session to look up or confirm", async () => {
-    await renderHarness(<WorkflowHarness purpose="check_in" />, auth({ sessionToken: null }));
+    const harness = <WorkflowHarness purpose="point_scan" eventId={workshop.eventId} />;
+    await renderHarness(harness, auth({ sessionToken: null }));
     await click("scan");
     expect(step()).toBe("Session expired");
 
-    mocks.resolve.mockResolvedValue(checkInPreview);
-    await renderHarness(<WorkflowHarness purpose="check_in" />);
+    mocks.resolve.mockResolvedValue({ status: "ok", purpose: "point_scan", participant: { name: "Sam Lee" },
+      event: { eventId: workshop.eventId, name: workshop.name, pointsAwarded: 25 }, alreadyAwarded: false });
+    await renderHarness(harness);
     await click("confirm");
-    expect(mocks.checkIn).not.toHaveBeenCalled();
+    expect(mocks.award).not.toHaveBeenCalled();
     await click("scan");
     expect(step()).toBe("confirm");
     await click("scan");
     expect(mocks.resolve).toHaveBeenCalledTimes(1);
-    await renderHarness(<WorkflowHarness purpose="check_in" />, auth({ sessionToken: null }));
+    await renderHarness(harness, auth({ sessionToken: null }));
     await click("confirm");
     expect(step()).toBe("Session expired");
-    expect(mocks.checkIn).not.toHaveBeenCalled();
+    expect(mocks.award).not.toHaveBeenCalled();
   });
 });

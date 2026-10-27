@@ -2,7 +2,7 @@ import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { listMyScanOptionsRef, resolveQrForScanRef } from "../../src/convex/adminApi";
-import { isWellFormedQrToken } from "../../convex/admin/volunteerScan";
+import { hashBadgeToken } from "../../convex/admin/participantQr";
 import {
   QR_SCAN_ATTEMPT_LIMIT,
   QR_SCAN_ATTEMPT_WINDOW_MS,
@@ -15,7 +15,9 @@ import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTest
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { seedMealPeriod } from "../helpers/mealTestKit";
 
-const QR_TOKEN = "ab".repeat(32);
+/** The seeded participant's badge; they are checked in with it. */
+const QR_TOKEN = "BADGE-0042";
+const REGISTRATION_TOKEN = "ab".repeat(32);
 const UNKNOWN_TOKEN = "cd".repeat(32);
 
 afterEach(() => {
@@ -24,7 +26,7 @@ afterEach(() => {
 
 async function seedVolunteer(
   t: ConvexTestInstance,
-  capabilities: { canCheckIn?: boolean; canFoodCheckIn?: boolean } = {},
+  capabilities: { canCheckIn?: boolean; canFoodCheckIn?: boolean; canRedeemShop?: boolean } = {},
 ) {
   const staff = await seedStaff(t, { role: "volunteer" });
   await t.run((ctx) => ctx.db.patch(staff.adminId, capabilities));
@@ -46,6 +48,10 @@ async function seedParticipant(
       acceptedAt: 1,
       acceptedBy: admin.adminId,
       qrCodeToken: options.qrCodeToken ?? QR_TOKEN,
+      registrationQrCodeToken: REGISTRATION_TOKEN,
+      badgeQrCodeToken: options.qrCodeToken ?? QR_TOKEN,
+      badgeAssignedAt: 2,
+      checkedInAt: 2,
       points: 25,
       foodRestriction: "Vegetarian; peanut allergy",
       createdAt: 1,
@@ -88,20 +94,6 @@ function scanRows(t: ConvexTestInstance) {
   return t.run((ctx) => ctx.db.query("rateLimits").collect());
 }
 
-describe("isWellFormedQrToken", () => {
-  it.each([
-    ["valid lowercase hex", QR_TOKEN, true],
-    ["uppercase hex", QR_TOKEN.toUpperCase(), false],
-    ["too short", QR_TOKEN.slice(1), false],
-    ["too long", `${QR_TOKEN}a`, false],
-    ["non-hex", "zz".repeat(32), false],
-    ["empty", "", false],
-    ["oversized", "a".repeat(10_000), false],
-  ])("%s", (_label, token, expected) => {
-    expect(isWellFormedQrToken(token)).toBe(expected);
-  });
-});
-
 describe("listMyScanOptions", () => {
   it("returns only the caller's capabilities and assigned active events", async () => {
     const t = createConvexTest();
@@ -137,21 +129,48 @@ describe("listMyScanOptions", () => {
 });
 
 describe("resolveQrForScan", () => {
-  it("previews check-in without dietary info, points, or the token", async () => {
+  it("previews a shop scan by badge without dietary info or any QR value", async () => {
     const t = createConvexTest();
-    const volunteer = await seedVolunteer(t, { canCheckIn: true });
-    await seedParticipant(t, { fields: { checkedInAt: 500 } });
+    const volunteer = await seedVolunteer(t, { canRedeemShop: true });
+    const { participantId } = await seedParticipant(t);
     const result = await t.mutation(resolveQrForScanRef, {
-      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "check_in",
+      sessionToken: volunteer.sessionToken, qrCodeToken: ` ${QR_TOKEN}\n`, purpose: "shop",
     });
     expect(result).toEqual({
       status: "ok",
-      purpose: "check_in",
-      participant: { name: "Taylor Student", checkedIn: true, checkedInAt: 500 },
+      purpose: "shop",
+      participant: { participantId, name: "Taylor Student", points: 25 },
     });
     const serialized = JSON.stringify(result);
-    expect(serialized).not.toMatch(/Vegetarian|"points"|@/);
+    expect(serialized).not.toMatch(/Vegetarian|@/);
     expect(serialized).not.toContain(QR_TOKEN);
+    expect(serialized).not.toContain(REGISTRATION_TOKEN);
+  });
+
+  it("rejects registration, replaced, and retired codes with distinct statuses", async () => {
+    const t = createConvexTest();
+    const volunteer = await seedVolunteer(t, { canRedeemShop: true });
+    const { participantId, adminId } = await seedParticipant(t);
+    await seedParticipant(t, {
+      qrCodeToken: "ef".repeat(32),
+      fields: { registrationQrCodeToken: undefined, badgeQrCodeToken: undefined, badgeAssignedAt: undefined, checkedInAt: undefined },
+    });
+    await seedParticipant(t, {
+      qrCodeToken: "12".repeat(32),
+      fields: { registrationQrCodeToken: undefined, badgeQrCodeToken: undefined, badgeAssignedAt: undefined },
+    });
+    await t.run(async (ctx) => ctx.db.insert("retiredBadgeTokens", {
+      tokenHash: await hashBadgeToken("BADGE-LOST"), participantId, retiredBy: adminId, retiredAt: 1,
+    }));
+    const scan = (qrCodeToken: string) =>
+      t.mutation(resolveQrForScanRef, { sessionToken: volunteer.sessionToken, qrCodeToken, purpose: "shop" });
+
+    expect(await scan(REGISTRATION_TOKEN)).toEqual({ status: "registration_qr_replaced" });
+    expect(await scan("BADGE-LOST")).toEqual({ status: "badge_retired" });
+    expect(await scan("EF".repeat(32))).toEqual({ status: "participant_not_checked_in" });
+    expect(await scan("12".repeat(32))).toEqual({ status: "badge_not_assigned" });
+    const failures = (await scanRows(t)).filter((row) => row.bucket.startsWith("volunteer_qr_scan_failure"));
+    expect(failures).toHaveLength(2);
   });
 
   it("includes dietary info only for food check-in", async () => {
@@ -214,7 +233,7 @@ describe("resolveQrForScan", () => {
 
   it("is a preview only: participant, award, and log rows are unchanged", async () => {
     const t = createConvexTest();
-    const volunteer = await seedVolunteer(t, { canCheckIn: true, canFoodCheckIn: true });
+    const volunteer = await seedVolunteer(t, { canRedeemShop: true, canFoodCheckIn: true });
     const { adminId } = await seedParticipant(t);
     const mealPeriodId = await seedMealPeriod(t, adminId);
     const eventId = await seedEvent(t);
@@ -225,24 +244,24 @@ describe("resolveQrForScan", () => {
       logs: await ctx.db.query("volunteerActionLogs").collect(),
     }));
     const before = await snapshot();
-    for (const purpose of ["check_in", "food_check_in", "point_scan"] as const) {
+    for (const purpose of ["shop", "food_check_in", "point_scan"] as const) {
       expect(await t.mutation(resolveQrForScanRef, { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose, eventId, mealPeriodId })).toMatchObject({ status: "ok" });
     }
     expect(await snapshot()).toEqual(before);
   });
 
-  it("returns the same generic result for malformed and unknown tokens and never stores them", async () => {
+  it("returns the same generic result for malformed and unknown values and never stores them", async () => {
     const t = createConvexTest();
-    const volunteer = await seedVolunteer(t, { canCheckIn: true });
+    const volunteer = await seedVolunteer(t, { canRedeemShop: true });
     await seedParticipant(t);
     const results = [];
-    for (const qrCodeToken of [UNKNOWN_TOKEN, "not-a-token", QR_TOKEN.toUpperCase(), "a".repeat(5000)]) {
+    for (const qrCodeToken of [UNKNOWN_TOKEN, "not-a-token", QR_TOKEN.toLowerCase(), "a".repeat(5000)]) {
       results.push(await t.mutation(resolveQrForScanRef, {
-        sessionToken: volunteer.sessionToken, qrCodeToken, purpose: "check_in",
+        sessionToken: volunteer.sessionToken, qrCodeToken, purpose: "shop",
       }));
     }
     expect(results).toEqual(Array(4).fill({ status: "qr_not_found" }));
-    expect(JSON.stringify(await scanRows(t))).not.toMatch(/cdcd|not-a-token|aaaa/i);
+    expect(JSON.stringify(await scanRows(t))).not.toMatch(/cdcd|not-a-token|badge-0042|aaaa/i);
   });
 
   it("reveals nothing about ineligible participants", async () => {
@@ -264,7 +283,7 @@ describe("resolveQrForScan", () => {
     await assign(t, volunteer.adminId, inactive, adminId);
     const sessionToken = volunteer.sessionToken;
     const denied = [
-      { purpose: "check_in" as const },
+      { purpose: "shop" as const },
       { purpose: "food_check_in" as const },
       { purpose: "point_scan" as const },
       { purpose: "point_scan" as const, eventId: unassigned },
@@ -278,25 +297,25 @@ describe("resolveQrForScan", () => {
 
   it("applies capability and assignment changes on the next request", async () => {
     const t = createConvexTest();
-    const volunteer = await seedVolunteer(t, { canCheckIn: true });
+    const volunteer = await seedVolunteer(t, { canRedeemShop: true });
     const { adminId } = await seedParticipant(t);
     const eventId = await seedEvent(t);
     const assignmentId = await assign(t, volunteer.adminId, eventId, adminId);
-    const scan = (purpose: "check_in" | "point_scan") => t.mutation(resolveQrForScanRef, {
+    const scan = (purpose: "shop" | "point_scan") => t.mutation(resolveQrForScanRef, {
       sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose, eventId,
     });
-    expect(await scan("check_in")).toMatchObject({ status: "ok" });
+    expect(await scan("shop")).toMatchObject({ status: "ok" });
     expect(await scan("point_scan")).toMatchObject({ status: "ok" });
 
     await t.run(async (ctx) => {
-      await ctx.db.patch(volunteer.adminId, { canCheckIn: false });
+      await ctx.db.patch(volunteer.adminId, { canRedeemShop: false });
       await ctx.db.delete(assignmentId);
     });
-    expect(await scan("check_in")).toEqual({ status: "not_authorized" });
+    expect(await scan("shop")).toEqual({ status: "not_authorized" });
     expect(await scan("point_scan")).toEqual({ status: "not_authorized" });
 
     await t.run((ctx) => ctx.db.patch(volunteer.adminId, { active: false }));
-    await expectAdminErrorCode(scan("check_in"), "NOT_AUTHENTICATED");
+    await expectAdminErrorCode(scan("shop"), "NOT_AUTHENTICATED");
   });
 
   it("throws for non-volunteer sessions without writing counters", async () => {
@@ -304,7 +323,7 @@ describe("resolveQrForScan", () => {
     for (const role of ["admin", "reviewer"] as const) {
       const staff = await seedStaff(t, { role });
       await expectAdminErrorCode(t.mutation(resolveQrForScanRef, {
-        sessionToken: staff.sessionToken, qrCodeToken: QR_TOKEN, purpose: "check_in",
+        sessionToken: staff.sessionToken, qrCodeToken: QR_TOKEN, purpose: "shop",
       }), "VOLUNTEER_ONLY");
     }
     expect(await scanRows(t)).toEqual([]);
@@ -312,14 +331,14 @@ describe("resolveQrForScan", () => {
 
   it("throttles repeated invalid tokens, persists counters, and recovers after the window", async () => {
     const t = createConvexTest();
-    const volunteer = await seedVolunteer(t, { canCheckIn: true });
-    const other = await seedVolunteer(t, { canCheckIn: true });
+    const volunteer = await seedVolunteer(t, { canRedeemShop: true });
+    const other = await seedVolunteer(t, { canRedeemShop: true });
     await seedParticipant(t);
     vi.useFakeTimers();
     const now = Date.now();
     vi.setSystemTime(now);
     const scan = (sessionToken: string, qrCodeToken: string) =>
-      t.mutation(resolveQrForScanRef, { sessionToken, qrCodeToken, purpose: "check_in" });
+      t.mutation(resolveQrForScanRef, { sessionToken, qrCodeToken, purpose: "shop" });
 
     for (let i = 0; i < QR_SCAN_FAILURE_LIMIT; i++) {
       expect(await scan(volunteer.sessionToken, UNKNOWN_TOKEN)).toEqual({ status: "qr_not_found" });
@@ -338,22 +357,22 @@ describe("resolveQrForScan", () => {
     const volunteer = await seedVolunteer(t);
     await seedParticipant(t);
     for (let i = 0; i < QR_SCAN_FAILURE_LIMIT; i++) {
-      await t.mutation(resolveQrForScanRef, { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "check_in" });
+      await t.mutation(resolveQrForScanRef, { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "shop" });
     }
     expect(await t.mutation(resolveQrForScanRef, {
-      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "check_in",
+      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "shop",
     })).toEqual({ status: "rate_limited" });
   });
 
   it("caps successful lookups per window and prunes expired rows", async () => {
     const t = createConvexTest();
-    const volunteer = await seedVolunteer(t, { canCheckIn: true });
+    const volunteer = await seedVolunteer(t, { canRedeemShop: true });
     await seedParticipant(t);
     vi.useFakeTimers();
     const now = Date.now();
     vi.setSystemTime(now);
     const scan = () => t.mutation(resolveQrForScanRef, {
-      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "check_in",
+      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "shop",
     });
     for (let i = 0; i < QR_SCAN_ATTEMPT_LIMIT; i++) {
       expect(await scan()).toMatchObject({ status: "ok" });

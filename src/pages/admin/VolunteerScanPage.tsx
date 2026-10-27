@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { GenericId } from "convex/values";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
+import { CheckInWorkflow } from "../../components/volunteer/CheckInWorkflow";
 import { EventSelector } from "../../components/volunteer/EventSelector";
 import { QrScanner, type ScanSource } from "../../components/volunteer/QrScanner";
 import { ScanConfirmation } from "../../components/volunteer/ScanConfirmation";
 import { ScanResult } from "../../components/volunteer/ScanResult";
+import { ScanSteps } from "../../components/volunteer/ScanSteps";
 import { LoadingState } from "../../components/states/LoadingState";
 import { useScanWorkflow, type ScanWorkflowState } from "../../hooks/useScanWorkflow";
 import { useVolunteerAccess } from "../../hooks/useVolunteerAccess";
@@ -22,46 +24,30 @@ import { QueryErrorState } from "../../components/states/QueryErrorState";
 
 export type ScanWorkflowName = "check-in" | "food" | "points";
 
-const PAGES: Record<ScanWorkflowName, { purpose: ScanPurpose; title: string; lead: string }> = {
+const PAGES: Record<ScanWorkflowName, { purpose: ScanPurpose | null; title: string; lead: string }> = {
   "check-in": {
-    purpose: "check_in",
+    purpose: null,
     title: "Participant check-in",
-    lead: "Scan a participant's QR code, confirm their name, then check them in.",
+    lead: "Scan the participant's registration QR, then the badge you hand them, then confirm.",
   },
   food: {
     purpose: "food_check_in",
     title: "Food",
-    lead: "Scan a participant's QR code, check dietary restrictions, then confirm food distribution.",
+    lead: "Scan the participant's badge, check dietary restrictions, then confirm food distribution.",
   },
   points: {
     purpose: "point_scan",
     title: "Points",
-    lead: "Choose your event, scan a participant's QR code, then confirm the award.",
+    lead: "Choose your event, scan the participant's badge, then confirm the award.",
   },
 };
 
-const STEPS = ["Scan", "Confirm", "Done"] as const;
+const STEPS = ["Scan badge", "Confirm", "Done"] as const;
 
 function stepIndex(state: ScanWorkflowState) {
   if (state.step === "confirm") return 1;
   if (state.step === "result") return 2;
   return 0;
-}
-
-function ScanSteps({ current }: { current: number }) {
-  return (
-    <ol aria-label="Scan progress" className="grid grid-cols-3 gap-2 text-center text-sm font-semibold">
-      {STEPS.map((label, index) => (
-        <li
-          key={label}
-          aria-current={index === current ? "step" : undefined}
-          className={`rounded-lg border px-2 py-2 ${index === current ? "border-ocean bg-ocean text-light" : index < current ? "border-ocean/40 bg-white text-ocean" : "border-sand bg-white/60 text-mist"}`}
-        >
-          {index + 1}. {label}
-        </li>
-      ))}
-    </ol>
-  );
 }
 
 /** One scan → confirm → result loop. Keyed by purpose and event so a change clears all participant state. */
@@ -80,11 +66,11 @@ function ScanWorkflow({ purpose, eventId, mealPeriodId, onConfirming, onReset }:
 
   return (
     <div className="space-y-5">
-      <ScanSteps current={stepIndex(state)} />
-      {state.step === "scan" ? <QrScanner onScan={onScan} autoStart={cameraPreferred} /> : null}
+      <ScanSteps steps={STEPS} current={stepIndex(state)} />
+      {state.step === "scan" ? <QrScanner mode="badge" onScan={onScan} autoStart={cameraPreferred} /> : null}
       {state.step === "resolving" ? (
         <div className="space-y-3">
-          <LoadingState message="Looking up participant…" />
+          <LoadingState message="Looking up badge…" />
           <button type="button" className={scanSecondaryButtonClass} onClick={resetWorkflow}>Cancel</button>
         </div>
       ) : null}
@@ -191,7 +177,7 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
         </div>
       ) : null}
 
-      {workflow === "food" ? <ErrorBoundary key={mealRetry} fallback={<QueryErrorState title="Unable to load available meals" onRetry={() => setMealRetry((value) => value + 1)} />}><FoodMealScanner /></ErrorBoundary> : points && !selectedEvent ? (
+      {page.purpose === null ? <CheckInWorkflow /> : workflow === "food" ? <ErrorBoundary key={mealRetry} fallback={<QueryErrorState title="Unable to load available meals" onRetry={() => setMealRetry((value) => value + 1)} />}><FoodMealScanner /></ErrorBoundary> : points && !selectedEvent ? (
         <p className="admin-callout text-base">Choose an event to start scanning.</p>
       ) : showPicker ? null : (
         <ScanWorkflow

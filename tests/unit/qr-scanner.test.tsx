@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const detector = vi.hoisted(() => ({ detect: vi.fn(), load: vi.fn() }));
 vi.mock("../../src/lib/qrDetector", () => ({ loadQrDetector: detector.load }));
 
+import type { ScanMode } from "../../src/components/volunteer/QrScanner";
+
 const { QrScanner } = await import("../../src/components/volunteer/QrScanner");
 const { isCameraSupported, QR_SCAN_INTERVAL_MS } = await import("../../src/hooks/useQrCamera");
 
@@ -35,8 +37,8 @@ function defineNavigator(name: string, value: unknown) {
   Object.defineProperty(navigator, name, { value, configurable: true });
 }
 
-async function render(props: { autoStart?: boolean } = {}) {
-  await act(async () => root.render(<QrScanner onScan={onScan} {...props} />));
+async function render(props: { autoStart?: boolean; mode?: ScanMode } = {}) {
+  await act(async () => root.render(<QrScanner mode="registration" onScan={onScan} {...props} />));
 }
 
 async function flush(ms = 0) {
@@ -112,7 +114,7 @@ describe("camera scanning", () => {
     await click("Scan with camera");
     expect(getUserMedia).toHaveBeenCalledWith({ audio: false, video: { facingMode: { ideal: "environment" } } });
     expect(video().srcObject).toBe(stream);
-    expect(message()).toBe("Point the camera at the participant's QR code.");
+    expect(message()).toBe("Point the camera at the registration QR on the participant's phone.");
     expect(button("Stop camera and enter code")).toBeDefined();
 
     await flush(QR_SCAN_INTERVAL_MS * 3);
@@ -193,7 +195,7 @@ describe("camera scanning", () => {
     await render();
     await click("Scan with camera");
     await act(async () => permission.onchange?.());
-    expect(message()).toBe("Point the camera at the participant's QR code.");
+    expect(message()).toBe("Point the camera at the registration QR on the participant's phone.");
   });
 
   it("pauses when the page is hidden or left", async () => {
@@ -293,7 +295,7 @@ describe("camera scanning", () => {
     getUserMedia.mockResolvedValue(fakeStream().stream);
     await render();
     await click("Scan with camera");
-    expect(message()).toBe("Point the camera at the participant's QR code.");
+    expect(message()).toBe("Point the camera at the registration QR on the participant's phone.");
   });
 
   it("tolerates a Permissions API that rejects camera queries", async () => {
@@ -301,7 +303,7 @@ describe("camera scanning", () => {
     getUserMedia.mockResolvedValue(fakeStream().stream);
     await render();
     await click("Scan with camera");
-    expect(message()).toBe("Point the camera at the participant's QR code.");
+    expect(message()).toBe("Point the camera at the registration QR on the participant's phone.");
   });
 
   it("reports support changing after render", async () => {
@@ -316,11 +318,11 @@ describe("manual entry", () => {
   it("validates before submitting and clears the field after", async () => {
     await render();
     await submitCode();
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Enter the participant's code.");
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Enter the registration code.");
     await typeCode("not-a-code");
     expect(container.querySelector('[role="alert"]')).toBeNull();
     await submitCode();
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("isn't a valid participant code");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("isn't a registration code");
     expect(container.querySelector("input")!.getAttribute("aria-invalid")).toBe("true");
     expect(onScan).not.toHaveBeenCalled();
 
@@ -328,6 +330,21 @@ describe("manual entry", () => {
     await submitCode();
     expect(onScan).toHaveBeenCalledWith(` ${token.toUpperCase()} `, "manual");
     expect(container.querySelector("input")!.value).toBe("");
+  });
+
+  it("labels badge mode and accepts opaque printed badge values", async () => {
+    await render({ mode: "badge" });
+    expect(container.textContent).toContain("Or enter the badge code");
+    expect(button("Look up badge")).toBeDefined();
+    await submitCode();
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Enter the badge code.");
+    await typeCode("x".repeat(257));
+    await submitCode();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("isn't a badge code");
+    expect(onScan).not.toHaveBeenCalled();
+    await typeCode(" HACKUTA-BADGE-0001 ");
+    await submitCode();
+    expect(onScan).toHaveBeenCalledWith(" HACKUTA-BADGE-0001 ", "manual");
   });
 
   it("stops the camera when a code is entered", async () => {

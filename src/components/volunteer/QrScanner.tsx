@@ -1,13 +1,36 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { useQrCamera, type CameraStatus } from "../../hooks/useQrCamera";
-import { normalizeQrToken } from "../../lib/scanResults";
+import { normalizeBadgeQr, normalizeRegistrationQr } from "../../../shared/admin/qrValues";
 import { scanPrimaryButtonClass, scanSecondaryButtonClass } from "../../lib/scanButtonClasses";
 
 export type ScanSource = "camera" | "manual";
 
+/** Which code the volunteer should be scanning: the portal registration QR or the printed badge. */
+export type ScanMode = "registration" | "badge";
+
+const MODES = {
+  registration: {
+    aim: "Point the camera at the registration QR on the participant's phone.",
+    label: "Or enter the registration code",
+    hint: "From the participant portal. Use a handheld scanner, or paste a code read by another QR app.",
+    empty: "Enter the registration code.",
+    invalid: "That isn't a registration code. Registration codes are 64 letters (a–f) and numbers from the participant portal.",
+    submit: "Look up registration",
+    normalize: normalizeRegistrationQr,
+  },
+  badge: {
+    aim: "Point the camera at the QR code printed on the participant's badge.",
+    label: "Or enter the badge code",
+    hint: "Printed on the badge. Use a handheld scanner, or paste a code read by another QR app.",
+    empty: "Enter the badge code.",
+    invalid: "That isn't a badge code. Scan or enter the code printed on the badge (up to 256 characters).",
+    submit: "Look up badge",
+    normalize: normalizeBadgeQr,
+  },
+} as const;
+
 const CAMERA_MESSAGES: Partial<Record<CameraStatus, string>> = {
   starting: "Starting camera…",
-  scanning: "Point the camera at the participant's QR code.",
   paused: "The camera turned off while this page was in the background. Start it again when you're ready.",
   denied: "Camera access is blocked. Allow camera access for this site in your browser settings, then try again, or enter the code below.",
   no_camera: "No camera was found on this device. Enter the code below.",
@@ -19,20 +42,21 @@ const CAMERA_MESSAGES: Partial<Record<CameraStatus, string>> = {
 
 const PROBLEM_STATUSES = new Set<CameraStatus>(["denied", "no_camera", "in_use", "interrupted", "unsupported", "error"]);
 
-const INVALID_ENTRY = "That isn't a valid participant code. Codes are 64 letters (a–f) and numbers.";
-
 /**
- * Camera or manual QR entry. Reports one raw value per scan; the camera stops
- * before `onScan` runs. Set `autoStart` only after the volunteer asked for
- * the camera (for example, Scan next after a camera scan).
+ * Camera or manual QR entry for one kind of code. Reports one raw value per
+ * scan; the camera stops before `onScan` runs. Set `autoStart` only after the
+ * volunteer asked for the camera (for example, Scan next after a camera scan).
  */
 export function QrScanner({
+  mode,
   onScan,
   autoStart = false,
 }: {
+  mode: ScanMode;
   onScan: (rawValue: string, source: ScanSource) => void;
   autoStart?: boolean;
 }) {
+  const copy = MODES[mode];
   const { status, videoRef, start, stop } = useQrCamera((rawValue) => onScan(rawValue, "camera"));
   const [code, setCode] = useState("");
   const [entryError, setEntryError] = useState<string | null>(null);
@@ -48,11 +72,11 @@ export function QrScanner({
 
   const submit = (value: string) => {
     if (!value.trim()) {
-      setEntryError("Enter the participant's code.");
+      setEntryError(copy.empty);
       return;
     }
-    if (!normalizeQrToken(value)) {
-      setEntryError(INVALID_ENTRY);
+    if (!copy.normalize(value)) {
+      setEntryError(copy.invalid);
       return;
     }
     setEntryError(null);
@@ -76,7 +100,7 @@ export function QrScanner({
     }
   };
 
-  const message = CAMERA_MESSAGES[status];
+  const message = status === "scanning" ? copy.aim : CAMERA_MESSAGES[status];
   return (
     <div className="space-y-5">
       <section aria-label="Camera scanner" className="space-y-3">
@@ -111,9 +135,9 @@ export function QrScanner({
 
       <form onSubmit={onSubmit} className="admin-card space-y-3 p-4" noValidate>
         <label htmlFor={inputId} className="block text-base font-semibold text-night">
-          Or enter the participant's code
+          {copy.label}
         </label>
-        <p id={hintId} className="text-sm text-ocean">Use a handheld scanner, or paste a code read by another QR app.</p>
+        <p id={hintId} className="text-sm text-ocean">{copy.hint}</p>
         <input
           id={inputId}
           className="admin-field__control min-h-14 font-mono text-base"
@@ -132,7 +156,7 @@ export function QrScanner({
         />
         {entryError ? <p id={errorId} role="alert" className="text-sm font-semibold text-red-800">{entryError}</p> : null}
         <div className="flex flex-col gap-3 sm:flex-row">
-          <button type="submit" className={scanPrimaryButtonClass}>Look up participant</button>
+          <button type="submit" className={scanPrimaryButtonClass}>{copy.submit}</button>
           {canPaste ? (
             <button type="button" className={scanSecondaryButtonClass} onClick={() => void paste()}>Paste code</button>
           ) : null}

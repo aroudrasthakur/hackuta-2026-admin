@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
+import { ParticipantBadgeSection } from "../../components/admin/ParticipantBadgeSection";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
 import { usePaginatedQuery, useMutation, useQuery } from "../../convex/reactBindings";
@@ -34,6 +35,11 @@ function formatTimestamp(timestamp: number | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(timestamp);
+}
+
+function checkInLabel(participant: ParticipantRow) {
+  if (participant.checkedInAt === null) return "Not checked in";
+  return participant.badgeAssigned ? "Checked in" : "Checked in, no badge";
 }
 
 function StatusBadge({ children, positive }: { children: string; positive: boolean }) {
@@ -189,7 +195,7 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
                   <dl className="grid grid-cols-2 gap-3 text-sm">
                     <div><dt className="font-semibold text-ocean">Points</dt><dd className="text-night">{participant.points}</dd></div>
                     <div><dt className="font-semibold text-ocean">Volunteer</dt><dd>{participant.volunteer ? participant.volunteer.active ? "Active" : "Inactive" : "No"}</dd></div>
-                    <div><dt className="font-semibold text-ocean">Check-in</dt><dd>{participant.checkedInAt === null ? "Not checked in" : "Checked in"}</dd></div>
+                    <div><dt className="font-semibold text-ocean">Check-in</dt><dd>{checkInLabel(participant)}</dd></div>
                     <div><dt className="font-semibold text-ocean">Food</dt><dd>{participant.foodCheckedInAt === null ? "Not redeemed" : "Redeemed"}</dd></div>
                   </dl>
                   <button
@@ -231,8 +237,8 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-semibold">{participant.points}</td>
                     <td className="px-4 py-3">
-                      <StatusBadge positive={participant.checkedInAt !== null}>
-                        {participant.checkedInAt === null ? "Not checked in" : "Checked in"}
+                      <StatusBadge positive={participant.checkedInAt !== null && participant.badgeAssigned}>
+                        {checkInLabel(participant)}
                       </StatusBadge>
                     </td>
                     <td className="px-4 py-3">
@@ -559,6 +565,19 @@ function ParticipantsPageContent() {
                       {details.foodCheckedInAt === null ? "Not redeemed" : <time dateTime={new Date(details.foodCheckedInAt).toISOString()}>{formatTimestamp(details.foodCheckedInAt)}</time>}
                     </dd></div>
                   </dl>
+
+                  {sessionToken ? (
+                    <ParticipantBadgeSection
+                      key={details.participantId}
+                      sessionToken={sessionToken}
+                      participantId={details.participantId}
+                      name={details.name}
+                      checkedInAt={details.checkedInAt}
+                      badge={details.badge}
+                      disabled={busy !== null}
+                      onDone={(message) => { setError(null); setNotice(message); }}
+                    />
+                  ) : null}
 
                   {details.pointsConsistent ? null : (
                     <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">

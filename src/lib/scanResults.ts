@@ -2,13 +2,15 @@ import { adminErrorCode, GENERIC_ERROR_MESSAGE } from "../../shared/admin/errors
 import { logAdminError } from "../../shared/admin/logAdminError";
 import type {
   AwardEventPointsResult,
-  CheckInResult,
+  BadgeCheckInPreview,
+  CheckInWithBadgeResult,
   MealRedemptionResult,
   QrScanPreview,
+  RegistrationCheckInPreview,
 } from "../convex/adminApi";
 
-/** Backend scan purposes, matching `resolveQrForScan`. */
-export type ScanPurpose = "check_in" | "food_check_in" | "point_scan";
+/** Badge scan purposes, matching `resolveQrForScan`. Check-in has its own flow. */
+export type ScanPurpose = "food_check_in" | "point_scan";
 
 export type ScanOutcome = {
   /** `duplicate` means nothing changed because the action was already done. */
@@ -16,14 +18,6 @@ export type ScanOutcome = {
   title: string;
   detail: string;
 };
-
-const QR_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
-
-/** Participant QR codes hold a 64-character hex token. Whitespace and letter case from manual entry are forgiven. */
-export function normalizeQrToken(raw: string): string | null {
-  const token = raw.replace(/\s+/g, "").toLowerCase();
-  return QR_TOKEN_PATTERN.test(token) ? token : null;
-}
 
 /** Thrown when the device is offline or the server does not answer in time. */
 export class ScanNetworkError extends Error {
@@ -63,8 +57,8 @@ export function formatScanTime(timestamp: number) {
 
 export const INVALID_QR_OUTCOME: ScanOutcome = {
   tone: "error",
-  title: "Not a participant QR code",
-  detail: "This code isn't a HackUTA participant QR code. Ask the participant to open their QR code in the participant portal, or check the code and try again.",
+  title: "Not a badge QR code",
+  detail: "This code couldn't be read as a HackUTA badge. Scan the QR code printed on the participant's badge and try again.",
 };
 
 const OUTCOMES = {
@@ -88,7 +82,47 @@ const OUTCOMES = {
   qr_not_found: {
     tone: "error",
     title: "Participant not found",
-    detail: "No participant matches this QR code. Ask them to reopen their QR code in the participant portal, then scan again.",
+    detail: "No participant matches this code. Check that you scanned the right QR code, then try again.",
+  },
+  registration_qr_replaced: {
+    tone: "error",
+    title: "Registration QR no longer works",
+    detail: "This participant is checked in and has a badge. Scan the QR code printed on their badge instead.",
+  },
+  registration_qr_used: {
+    tone: "error",
+    title: "Registration QR already used",
+    detail: "This participant already checked in and received a badge, so this registration QR no longer works. Nothing was changed.",
+  },
+  badge_retired: {
+    tone: "error",
+    title: "Badge deactivated",
+    detail: "This badge was replaced and no longer works. Ask for the participant's current badge, or send them to an administrator.",
+  },
+  participant_not_checked_in: {
+    tone: "error",
+    title: "Not checked in yet",
+    detail: "This is a registration QR. The participant must check in at the front desk to get their badge first. Nothing was recorded.",
+  },
+  badge_not_assigned: {
+    tone: "error",
+    title: "No badge assigned",
+    detail: "This participant checked in without a badge. An administrator must assign one before they can use food, points, or the shop.",
+  },
+  badge_invalid: {
+    tone: "error",
+    title: "Badge not recognized",
+    detail: "That code can't be used as a badge. Scan the QR code printed on the badge.",
+  },
+  badge_is_registration: {
+    tone: "error",
+    title: "That's a registration QR",
+    detail: "You scanned a registration QR, not a badge. Scan the QR code printed on the physical badge.",
+  },
+  badge_in_use: {
+    tone: "error",
+    title: "Badge already assigned",
+    detail: "This badge belongs to another participant. Set it aside and scan a new badge.",
   },
   participant_not_eligible: {
     tone: "error",
@@ -162,9 +196,6 @@ export type ScanPreview = Extract<QrScanPreview, { status: "ok" }>;
 export function previewOutcome(preview: QrScanPreview): ScanOutcome | null {
   if (preview.status !== "ok") return OUTCOMES[preview.status];
   const { participant } = preview;
-  if (preview.purpose === "check_in" && preview.participant.checkedIn) {
-    return alreadyCheckedIn(participant.name, preview.participant.checkedInAt);
-  }
   if (preview.purpose === "food_check_in" && preview.participant.alreadyRedeemed) {
     return alreadyRedeemed(preview.meal.name, preview.participant.redeemedAt);
   }
@@ -174,7 +205,7 @@ export function previewOutcome(preview: QrScanPreview): ScanOutcome | null {
   return null;
 }
 
-function alreadyCheckedIn(name: string, at: number | null): ScanOutcome {
+export function alreadyCheckedIn(name: string, at: number | null): ScanOutcome {
   return {
     tone: "duplicate",
     title: "Already checked in",
@@ -198,10 +229,33 @@ function alreadyAwarded(name: string, eventName: string): ScanOutcome {
   };
 }
 
-export function checkInOutcome(result: CheckInResult, name: string): ScanOutcome {
-  if (result.status === "success") return { tone: "success", title: "Checked in", detail: `${name} is checked in.` };
-  if (result.status === "already_checked_in") return alreadyCheckedIn(name, result.checkedInAt);
+export type CheckInStepFailure = Exclude<
+  RegistrationCheckInPreview | BadgeCheckInPreview | CheckInWithBadgeResult,
+  { status: "ok" | "success" }
+>;
+
+/** Badge-step statuses: the volunteer can scan a different badge for the same participant. */
+export const BADGE_RETRY_STATUSES = new Set<string>(["badge_invalid", "badge_is_registration", "badge_in_use", "badge_retired"]);
+
+/** Any non-`ok`, non-`success` result from the three check-in mutations. */
+export function checkInStepOutcome(result: CheckInStepFailure): ScanOutcome {
+  if (result.status === "already_checked_in") return alreadyCheckedIn(result.participant.name, result.participant.checkedInAt);
+  if (result.status === "registration_qr_used") {
+    const { name, checkedInAt } = result.participant;
+    return {
+      ...OUTCOMES.registration_qr_used,
+      detail: `${name} already checked in${checkedInAt === null ? "" : ` at ${formatScanTime(checkedInAt)}`} and received a badge, so this registration QR no longer works. Nothing was changed.`,
+    };
+  }
   return OUTCOMES[result.status];
+}
+
+export function checkedInOutcome(name: string): ScanOutcome {
+  return {
+    tone: "success",
+    title: "Checked in",
+    detail: `${name} is checked in with their badge. From now on, scan the badge for food, points, and the shop.`,
+  };
 }
 
 export function foodOutcome(result: MealRedemptionResult, name: string): ScanOutcome {

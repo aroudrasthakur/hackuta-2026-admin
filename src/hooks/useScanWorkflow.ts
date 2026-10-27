@@ -1,19 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GenericId } from "convex/values";
 import { useMutation } from "../convex/reactBindings";
-import {
-  awardEventPointsRef,
-  checkInParticipantRef,
-  redeemMealRef,
-  resolveQrForMealRef,
-  resolveQrForScanRef,
-} from "../convex/adminApi";
+import { awardEventPointsRef, redeemMealRef, resolveQrForMealRef, resolveQrForScanRef } from "../convex/adminApi";
+import { normalizeBadgeQr } from "../../shared/admin/qrValues";
 import {
   awardOutcome,
-  checkInOutcome,
   foodOutcome,
   INVALID_QR_OUTCOME,
-  normalizeQrToken,
   previewOutcome,
   scanErrorOutcome,
   scanFailureOutcome,
@@ -31,18 +24,18 @@ export type ScanWorkflowState =
   | { step: "result"; outcome: ScanOutcome };
 
 /**
- * Scan → confirm → result for one purpose and selected event or meal. The
- * preview only identifies the participant; the confirmation mutation re-runs
- * every check on the server and its result is what the volunteer sees.
+ * Badge scan → confirm → result for food or points, for the selected event or
+ * meal. The preview only identifies the participant; the confirmation
+ * mutation re-runs every check on the server and its result is what the
+ * volunteer sees. Registration QR codes are rejected by the server.
  *
- * The QR token lives only in a ref between preview and confirmation and is
+ * The badge value lives only in a ref between preview and confirmation and is
  * dropped on any result, reset, or unmount. Remount when the purpose, event,
  * meal, or meal schedule changes to clear the previous participant.
  */
 export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"events">, mealPeriodId?: GenericId<"mealPeriods">) {
   const { sessionToken } = useAdminAuth();
   const resolve = useMutation(resolveQrForScanRef);
-  const checkIn = useMutation(checkInParticipantRef);
   const resolveMeal = useMutation(resolveQrForMealRef);
   const redeemFood = useMutation(redeemMealRef);
   const awardPoints = useMutation(awardEventPointsRef);
@@ -63,7 +56,7 @@ export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"event
 
   const scan = useCallback(async (rawValue: string) => {
     if (busyRef.current || tokenRef.current) return;
-    const token = normalizeQrToken(rawValue);
+    const token = normalizeBadgeQr(rawValue);
     if (!token) return finish(INVALID_QR_OUTCOME);
     if (!sessionToken) return finish(scanFailureOutcome("session_expired"));
     if (purpose === "point_scan" && !eventId) return finish(scanFailureOutcome("event_denied"));
@@ -75,12 +68,7 @@ export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"event
     try {
       const preview = await withScanTimeout(() => purpose === "food_check_in" && mealPeriodId
         ? resolveMeal({ sessionToken, qrCodeToken: token, mealPeriodId })
-        : resolve({
-        sessionToken,
-        qrCodeToken: token,
-        purpose,
-        ...(purpose === "point_scan" && eventId ? { eventId } : {}),
-      }));
+        : resolve({ sessionToken, qrCodeToken: token, purpose, ...(eventId ? { eventId } : {}) }));
       if (request !== requestRef.current) return;
       const ended = previewOutcome(preview);
       if (ended) return finish(ended);
@@ -119,9 +107,7 @@ export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"event
         outcome = foodOutcome(result, name);
         rateLimited = result.status === "rate_limited";
       } else {
-        const result = await withScanTimeout(() => checkIn(args));
-        outcome = checkInOutcome(result, name);
-        rateLimited = result.status === "rate_limited";
+        return finish(scanFailureOutcome("unexpected"));
       }
       if (request !== requestRef.current) return;
       if (rateLimited) retryable(outcome);
@@ -134,7 +120,7 @@ export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"event
     } finally {
       if (request === requestRef.current) busyRef.current = false;
     }
-  }, [awardPoints, checkIn, finish, redeemFood, sessionToken, state]);
+  }, [awardPoints, finish, redeemFood, sessionToken, state]);
 
   /** Back to scanning. Ignores any response still in flight. */
   const reset = useCallback(() => {
