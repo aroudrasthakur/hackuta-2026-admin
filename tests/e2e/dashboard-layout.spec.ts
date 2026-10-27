@@ -33,7 +33,7 @@ test("keeps the storm backdrop pinned while page content scrolls", async ({ page
   await signInOrganizer(page, E2E_ADMIN);
   await page.setViewportSize({ width: 1024, height: 600 });
   await page.getByRole("navigation", { name: "Admin", exact: true }).getByRole("link", { name: "Shop", exact: true }).click();
-  await expect(page.locator(".admin-frieze .admin-eyebrow")).toHaveText("The Agora · Event shop");
+  await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText("Shop");
   expect(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight)).toBe(true);
   await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
   const backdrop = await page.locator(".sign-in-storm").evaluate((node) => {

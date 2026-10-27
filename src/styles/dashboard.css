@@ -175,15 +175,6 @@
     pointer-events: none;
   }
   .admin-frieze .admin-page-title { font-size: clamp(2.2rem, 5vw, 3rem); line-height: 1; }
-  .admin-eyebrow {
-    display: block;
-    margin-bottom: 0.35rem;
-    color: var(--color-ocean);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-  }
   @media (max-width: 640px) { .admin-frieze__art { opacity: 0.16; } }
 
   .admin-page-header {

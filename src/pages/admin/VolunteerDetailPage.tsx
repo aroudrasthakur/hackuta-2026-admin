@@ -309,7 +309,6 @@ function VolunteerDetail({ sessionToken, volunteerAdminId }: { sessionToken: str
       <AdminPageHeader
         id="volunteer-detail-heading"
         title={volunteer.name}
-        eyebrow="The Stoa · Volunteer"
         description={volunteer.email}
         actions={<AdminStatusBadge tone={volunteer.active ? "positive" : "negative"}>{volunteer.active ? "Active" : "Revoked"}</AdminStatusBadge>}
       />

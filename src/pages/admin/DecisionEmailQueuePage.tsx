@@ -306,7 +306,7 @@ export function DecisionEmailQueuePage() {
   const [retry, setRetry] = useState(0);
   return (
     <section aria-labelledby="decision-emails-heading" className="space-y-5">
-      <AdminPageHeader id="decision-emails-heading" title="Decision emails" eyebrow="The Herald · Decision emails" description="Review queued decisions before they are emailed. Review status and participant records update only after the email server accepts each message." />
+      <AdminPageHeader id="decision-emails-heading" title="Decision emails" description="Review queued decisions before they are emailed. Review status and participant records update only after the email server accepts each message." />
       {staff?.role !== "admin" ? <p className="admin-callout">An admin releases these emails. You can review the queue, but you cannot send it.</p> : null}
       <ErrorBoundary key={`${sessionToken}:${retry}`} fallback={<QueryErrorState title="Unable to load decision emails" onRetry={() => setRetry((value) => value + 1)} />}>
         <DecisionEmailQueueContent />

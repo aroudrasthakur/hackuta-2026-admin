@@ -296,7 +296,6 @@ export function EventsPage() {
       <AdminPageHeader
         id="events-heading"
         title="Events"
-        eyebrow="The Games · Events"
         description="Create the events volunteers award points for. Points can be awarded while an event is switched on; start and end times are for reference. Assign events to volunteers from the Volunteers page."
       />
       {staff?.role === "admin" && sessionToken ? <EventsList sessionToken={sessionToken} /> : (

@@ -510,7 +510,7 @@ function ParticipantsPageContent() {
 
   return (
     <section aria-labelledby="participants-heading" className="space-y-5">
-      <AdminPageHeader id="participants-heading" title="Participants" eyebrow="The Polis · Participants" description="Manage accepted participants, check-in and food status, points, and linked volunteer access." />
+      <AdminPageHeader id="participants-heading" title="Participants" description="Manage accepted participants, check-in and food status, points, and linked volunteer access." />
       {staff?.role === "admin" && sessionToken ? (
         <ParticipantsRoster sessionToken={sessionToken} onOpen={openDetails} />
       ) : (

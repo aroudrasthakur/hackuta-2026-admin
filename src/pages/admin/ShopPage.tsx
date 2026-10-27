@@ -28,7 +28,6 @@ export function ShopPage() {
       <AdminPageHeader
         id="shop-heading"
         title="Shop"
-        eyebrow="The Agora · Event shop"
         description="Manage items, point prices, stock, and flash sales. Changes show up in the participant shop and the volunteer scanner right away."
       />
       <nav aria-label="Shop sections" className="shop-tabs">

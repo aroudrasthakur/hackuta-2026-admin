@@ -164,7 +164,7 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
 
   return (
     <section aria-labelledby={`${workflow}-scan-heading`} className="mx-auto max-w-2xl space-y-6">
-      <AdminPageHeader id={`${workflow}-scan-heading`} title={page.title} eyebrow="The Stoa · Volunteer scanner" description={page.lead} />
+      <AdminPageHeader id={`${workflow}-scan-heading`} title={page.title} description={page.lead} />
 
       {showPicker ? (
         <EventSelector

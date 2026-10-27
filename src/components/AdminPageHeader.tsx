@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 
-export function AdminPageHeader({ id, title, eyebrow, description, actions }: {
+export function AdminPageHeader({ id, title, description, actions }: {
   id: string;
   title: string;
-  eyebrow?: string;
   description?: ReactNode;
   actions?: ReactNode;
 }) {
@@ -13,12 +12,7 @@ export function AdminPageHeader({ id, title, eyebrow, description, actions }: {
       <header className="admin-page-header">
         <div className="admin-page-header__copy">
           <h1 id={id} className="admin-page-title">{title}</h1>
-          {eyebrow || description ? (
-            <div className="admin-page-header__description">
-              {eyebrow ? <span className="admin-eyebrow">{eyebrow}</span> : null}
-              {description}
-            </div>
-          ) : null}
+          {description ? <div className="admin-page-header__description">{description}</div> : null}
         </div>
         {actions ? <div className="admin-page-header__actions">{actions}</div> : null}
       </header>

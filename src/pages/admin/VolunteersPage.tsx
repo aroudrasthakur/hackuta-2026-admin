@@ -77,7 +77,6 @@ export function VolunteersPage() {
       <AdminPageHeader
         id="volunteers-heading"
         title="Volunteers"
-        eyebrow="The Stoa · Volunteers"
         description="View every volunteer and their activity. Open a volunteer to see their own log and assign events."
       />
       {staff?.role === "admin" && sessionToken ? (
