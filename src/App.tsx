@@ -13,6 +13,7 @@ import { VolunteersPage } from "./pages/admin/VolunteersPage";
 import { VolunteerDetailPage } from "./pages/admin/VolunteerDetailPage";
 import { EventsPage } from "./pages/admin/EventsPage";
 import { MealsPage } from "./pages/admin/MealsPage";
+import { NotificationsPage } from "./pages/admin/NotificationsPage";
 import { ShopPage } from "./pages/admin/ShopPage";
 import { VolunteerShopPage } from "./pages/admin/VolunteerShopPage";
 
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="events" element={<EventsPage />} />
         <Route path="meals" element={<MealsPage />} />
         <Route path="shop" element={<ShopPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
       <Route path="*" element={<AdminProtectedRoute />} />
     </Routes>

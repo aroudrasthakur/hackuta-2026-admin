@@ -39,14 +39,24 @@ test.describe("organizer authentication", () => {
   test("restricts management pages to administrators", async ({ page }) => {
     await signInOrganizer(page, E2E_REVIEWER);
     await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Applications", "Decision emails"]);
-    for (const path of ["/admin/participants", "/admin/volunteers", "/admin/volunteers/e2e-admin-lead", "/admin/events", "/admin/meals", "/admin/shop"]) {
+    for (const path of ["/admin/participants", "/admin/volunteers", "/admin/volunteers/e2e-admin-lead", "/admin/events", "/admin/meals", "/admin/shop", "/admin/notifications"]) {
       await page.goto(path);
       await expect(page).toHaveURL(/\/admin\/applications$/);
       await expect(page.getByRole("alert")).toContainText("current permissions");
     }
     await signOutOrganizer(page);
     await signInOrganizer(page, E2E_ADMIN);
-    await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Meals", "Shop", "Scan"]);
+    await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText([
+      "Applications",
+      "Decision emails",
+      "Participants",
+      "Volunteers",
+      "Events",
+      "Meals",
+      "Shop",
+      "Send Notifications",
+      "Scan",
+    ]);
     await page.getByRole("link", { name: "Participants", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Participants", exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Volunteers", exact: true }).click();

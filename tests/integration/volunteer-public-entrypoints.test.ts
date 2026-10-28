@@ -65,6 +65,17 @@ const PUBLIC_ENTRY_GUARDS = [
   ...["createFlashSale", "updateFlashSale", "cancelFlashSale", "listFlashSales"].map((exportName) => ({
     file: "shopFlashSales.ts", exportName, guard: "requireAdminRole",
   })),
+  ...[
+    "saveNotificationDraft",
+    "publishNotificationNow",
+    "scheduleNotification",
+    "updateNotification",
+    "cancelNotification",
+    "listNotificationsAdmin",
+    "getNotificationAdmin",
+  ].map((exportName) => ({
+    file: "notifications.ts", exportName, guard: "requireAdminRole",
+  })),
   ...["listShopCatalogForVolunteer", "getShopCustomer", "previewShopPurchase", "purchaseShopItem"].map((exportName) => ({
     file: "shopRedemption.ts", exportName, guard: "requireShopVolunteer",
   })),
