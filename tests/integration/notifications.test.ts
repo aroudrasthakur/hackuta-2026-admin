@@ -435,6 +435,100 @@ describe("admin notifications management & participant notifications", () => {
     });
   });
 
+  it("covers relatedEvent validation, scheduleNotification on existing rows, updateNotification on drafts, and migration edge cases", async () => {
+    const { t, admin, asParticipant } = await seedNotificationsContext();
+
+    const eventId = await t.run((ctx) =>
+      ctx.db.insert("events", {
+        name: "Keynote Panel",
+        pointsAwarded: 25,
+        startsAt: NOW,
+        endsAt: NOW + HOUR,
+        active: true,
+        createdAt: NOW,
+        updatedAt: NOW,
+      }),
+    );
+
+    // Create draft linked to an event
+    const { notificationId } = await t.mutation(saveNotificationDraftRef, {
+      sessionToken: admin.sessionToken,
+      title: "Keynote Reminder",
+      message: "Join the keynote panel.",
+      type: "event",
+      relatedEventId: eventId,
+    });
+
+    // Update draft via updateNotification (stays draft)
+    const draftUpdate = await t.mutation(updateNotificationRef, {
+      sessionToken: admin.sessionToken,
+      notificationId,
+      title: "Keynote Reminder Edited",
+      message: "Join the keynote panel in 10 minutes.",
+      type: "event",
+      relatedEventId: eventId,
+    });
+    expect(draftUpdate).toEqual({ ok: true, status: "draft" });
+
+    // Transition existing draft to scheduled via scheduleNotification
+    const scheduled = await t.mutation(scheduleNotificationRef, {
+      sessionToken: admin.sessionToken,
+      notificationId,
+      title: "Keynote Scheduled",
+      message: "Starting soon.",
+      type: "event",
+      scheduledAt: NOW + 30 * MINUTE,
+      relatedEventId: eventId,
+    });
+    expect(scheduled.scheduledAt).toBe(NOW + 30 * MINUTE);
+
+    // Convert scheduled back to draft via saveNotificationDraft
+    await t.mutation(saveNotificationDraftRef, {
+      sessionToken: admin.sessionToken,
+      notificationId,
+      title: "Keynote Back To Draft",
+      message: "Back to draft.",
+      type: "event",
+      relatedEventId: eventId,
+    });
+
+    // Combined status + type + message search in listNotificationsAdmin
+    const filtered = await t.query(listNotificationsAdminRef, {
+      sessionToken: admin.sessionToken,
+      status: "draft",
+      type: "event",
+      search: "back to draft",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(filtered.page).toHaveLength(1);
+    expect(filtered.page[0]?.relatedEvent).toEqual({ eventId, name: "Keynote Panel" });
+
+    // Legacy announcements migration for general, scheduled, and withdrawn rows
+    await t.run(async (ctx) => {
+      await ctx.db.insert("participantAnnouncements", {
+        kind: "general",
+        title: "Legacy Scheduled General",
+        body: "Future general announcement",
+        publishedAt: NOW + 45 * MINUTE,
+        createdBy: admin.adminId,
+        createdAt: NOW,
+      });
+      await ctx.db.insert("participantAnnouncements", {
+        kind: "flash_sale",
+        title: "Legacy Withdrawn Sale",
+        body: "   ",
+        publishedAt: NOW - MINUTE,
+        withdrawnAt: NOW,
+        createdBy: admin.adminId,
+        createdAt: NOW - MINUTE,
+      });
+    });
+
+    const mig = await t.mutation(migrateAnnouncementsRef, {});
+    expect(mig).toEqual({ ok: true, migrated: 2, skipped: 0 });
+    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
+  });
+
   it("restricts notification management to admins and returns null for signed-out participants", async () => {
     const { t, reviewer, volunteer } = await seedNotificationsContext();
 

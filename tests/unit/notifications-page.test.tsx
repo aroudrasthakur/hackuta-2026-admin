@@ -302,5 +302,127 @@ describe("NotificationsPage", () => {
       type: "flash_sale",
       status: "scheduled",
     });
+
+    // Clear filters and search form submission
+    await click("Clear filters");
+    const searchInput = container.querySelector('input[type="search"]') as HTMLInputElement;
+    await type(searchInput, "Lunch");
+    await click("Search");
+    expect(mocks.queryArgs.get(listNotificationsAdminRef)).toMatchObject({
+      sessionToken: "session-token",
+      search: "Lunch",
+    });
+    await type(searchInput, "");
+  });
+
+  it("validates composer inputs, handles mutation failures, and supports pagination and detail dialog actions", async () => {
+    const loadMore = vi.fn();
+    mocks.paginated.set(listNotificationsAdminRef, {
+      results: [
+        makeRow({
+          notificationId: "notif-draft" as AdminNotificationRow["notificationId"],
+          title: "Draft Item",
+          status: "draft",
+          publishedAt: null,
+          expiresAt: now + 3_600_000,
+          relatedEvent: {
+            eventId: "evt-1" as NonNullable<AdminNotificationRow["relatedEvent"]>["eventId"],
+            name: "Opening Ceremony",
+          },
+          updatedBy: { adminId: "admin-1" as AdminNotificationRow["createdBy"]["adminId"], name: "Sam Admin" },
+        }),
+        makeRow({
+          notificationId: "notif-cancelled" as AdminNotificationRow["notificationId"],
+          title: "Cancelled Item",
+          status: "cancelled",
+          publishedAt: null,
+          cancelledAt: now - 10_000,
+          expired: true,
+        }),
+      ],
+      status: "CanLoadMore",
+      loadMore,
+    });
+
+    await renderPage();
+
+    // Validation errors on empty submit
+    await click("Send Now");
+    expect(container.textContent).toContain("Enter a notification title.");
+    expect(container.textContent).toContain("Enter a notification message.");
+
+    // Invalid link URL and link label without URL
+    await type("Title", "Test");
+    await type("Message", "Body");
+    await type("Link label (optional)", "Orphan label");
+    await click("Save as draft");
+    expect(container.textContent).toContain("Add a link URL before setting a link label.");
+
+    await type("Link URL (optional)", "javascript:alert(1)");
+    await click("Save as draft");
+    expect(container.textContent).toContain("Enter a valid link URL");
+
+    // Past schedule validation
+    await type("Link URL (optional)", "");
+    await type("Link label (optional)", "");
+    await type("Schedule for (when scheduling)", toDateTimeInput(now - 60_000));
+    await click("Schedule");
+    expect(container.textContent).toContain("Choose a future date and time for scheduled delivery.");
+
+    // View draft details & click Edit notification from inside dialog
+    await click("View Draft Item");
+    expect(container.textContent).toContain("Opening Ceremony");
+    await click("Edit notification");
+    expect((field("Title") as HTMLInputElement).value).toBe("Draft Item");
+
+    // View cancelled notification details & close
+    await click("View Cancelled Item");
+    expect(container.textContent).toContain("Cancelled at");
+    await click("Close");
+
+    // Load more pagination
+    await click("Load more notifications");
+    expect(loadMore).toHaveBeenCalledWith(25);
+
+    // Mutation error handling on Save as draft, Schedule, Send Now, and Cancel
+    mutation(saveNotificationDraftRef).mockRejectedValueOnce(new Error("Draft save failed"));
+    await click("Save as draft");
+    expect(container.textContent).toContain("We couldn't save this draft. Please try again.");
+
+    mutation(scheduleNotificationRef).mockRejectedValueOnce(new Error("Schedule failed"));
+    await type("Schedule for (when scheduling)", toDateTimeInput(now + 3_600_000));
+    await click("Schedule");
+    expect(container.textContent).toContain(
+      "The expiration time must be after the scheduled delivery time.",
+    );
+
+    await type("Expires at (optional)", "");
+    await click("Schedule");
+    expect(container.textContent).toContain(
+      "We couldn't schedule this notification. Please try again.",
+    );
+
+    mutation(publishNotificationNowRef).mockRejectedValueOnce(new Error("Publish failed"));
+    await click("Send Now");
+    await click("Confirm & Send Now");
+    expect(container.textContent).toContain("We couldn't publish this notification. Please try again.");
+
+    mutation(cancelNotificationRef).mockRejectedValueOnce(new Error("Cancel failed"));
+    await click("Cancel Draft Item");
+    await click("Confirm cancel");
+    expect(container.textContent).toContain("We couldn't cancel this notification. Please try again.");
+  });
+
+  it("renders loading and empty states when non-admin or when no rows match", async () => {
+    mocks.paginated.set(listNotificationsAdminRef, {
+      results: [],
+      status: "Exhausted",
+      loadMore: vi.fn(),
+    });
+    await renderPage();
+    expect(container.textContent).toContain("No notifications yet.");
+
+    await renderPage(auth({ sessionToken: null }));
+    expect(container.textContent).toContain("Verifying administrator access…");
   });
 });
