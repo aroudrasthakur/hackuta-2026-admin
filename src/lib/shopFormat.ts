@@ -17,25 +17,11 @@ export function formatShopTime(timestamp: number) {
   return dateTimeFormatter.format(timestamp);
 }
 
-export const STOCK_STATUS: Record<ShopItemAdminRow["stockStatus"], { label: string; tone: StatusTone }> = {
-  in_stock: { label: "In stock", tone: "positive" },
-  low: { label: "Low", tone: "warning" },
-  out: { label: "Out", tone: "negative" },
-};
-
 export const ITEM_STATUS: Record<ShopItemAdminRow["status"], { label: string; tone: StatusTone }> = {
   active: { label: "Active", tone: "positive" },
   inactive: { label: "Inactive", tone: "neutral" },
   archived: { label: "Archived", tone: "neutral" },
 };
-
-/** Sellable state for the admin table: active items with no stock read as sold out. */
-export function itemListingStatus(item: Pick<ShopItemAdminRow, "status" | "stockStatus">) {
-  if (item.status === "active" && item.stockStatus === "out") {
-    return { label: "Sold out", tone: "negative" as const };
-  }
-  return ITEM_STATUS[item.status];
-}
 
 export const SALE_STATUS: Record<FlashSaleRow["status"], { label: string; tone: StatusTone }> = {
   live: { label: "Live", tone: "positive" },

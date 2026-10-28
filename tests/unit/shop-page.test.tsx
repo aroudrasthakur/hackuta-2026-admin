@@ -6,12 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { adminError } from "../../shared/admin/errors";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
-  adjustShopStockRef,
   cancelFlashSaleRef,
   createFlashSaleRef,
   createShopItemRef,
   listFlashSalesRef,
-  listInventoryAdjustmentsRef,
   listShopItemsAdminRef,
   listShopRedemptionsRef,
   listShopVolunteersRef,
@@ -53,12 +51,11 @@ vi.mock("../../src/convex/reactBindings", () => ({
 const now = Date.now();
 const row = (overrides: Record<string, unknown>) => ({
   itemId: "item-x", name: "Item", description: "", imageUrl: null, pointsCost: 100, effectivePointsCost: 100,
-  flashSaleId: null, saleEndsAt: null, stockQuantity: 10, stockStatus: "in_stock", lowStockThreshold: null,
-  status: "active", featured: false, createdAt: now, updatedAt: now, ...overrides,
+  flashSaleId: null, saleEndsAt: null, status: "active", createdAt: now, updatedAt: now, ...overrides,
 });
-const tee = row({ itemId: "tee", name: "HackUTA 2026 T-shirt", description: "Soft tee", pointsCost: 400, effectivePointsCost: 300, flashSaleId: "sale-live", stockQuantity: 12, featured: true, imageUrl: "https://img.test/tee.png" });
-const stickers = row({ itemId: "stickers", name: "Sticker pack", pointsCost: 50, effectivePointsCost: 50, stockQuantity: 3, stockStatus: "low", lowStockThreshold: 5 });
-const bottle = row({ itemId: "bottle", name: "Insulated bottle", pointsCost: 600, effectivePointsCost: 600, stockQuantity: 0, stockStatus: "out" });
+const tee = row({ itemId: "tee", name: "HackUTA 2026 T-shirt", description: "Soft tee", pointsCost: 400, effectivePointsCost: 300, flashSaleId: "sale-live", imageUrl: "https://img.test/tee.png" });
+const stickers = row({ itemId: "stickers", name: "Sticker pack", pointsCost: 50, effectivePointsCost: 50 });
+const bottle = row({ itemId: "bottle", name: "Insulated bottle", pointsCost: 600, effectivePointsCost: 600 });
 const mug = row({ itemId: "mug", name: "Amphora mug", status: "inactive" });
 const tote = row({ itemId: "tote", name: "Canvas tote", status: "archived" });
 const items = [tee, stickers, bottle, mug, tote];
@@ -178,7 +175,7 @@ describe("ShopPage", () => {
     expect(container.querySelector("[data-testid=location]")?.textContent).toBe("?tab=sales");
     expect(button("Flash sales").getAttribute("aria-current")).toBe("page");
     await click("History");
-    expect(text()).toContain("Stock changes");
+    expect(text()).toContain("Loading purchases");
     await click("Items");
     expect(container.querySelector("[data-testid=location]")?.textContent).toBe("");
   });
@@ -208,13 +205,12 @@ describe("ShopPage", () => {
 });
 
 describe("Items tab", () => {
-  it("summarizes stock and filters the table", async () => {
+  it("summarizes items and filters the table", async () => {
     await render();
-    const stats = container.querySelector("[aria-label='Inventory summary']")!.textContent;
+    const stats = container.querySelector("[aria-label='Item summary']")!.textContent;
     expect(stats).toContain("Active items3");
-    expect(stats).toContain("Units in stock25");
-    expect(stats).toContain("Low stock1");
-    expect(stats).toContain("Out of stock1");
+    expect(stats).toContain("Inactive1");
+    expect(stats).toContain("Archived1");
     expect(text()).toContain("4 of 5 items");
     expect(text()).toContain("On sale");
     expect(container.querySelector(".shop-price__was")?.textContent).toBe("400");
@@ -223,7 +219,7 @@ describe("Items tab", () => {
     await type("Search items", "sticker");
     expect(text()).toContain("1 of 5 items");
     await type("Search items", "");
-    for (const [filter, count] of [["active", 3], ["low", 2], ["archived", 1], ["all", 5]] as const) {
+    for (const [filter, count] of [["active", 3], ["archived", 1], ["all", 5]] as const) {
       await type("Filter by status", filter);
       expect(text()).toContain(`${count} of 5 items`);
     }
@@ -237,65 +233,6 @@ describe("Items tab", () => {
     expect(text()).toContain("No shop items yet");
   });
 
-  it("logs quick ±1 changes and toggles featured items", async () => {
-    await render();
-    await click("Add one Sticker pack");
-    expect(mutation(adjustShopStockRef)).toHaveBeenCalledWith({ sessionToken: "session", itemId: "stickers", kind: "manual", delta: 1, reason: "Quick adjust +1" });
-    expect(text()).toContain("Sticker pack: stock +1, now 4.");
-    await click("Remove one Sticker pack");
-    expect(mutation(adjustShopStockRef)).toHaveBeenLastCalledWith(expect.objectContaining({ delta: -1, reason: "Quick adjust -1" }));
-    expect(button("Remove one Insulated bottle").disabled).toBe(true);
-
-    await click("Feature Sticker pack");
-    expect(mutation(updateShopItemRef)).toHaveBeenCalledWith({
-      sessionToken: "session", itemId: "stickers", name: "Sticker pack", description: "", pointsCost: 50, featured: true, lowStockThreshold: 5,
-    });
-    expect(text()).toContain("Sticker pack is featured.");
-    await click("Feature HackUTA 2026 T-shirt");
-    expect(text()).toContain("is no longer featured.");
-
-    mutation(adjustShopStockRef).mockRejectedValueOnce(adminError("INVALID_STOCK_ADJUSTMENT"));
-    await click("Add one Sticker pack");
-    expect(container.querySelector("[role=alert]")?.textContent).toContain("Enter a stock change");
-  });
-
-  it("adjusts stock with a required reason and never below zero", async () => {
-    await render();
-    await click("Adjust stock for Sticker pack");
-    expect(container.querySelector("dialog")?.textContent).toContain("Adjust stock");
-    await submit(container.querySelector("dialog form"));
-    expect(text()).toContain("Add a reason for this change.");
-    expect(mutation(adjustShopStockRef)).not.toHaveBeenCalled();
-
-    await click("Remove");
-    await type("Units to remove", "5");
-    expect(text()).toContain("Stock can't go below 0.");
-    await click("Set count");
-    await type("New stock count", "3");
-    await type("Reason", "Counted the box");
-    await submit(container.querySelector("dialog form"));
-    expect(text()).toContain("Enter a number that changes the stock.");
-    await type("New stock count", "9");
-    await submit(container.querySelector("dialog form"));
-    expect(mutation(adjustShopStockRef)).toHaveBeenCalledWith({ sessionToken: "session", itemId: "stickers", kind: "manual", newQuantity: 9, reason: "Counted the box" });
-    expect(container.querySelector("dialog")).toBeNull();
-    expect(text()).toContain("Sticker pack: stock 3 → 9.");
-
-    await click("Adjust stock for Sticker pack");
-    await type("Units to add", "abc");
-    expect(container.querySelector(".shop-before-after")?.textContent).toContain("–");
-    await type("Units to add", "12");
-    await type("Reason", "Second box");
-    mutation(adjustShopStockRef).mockRejectedValueOnce(new Error("boom"));
-    await submit(container.querySelector("dialog form"));
-    expect(container.querySelector("dialog [role=alert]")?.textContent).toContain("couldn't change the stock");
-    await submit(container.querySelector("dialog form"));
-    expect(mutation(adjustShopStockRef)).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "restock", delta: 12 }));
-    await click("Adjust stock for Sticker pack");
-    await act(async () => container.querySelector("dialog")!.dispatchEvent(new Event("cancel")));
-    expect(container.querySelector("dialog")).toBeNull();
-  });
-
   it("adds an item through the form", async () => {
     mutation(createShopItemRef).mockResolvedValue({ itemId: "new" });
     await render();
@@ -307,19 +244,10 @@ describe("Items tab", () => {
     await type("Name", "  Bucket hat ");
     await type("Description", "Sun hat");
     await type("Price (points)", "250");
-    await type("Starting stock", "-1");
-    await type("Low-stock warning at", "x");
-    await submit(container.querySelector("dialog form"));
-    expect(text()).toContain("Enter a whole number of 0 or more.");
-    expect(text()).toContain("or leave it empty");
-    await type("Starting stock", "6");
-    await type("Low-stock warning at", "");
-    await act(async () => field("Feature this item").click());
     await type("Status", "archived");
     await submit(container.querySelector("dialog form"));
     expect(mutation(createShopItemRef)).toHaveBeenCalledWith({
-      sessionToken: "session", name: "Bucket hat", description: "Sun hat", pointsCost: 250, featured: true, lowStockThreshold: null,
-      stockQuantity: 6, active: false,
+      sessionToken: "session", name: "Bucket hat", description: "Sun hat", pointsCost: 250, active: false,
     });
     expect(mutation(setShopItemStatusRef)).toHaveBeenCalledWith({ sessionToken: "session", itemId: "new", status: "archived" });
     expect(text()).toContain("Bucket hat added.");
@@ -328,12 +256,11 @@ describe("Items tab", () => {
   it("edits an item and changes its status", async () => {
     await render();
     await click("Edit HackUTA 2026 T-shirt");
-    expect(field("Current stock").disabled).toBe(true);
     await type("Price (points)", "450");
     await type("Status", "inactive");
     await submit(container.querySelector("dialog form"));
     expect(mutation(updateShopItemRef)).toHaveBeenCalledWith({
-      sessionToken: "session", itemId: "tee", name: "HackUTA 2026 T-shirt", description: "Soft tee", pointsCost: 450, featured: true, lowStockThreshold: 5,
+      sessionToken: "session", itemId: "tee", name: "HackUTA 2026 T-shirt", description: "Soft tee", pointsCost: 450,
     });
     expect(mutation(setShopItemStatusRef)).toHaveBeenCalledWith({ sessionToken: "session", itemId: "tee", status: "inactive" });
     expect(text()).toContain("HackUTA 2026 T-shirt saved.");
@@ -453,21 +380,13 @@ describe("History tab", () => {
       status: "CanLoadMore", loadMore,
       results: [
         purchase({}),
-        purchase({ redemptionId: "red-2", participant: { participantId: "p2", name: "Aisha Khan" }, flashSale: null, refund: { refundedAt: now, reason: "Dented", restocked: true, pointsRestored: 600, refundedBy: { adminId: "a", name: "Sam" } } }),
-      ],
-    });
-    mocks.paginated.set(listInventoryAdjustmentsRef, {
-      status: "Exhausted", loadMore: vi.fn(),
-      results: [
-        { adjustmentId: "adj-1", itemId: "tee", itemName: "HackUTA 2026 T-shirt", kind: "restock", previousQuantity: 2, newQuantity: 12, delta: 10, reason: "Box", admin: { adminId: "a", name: "Sam" }, createdAt: now },
-        { adjustmentId: "adj-2", itemId: "tee", itemName: "HackUTA 2026 T-shirt", kind: "purchase", previousQuantity: 12, newQuantity: 11, delta: -1, reason: null, admin: { adminId: "v", name: "Priya" }, createdAt: now },
+        purchase({ redemptionId: "red-2", participant: { participantId: "p2", name: "Aisha Khan" }, flashSale: null, refund: { refundedAt: now, reason: "Dented", pointsRestored: 600, refundedBy: { adminId: "a", name: "Sam" } } }),
       ],
     });
     await render("?tab=history");
     expect(text()).toContain("2 purchases shown");
-    expect(text()).toContain("Dented · Sam · restocked");
-    expect(text()).toContain("+10");
-    expect(text()).toContain("Purchase");
+    expect(text()).toContain("Dented · Sam");
+    expect(text()).not.toContain("restocked");
     await click("Show more");
     expect(loadMore).toHaveBeenCalledWith(25);
 
@@ -475,24 +394,20 @@ describe("History tab", () => {
     await submit(container.querySelector("dialog form"));
     expect(text()).toContain("Add a reason for the refund.");
     await type("Reason", "Wrong size");
-    await act(async () => field("Put the item back").click());
     mutation(refundShopRedemptionRef).mockRejectedValueOnce(adminError("REDEMPTION_ALREADY_REFUNDED"));
     await submit(container.querySelector("dialog form"));
     expect(container.querySelector("dialog [role=alert]")?.textContent).toContain("already been refunded");
     await submit(container.querySelector("dialog form"));
-    expect(mutation(refundShopRedemptionRef)).toHaveBeenLastCalledWith({ sessionToken: "session", redemptionId: "red-1", reason: "Wrong size", restock: false });
+    expect(mutation(refundShopRedemptionRef)).toHaveBeenLastCalledWith({ sessionToken: "session", redemptionId: "red-1", reason: "Wrong size" });
     expect(text()).toContain("300 points returned to Riley Ready.");
   });
 
   it("searches purchases and shows loading and empty states", async () => {
     await render("?tab=history");
     expect(text()).toContain("Loading purchases…");
-    expect(text()).toContain("Loading stock changes…");
-    mocks.paginated.set(listShopRedemptionsRef, { status: "Exhausted", loadMore: vi.fn(), results: [] });
-    mocks.paginated.set(listInventoryAdjustmentsRef, { status: "CanLoadMore", loadMore: vi.fn(), results: [] });
+    mocks.paginated.set(listShopRedemptionsRef, { status: "CanLoadMore", loadMore: vi.fn(), results: [] });
     await render("?tab=history");
     expect(text()).toContain("No purchases yet.");
-    expect(text()).toContain("No stock changes yet.");
     await type("Search purchases", " riley ");
     await submit(container.querySelector("form[role=search]"));
     expect(mocks.queryArgs.get(listShopRedemptionsRef)).toEqual({ sessionToken: "session", search: "riley" });
@@ -500,6 +415,6 @@ describe("History tab", () => {
     await click("Clear");
     expect(mocks.queryArgs.get(listShopRedemptionsRef)).toEqual({ sessionToken: "session" });
     await click("Show more");
-    expect(mocks.paginated.get(listInventoryAdjustmentsRef)!.loadMore).toHaveBeenCalledWith(25);
+    expect(mocks.paginated.get(listShopRedemptionsRef)!.loadMore).toHaveBeenCalledWith(25);
   });
 });

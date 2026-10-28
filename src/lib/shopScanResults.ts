@@ -15,7 +15,7 @@ export type PurchaseNext = "result" | "choose" | "review";
 
 export type PurchaseOutcome = { outcome: ScanOutcome; next: PurchaseNext; receipt: ShopReceipt | null };
 
-const NOTHING_CHARGED = "Nothing was charged and no stock was used.";
+const NOTHING_CHARGED = "Nothing was charged.";
 
 export function purchaseOutcome(result: ShopPurchaseResult, name: string): PurchaseOutcome {
   const end = (outcome: ScanOutcome, next: PurchaseNext = "result"): PurchaseOutcome => ({ outcome, next, receipt: null });
@@ -43,12 +43,6 @@ export function purchaseOutcome(result: ShopPurchaseResult, name: string): Purch
         tone: "error",
         title: "Not enough points",
         detail: `${name} has ${formatPoints(result.points)} points and needs ${formatPoints(result.totalPointsCost)}. ${NOTHING_CHARGED}`,
-      }, "choose");
-    case "insufficient_stock":
-      return end({
-        tone: "error",
-        title: result.stockQuantity === 0 ? "Sold out" : "Not enough stock",
-        detail: `${result.stockQuantity === 0 ? "This item just sold out." : `Only ${formatPoints(result.stockQuantity)} left.`} ${NOTHING_CHARGED}`,
       }, "choose");
     case "item_unavailable":
       return end({ tone: "error", title: "Item unavailable", detail: `This item is no longer for sale. ${NOTHING_CHARGED}` }, "choose");

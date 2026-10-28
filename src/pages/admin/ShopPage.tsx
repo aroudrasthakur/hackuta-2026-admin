@@ -16,7 +16,7 @@ const TABS: Array<{ tab: ShopTab; numeral: string; label: string; error: string 
   { tab: "history", numeral: "III", label: "History", error: "Unable to load purchase history" },
 ];
 
-/** Admin shop: items and stock, flash sales, and purchase history. `?tab=` picks the section. */
+/** Admin shop: items, flash sales, and purchase history. `?tab=` picks the section. */
 export function ShopPage() {
   const { sessionToken } = useAdminAuth();
   const [searchParams] = useSearchParams();
@@ -28,7 +28,7 @@ export function ShopPage() {
       <AdminPageHeader
         id="shop-heading"
         title="Shop"
-        description="Manage items, point prices, stock, and flash sales. Changes show up in the participant shop and the volunteer scanner right away."
+        description="Manage items, point prices, and flash sales. Changes show up in the participant shop and the volunteer scanner right away."
       />
       <nav aria-label="Shop sections" className="shop-tabs">
         {TABS.map(({ tab, numeral, label }) => (

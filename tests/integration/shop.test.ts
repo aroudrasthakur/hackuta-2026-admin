@@ -2,14 +2,12 @@ import { makeFunctionReference } from "convex/server";
 import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  adjustShopStockRef,
   cancelFlashSaleRef,
   createFlashSaleRef,
   createShopItemRef,
   generateShopImageUploadUrlRef,
   getShopCustomerRef,
   listFlashSalesRef,
-  listInventoryAdjustmentsRef,
   listShopCatalogForVolunteerRef,
   listShopItemsAdminRef,
   listShopRedemptionsRef,
@@ -80,15 +78,13 @@ type Shop = Awaited<ReturnType<typeof seedShop>>;
 
 async function createItem(
   shop: Shop,
-  fields: { name?: string; pointsCost?: number; stockQuantity?: number; active?: boolean } = {},
+  fields: { name?: string; pointsCost?: number; active?: boolean } = {},
 ) {
   const { itemId } = await shop.t.mutation(createShopItemRef, {
     sessionToken: shop.admin.sessionToken,
     name: fields.name ?? "Sticker pack",
     description: "Five stickers",
     pointsCost: fields.pointsCost ?? 20,
-    stockQuantity: fields.stockQuantity ?? 5,
-    featured: false,
     ...(fields.active !== undefined ? { active: fields.active } : {}),
   });
   return itemId;
@@ -109,44 +105,33 @@ function purchase(
   });
 }
 
-async function state(shop: Shop, itemId: GenericId<"shopItems">) {
+async function state(shop: Shop) {
   return shop.t.run(async (ctx) => ({
     points: (await ctx.db.get(shop.participantId))?.points,
-    stock: (await ctx.db.get(itemId))?.stockQuantity,
     redemptions: (await ctx.db.query("shopRedemptions").collect()).length,
-    adjustments: (await ctx.db.query("shopInventoryAdjustments").collect()).length,
     ledger: (await ctx.db.query("volunteerActionLogs").collect()).length,
   }));
 }
 
 describe("admin shop items", () => {
-  it("creates an item with an audited initial stock count", async () => {
+  it("creates an item and writes an audit log", async () => {
     const shop = await seedShop();
-    const itemId = await createItem(shop, { stockQuantity: 7 });
+    const itemId = await createItem(shop);
 
     const list = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken });
     expect(list.items).toMatchObject([{
-      itemId, name: "Sticker pack", pointsCost: 20, effectivePointsCost: 20, stockQuantity: 7,
-      stockStatus: "in_stock", status: "active", featured: false,
+      itemId, name: "Sticker pack", pointsCost: 20, effectivePointsCost: 20, status: "active",
     }]);
-    const adjustments = await shop.t.query(listInventoryAdjustmentsRef, {
-      sessionToken: shop.admin.sessionToken, paginationOpts: { numItems: 10, cursor: null }, itemId,
-    });
-    expect(adjustments.page).toMatchObject([{ kind: "initial", previousQuantity: 0, newQuantity: 7, delta: 7 }]);
     const log = await shop.t.run((ctx) => ctx.db.query("staffConfigLogs").first());
     expect(log).toMatchObject({ action: "shop_item_created", targetShopItemId: itemId, actorAdminId: shop.admin.adminId });
   });
 
   it("rejects bad item fields", async () => {
     const shop = await seedShop();
-    const base = { sessionToken: shop.admin.sessionToken, description: "", featured: false, stockQuantity: 1 };
+    const base = { sessionToken: shop.admin.sessionToken, description: "" };
     await expectAdminErrorCode(shop.t.mutation(createShopItemRef, { ...base, name: " ", pointsCost: 5 }), "INVALID_SHOP_ITEM");
     await expectAdminErrorCode(shop.t.mutation(createShopItemRef, { ...base, name: "Hat", pointsCost: 0 }), "INVALID_SHOP_ITEM");
     await expectAdminErrorCode(shop.t.mutation(createShopItemRef, { ...base, name: "Hat", pointsCost: 1.5 }), "INVALID_SHOP_ITEM");
-    await expectAdminErrorCode(
-      shop.t.mutation(createShopItemRef, { ...base, name: "Hat", pointsCost: 5, stockQuantity: -1 }),
-      "INVALID_SHOP_ITEM",
-    );
   });
 
   it("edits, archives, and filters items", async () => {
@@ -154,7 +139,7 @@ describe("admin shop items", () => {
     const itemId = await createItem(shop);
     const edit = {
       sessionToken: shop.admin.sessionToken, itemId, name: "Sticker pack", description: "Ten stickers",
-      pointsCost: 30, featured: true, lowStockThreshold: 10,
+      pointsCost: 30,
     };
     expect(await shop.t.mutation(updateShopItemRef, edit)).toEqual({ ok: true, changed: true });
     expect(await shop.t.mutation(updateShopItemRef, edit)).toEqual({ ok: true, changed: false });
@@ -162,7 +147,7 @@ describe("admin shop items", () => {
       .toEqual({ ok: true, changed: true });
 
     const archived = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken, status: "archived" });
-    expect(archived.items).toMatchObject([{ pointsCost: 30, featured: true, stockStatus: "low", status: "archived" }]);
+    expect(archived.items).toMatchObject([{ pointsCost: 30, status: "archived" }]);
     const active = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken, status: "active" });
     expect(active.items).toEqual([]);
     const searched = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken, search: "hoodie" });
@@ -173,13 +158,13 @@ describe("admin shop items", () => {
     const shop = await seedShop();
     // convex-test stores no content type, so an upload here always fails the image check.
     const text = await shop.t.run((ctx) => ctx.storage.store(new Blob(["hello"], { type: "text/plain" })));
-    const base = { sessionToken: shop.admin.sessionToken, name: "Hat", description: "", pointsCost: 5, featured: false };
+    const base = { sessionToken: shop.admin.sessionToken, name: "Hat", description: "", pointsCost: 5 };
 
     await expectAdminErrorCode(
-      shop.t.mutation(createShopItemRef, { ...base, stockQuantity: 0, imageStorageId: text }),
+      shop.t.mutation(createShopItemRef, { ...base, imageStorageId: text }),
       "INVALID_SHOP_IMAGE",
     );
-    const itemId = await createItem(shop, { name: "Hat", pointsCost: 5, stockQuantity: 0 });
+    const itemId = await createItem(shop, { name: "Hat", pointsCost: 5 });
     await shop.t.run((ctx) => ctx.db.patch(itemId, { imageStorageId: text }));
     const list = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken });
     expect(list.items[0]).not.toHaveProperty("imageUrl");
@@ -199,77 +184,9 @@ describe("admin shop items", () => {
       "NOT_AUTHORIZED",
     );
     await expectAdminErrorCode(
-      shop.t.mutation(adjustShopStockRef, { sessionToken: shop.volunteer.sessionToken, itemId, kind: "manual", delta: 1, reason: "x" }),
+      shop.t.mutation(setShopItemStatusRef, { sessionToken: shop.volunteer.sessionToken, itemId, status: "inactive" }),
       "NOT_AUTHORIZED",
     );
-  });
-});
-
-describe("admin stock adjustments", () => {
-  it("audits increases, decreases, and absolute counts", async () => {
-    const shop = await seedShop();
-    const itemId = await createItem(shop, { stockQuantity: 5 });
-    const adjust = (fields: { delta?: number; newQuantity?: number; kind?: "manual" | "restock"; reason?: string }) =>
-      shop.t.mutation(adjustShopStockRef, {
-        sessionToken: shop.admin.sessionToken, itemId, kind: fields.kind ?? "manual", reason: fields.reason ?? "Counted",
-        ...(fields.delta !== undefined ? { delta: fields.delta } : {}),
-        ...(fields.newQuantity !== undefined ? { newQuantity: fields.newQuantity } : {}),
-      });
-
-    expect(await adjust({ delta: 10, kind: "restock", reason: " Box arrived " })).toEqual({ ok: true, previousQuantity: 5, newQuantity: 15 });
-    expect(await adjust({ delta: -3 })).toEqual({ ok: true, previousQuantity: 15, newQuantity: 12 });
-    expect(await adjust({ newQuantity: 4 })).toEqual({ ok: true, previousQuantity: 12, newQuantity: 4 });
-
-    const rows = await shop.t.run((ctx) => ctx.db.query("shopInventoryAdjustments").collect());
-    expect(rows.slice(1)).toMatchObject([
-      { kind: "restock", previousQuantity: 5, newQuantity: 15, delta: 10, reason: "Box arrived", actorAdminId: shop.admin.adminId },
-      { kind: "manual", previousQuantity: 15, newQuantity: 12, delta: -3, reason: "Counted" },
-      { kind: "manual", previousQuantity: 12, newQuantity: 4, delta: -8 },
-    ]);
-  });
-
-  it("never lets stock go negative and rejects unclear changes", async () => {
-    const shop = await seedShop();
-    const itemId = await createItem(shop, { stockQuantity: 2 });
-    const base = { sessionToken: shop.admin.sessionToken, itemId, reason: "Counted" };
-    await expectAdminErrorCode(shop.t.mutation(adjustShopStockRef, { ...base, kind: "manual", delta: -3 }), "INVALID_STOCK_ADJUSTMENT");
-    await expectAdminErrorCode(shop.t.mutation(adjustShopStockRef, { ...base, kind: "manual", newQuantity: -1 }), "INVALID_STOCK_ADJUSTMENT");
-    await expectAdminErrorCode(shop.t.mutation(adjustShopStockRef, { ...base, kind: "manual", delta: 0 }), "INVALID_STOCK_ADJUSTMENT");
-    await expectAdminErrorCode(shop.t.mutation(adjustShopStockRef, { ...base, kind: "manual" }), "INVALID_STOCK_ADJUSTMENT");
-    await expectAdminErrorCode(
-      shop.t.mutation(adjustShopStockRef, { ...base, kind: "manual", delta: 1, newQuantity: 3 }),
-      "INVALID_STOCK_ADJUSTMENT",
-    );
-    await expectAdminErrorCode(shop.t.mutation(adjustShopStockRef, { ...base, kind: "restock", delta: -1 }), "INVALID_STOCK_ADJUSTMENT");
-    await expectAdminErrorCode(shop.t.mutation(adjustShopStockRef, { ...base, kind: "manual", delta: 1, reason: " " }), "INVALID_SHOP_REASON");
-    expect((await state(shop, itemId)).stock).toBe(2);
-  });
-
-  it("keeps stock non-negative across random sequences of changes", async () => {
-    const shop = await seedShop({ points: 10_000 });
-    const itemId = await createItem(shop, { stockQuantity: 3, pointsCost: 1 });
-    let seed = 7;
-    const random = () => {
-      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
-      return seed / 2_147_483_648;
-    };
-    for (let step = 0; step < 30; step += 1) {
-      const roll = random();
-      if (roll < 0.4) {
-        await purchase(shop, itemId, { quantity: 1 + Math.floor(random() * 3), expected: 1 });
-      } else if (roll < 0.7) {
-        await shop.t.mutation(adjustShopStockRef, {
-          sessionToken: shop.admin.sessionToken, itemId, kind: "manual", delta: -1 - Math.floor(random() * 3), reason: "Shrink",
-        }).catch(() => undefined);
-      } else {
-        await shop.t.mutation(adjustShopStockRef, {
-          sessionToken: shop.admin.sessionToken, itemId, kind: "restock", delta: 1 + Math.floor(random() * 2), reason: "Restock",
-        });
-      }
-      expect((await state(shop, itemId)).stock).toBeGreaterThanOrEqual(0);
-    }
-    const adjustments = await shop.t.run((ctx) => ctx.db.query("shopInventoryAdjustments").collect());
-    expect((await state(shop, itemId)).stock).toBe(adjustments.reduce((sum, row) => sum + row.delta, 0));
   });
 });
 
@@ -290,7 +207,7 @@ describe("volunteer shop access", () => {
     await expectAdminErrorCode(purchase(shop, itemId, { sessionToken }), "CAPABILITY_DENIED");
     expect(await shop.t.mutation(resolveQrForScanRef, { sessionToken, qrCodeToken: QR_TOKEN, purpose: "shop" }))
       .toEqual({ status: "not_authorized" });
-    expect((await state(shop, itemId)).redemptions).toBe(0);
+    expect((await state(shop)).redemptions).toBe(0);
   });
 
   it("rejects expired sessions while allowing admins without canRedeemShop", async () => {
@@ -332,7 +249,7 @@ describe("volunteer shop access", () => {
       sessionToken: shop.volunteer.sessionToken, participantId: shop.participantId, itemId, quantity: 1,
     })).toEqual({ status: "self_purchase_denied" });
     expect(await purchase(shop, itemId)).toEqual({ status: "self_purchase_denied" });
-    expect((await state(shop, itemId)).redemptions).toBe(0);
+    expect((await state(shop)).redemptions).toBe(0);
   });
 
   it("blocks an unlinked volunteer whose email matches the participant", async () => {
@@ -363,7 +280,7 @@ describe("volunteer shop access", () => {
       sessionToken: shop.volunteer.sessionToken, participantId, itemId, quantity: 1,
     })).toEqual({ status: "self_purchase_denied" });
     expect(await purchase(shop, itemId, { qr: UNKNOWN_TOKEN })).toEqual({ status: "self_purchase_denied" });
-    expect((await state(shop, itemId)).redemptions).toBe(0);
+    expect((await state(shop)).redemptions).toBe(0);
   });
 
   it("toggles canRedeemShop from the admin panel with an audit row", async () => {
@@ -389,15 +306,15 @@ describe("volunteer shop access", () => {
 });
 
 describe("volunteer purchases", () => {
-  it("deducts points and stock and writes every record together", async () => {
+  it("deducts points and writes every record together", async () => {
     const shop = await seedShop({ points: 100 });
-    const itemId = await createItem(shop, { pointsCost: 20, stockQuantity: 5 });
+    const itemId = await createItem(shop, { pointsCost: 20 });
 
     const preview = await shop.t.query(previewShopPurchaseRef, {
       sessionToken: shop.volunteer.sessionToken, participantId: shop.participantId, itemId, quantity: 3,
     });
     expect(preview).toMatchObject({
-      status: "ok", unitPointsCost: 20, totalPointsCost: 60, points: 100, pointsAfter: 40, hasEnoughPoints: true, hasEnoughStock: true,
+      status: "ok", unitPointsCost: 20, totalPointsCost: 60, points: 100, pointsAfter: 40, hasEnoughPoints: true,
     });
 
     const result = await purchase(shop, itemId, { quantity: 3 });
@@ -408,13 +325,9 @@ describe("volunteer purchases", () => {
         totalPointsSpent: 60, pointsBefore: 100, pointsAfter: 40, flashSaleId: null, redeemedAt: NOW,
       },
     });
-    expect(await state(shop, itemId)).toMatchObject({ points: 40, stock: 2, redemptions: 1 });
-    const rows = await shop.t.run(async (ctx) => ({
-      adjustment: (await ctx.db.query("shopInventoryAdjustments").collect()).at(-1),
-      ledger: await ctx.db.query("volunteerActionLogs").first(),
-    }));
-    expect(rows.adjustment).toMatchObject({ kind: "purchase", previousQuantity: 5, newQuantity: 2, delta: -3 });
-    expect(rows.ledger).toMatchObject({
+    expect(await state(shop)).toMatchObject({ points: 40, redemptions: 1 });
+    const ledger = await shop.t.run((ctx) => ctx.db.query("volunteerActionLogs").first());
+    expect(ledger).toMatchObject({
       action: "shop_purchase", actorAdminId: shop.volunteer.adminId, pointsDelta: -60, previousPoints: 100, newPoints: 40,
     });
   });
@@ -428,21 +341,17 @@ describe("volunteer purchases", () => {
 
     expect(first.status).toBe("success");
     expect(second).toEqual({ status: "duplicate", receipt: "receipt" in first ? first.receipt : null });
-    expect(await state(shop, itemId)).toMatchObject({ points: 80, stock: 4, redemptions: 1 });
+    expect(await state(shop)).toMatchObject({ points: 80, redemptions: 1 });
     expect(await purchase(shop, itemId, { key, quantity: 2 })).toEqual({ status: "invalid_request" });
     expect(await purchase(shop, itemId, { key: "short" })).toEqual({ status: "invalid_request" });
   });
 
-  it("rejects short points or stock without writing anything", async () => {
+  it("rejects short points without writing anything", async () => {
     const shop = await seedShop({ points: 30 });
-    const itemId = await createItem(shop, { pointsCost: 20, stockQuantity: 1 });
-    const before = await state(shop, itemId);
-
-    expect(await purchase(shop, itemId, { quantity: 2 })).toEqual({ status: "insufficient_stock", stockQuantity: 1 });
-    const pricey = await createItem(shop, { name: "Hoodie", pointsCost: 50, stockQuantity: 3 });
+    const before = await state(shop);
+    const pricey = await createItem(shop, { name: "Hoodie", pointsCost: 50 });
     expect(await purchase(shop, pricey, { expected: 50 })).toEqual({ status: "insufficient_points", points: 30, totalPointsCost: 50 });
-    expect(await state(shop, itemId)).toMatchObject({ points: before.points, stock: 1, redemptions: 0, ledger: 0 });
-    expect((await state(shop, pricey)).stock).toBe(3);
+    expect(await state(shop)).toMatchObject({ points: before.points, redemptions: 0, ledger: 0 });
   });
 
   it("rejects bad quantities, inactive items, and unknown or ineligible participants", async () => {
@@ -464,28 +373,28 @@ describe("volunteer purchases", () => {
     expect(await purchase(shop, itemId)).toEqual({ status: "participant_not_eligible" });
     expect(await shop.t.query(getShopCustomerRef, { sessionToken: shop.volunteer.sessionToken, participantId: shop.participantId }))
       .toBeNull();
-    expect((await state(shop, itemId)).redemptions).toBe(0);
+    expect((await state(shop)).redemptions).toBe(0);
   });
 
   it("asks for reconfirmation when the price changed after preview", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop, { pointsCost: 20 });
     await shop.t.mutation(updateShopItemRef, {
-      sessionToken: shop.admin.sessionToken, itemId, name: "Sticker pack", description: "Five stickers", pointsCost: 25, featured: false,
+      sessionToken: shop.admin.sessionToken, itemId, name: "Sticker pack", description: "Five stickers", pointsCost: 25,
     });
     expect(await purchase(shop, itemId, { quantity: 2, expected: 20 }))
       .toEqual({ status: "price_changed", unitPointsCost: 25, totalPointsCost: 50 });
-    expect((await state(shop, itemId)).redemptions).toBe(0);
+    expect((await state(shop)).redemptions).toBe(0);
     expect((await purchase(shop, itemId, { quantity: 2, expected: 25 })).status).toBe("success");
   });
 
-  it("never oversells when two purchases race for the last unit", async () => {
+  it("lets concurrent purchases both succeed when the participant has enough points", async () => {
     const shop = await seedShop({ points: 100 });
-    const itemId = await createItem(shop, { stockQuantity: 1 });
+    const itemId = await createItem(shop);
     const results = await Promise.all([purchase(shop, itemId), purchase(shop, itemId)]);
 
-    expect(results.map((result) => result.status).sort()).toEqual(["insufficient_stock", "success"]);
-    expect(await state(shop, itemId)).toMatchObject({ stock: 0, points: 80, redemptions: 1 });
+    expect(results.map((result) => result.status).sort()).toEqual(["success", "success"]);
+    expect(await state(shop)).toMatchObject({ points: 60, redemptions: 2 });
   });
 
   it("keeps the charged price when the item price changes later", async () => {
@@ -493,7 +402,7 @@ describe("volunteer purchases", () => {
     const itemId = await createItem(shop, { pointsCost: 20 });
     await purchase(shop, itemId);
     await shop.t.mutation(updateShopItemRef, {
-      sessionToken: shop.admin.sessionToken, itemId, name: "Renamed", description: "", pointsCost: 99, featured: false,
+      sessionToken: shop.admin.sessionToken, itemId, name: "Renamed", description: "", pointsCost: 99,
     });
     const history = await shop.t.query(listShopRedemptionsRef, {
       sessionToken: shop.admin.sessionToken, paginationOpts: { numItems: 10, cursor: null },
@@ -524,38 +433,37 @@ describe("volunteer purchases", () => {
 
   it("lists an ordered catalog for the volunteer", async () => {
     const shop = await seedShop();
-    await createItem(shop, { name: "Sticker pack", stockQuantity: 6 });
-    const featured = await createItem(shop, { name: "Hoodie", pointsCost: 50, stockQuantity: 0 });
-    await shop.t.run((ctx) => ctx.db.patch(featured, { featured: true }));
+    await createItem(shop, { name: "Sticker pack" });
+    await createItem(shop, { name: "Hoodie", pointsCost: 50 });
     await createItem(shop, { name: "Mug", active: false });
 
     const catalog = await shop.t.query(listShopCatalogForVolunteerRef, { sessionToken: shop.volunteer.sessionToken });
-    expect(catalog.items.map((item) => [item.name, item.stockStatus])).toEqual([["Hoodie", "out"], ["Sticker pack", "in_stock"]]);
+    expect(catalog.items.map((item) => item.name)).toEqual(["Hoodie", "Sticker pack"]);
     expect(catalog.maxQuantity).toBe(SHOP_MAX_QUANTITY);
     expect(catalog.nextPriceChangeAt).toBeNull();
   });
 });
 
 describe("refunds", () => {
-  it("restores points, optionally restocks, and refunds only once", async () => {
+  it("restores points and refunds only once", async () => {
     const shop = await seedShop({ points: 100 });
-    const itemId = await createItem(shop, { stockQuantity: 5 });
+    const itemId = await createItem(shop);
     const first = await purchase(shop, itemId, { quantity: 2 });
     const second = await purchase(shop, itemId, { quantity: 1 });
     if (first.status !== "success" || second.status !== "success") throw new Error("purchase failed");
-    const refund = (redemptionId: GenericId<"shopRedemptions">, restock: boolean, reason = "Wrong size") =>
-      shop.t.mutation(refundShopRedemptionRef, { sessionToken: shop.admin.sessionToken, redemptionId, reason, restock });
+    const refund = (redemptionId: GenericId<"shopRedemptions">, reason = "Wrong size") =>
+      shop.t.mutation(refundShopRedemptionRef, { sessionToken: shop.admin.sessionToken, redemptionId, reason });
 
-    expect(await refund(first.receipt.redemptionId, true))
-      .toEqual({ ok: true, previousPoints: 40, newPoints: 80, pointsRestored: 40, restocked: true });
-    expect(await state(shop, itemId)).toMatchObject({ points: 80, stock: 4 });
-    expect(await refund(second.receipt.redemptionId, false))
-      .toEqual({ ok: true, previousPoints: 80, newPoints: 100, pointsRestored: 20, restocked: false });
-    expect(await state(shop, itemId)).toMatchObject({ points: 100, stock: 4 });
+    expect(await refund(first.receipt.redemptionId))
+      .toEqual({ ok: true, previousPoints: 40, newPoints: 80, pointsRestored: 40 });
+    expect(await state(shop)).toMatchObject({ points: 80 });
+    expect(await refund(second.receipt.redemptionId))
+      .toEqual({ ok: true, previousPoints: 80, newPoints: 100, pointsRestored: 20 });
+    expect(await state(shop)).toMatchObject({ points: 100 });
 
-    await expectAdminErrorCode(refund(first.receipt.redemptionId, true), "REDEMPTION_ALREADY_REFUNDED");
-    await expectAdminErrorCode(refund(first.receipt.redemptionId, true, " "), "INVALID_SHOP_REASON");
-    expect(await state(shop, itemId)).toMatchObject({ points: 100, stock: 4 });
+    await expectAdminErrorCode(refund(first.receipt.redemptionId), "REDEMPTION_ALREADY_REFUNDED");
+    await expectAdminErrorCode(refund(first.receipt.redemptionId, " "), "INVALID_SHOP_REASON");
+    expect(await state(shop)).toMatchObject({ points: 100 });
 
     const logs = await shop.t.run((ctx) => ctx.db.query("volunteerActionLogs").collect());
     expect(logs.map((log) => [log.action, log.pointsDelta])).toEqual([
@@ -566,7 +474,7 @@ describe("refunds", () => {
       sessionToken: shop.admin.sessionToken, paginationOpts: { numItems: 10, cursor: null },
     });
     expect(history.page.at(-1)?.refund).toMatchObject({
-      reason: "Wrong size", restocked: true, pointsRestored: 40, refundedBy: { adminId: shop.admin.adminId },
+      reason: "Wrong size", pointsRestored: 40, refundedBy: { adminId: shop.admin.adminId },
     });
   });
 
@@ -577,7 +485,7 @@ describe("refunds", () => {
     if (result.status !== "success") throw new Error("purchase failed");
     await expectAdminErrorCode(
       shop.t.mutation(refundShopRedemptionRef, {
-        sessionToken: shop.volunteer.sessionToken, redemptionId: result.receipt.redemptionId, reason: "x", restock: false,
+        sessionToken: shop.volunteer.sessionToken, redemptionId: result.receipt.redemptionId, reason: "x",
       }),
       "NOT_AUTHORIZED",
     );

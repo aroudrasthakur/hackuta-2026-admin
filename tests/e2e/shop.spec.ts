@@ -32,7 +32,7 @@ async function expectNoHorizontalScroll(page: Page) {
 }
 
 test.describe("admin shop", () => {
-  test("manages items, stock, volunteers, and flash sales", async ({ page }) => {
+  test("manages items, volunteers, and flash sales", async ({ page }) => {
     await signInOrganizer(page, E2E_ADMIN);
     await openShop(page);
     const table = page.getByRole("region", { name: "Shop items" });
@@ -40,22 +40,10 @@ test.describe("admin shop", () => {
     await expect(table).toContainText("On sale");
     await expect(page.getByRole("img", { name: "HackUTA" }).first()).toBeVisible();
 
-    await page.getByRole("button", { name: "Add one Sticker pack" }).click();
-    await expect(page.locator(".admin-callout--success")).toContainText("Sticker pack: stock +1, now 4.");
-
-    await page.getByRole("button", { name: "Adjust stock for Sticker pack" }).click();
-    const adjust = page.getByRole("dialog", { name: "Adjust stock" });
-    await adjust.getByRole("button", { name: "Save adjustment" }).click();
-    await expect(adjust).toContainText("Add a reason for this change.");
-    await adjust.getByLabel("Reason").fill("Second box delivered");
-    await adjust.getByRole("button", { name: "Save adjustment" }).click();
-    await expect(page.locator(".admin-callout--success")).toContainText("Sticker pack: stock 4 → 14.");
-
     await page.getByRole("button", { name: "Add item" }).click();
     const drawer = page.getByRole("dialog", { name: "Add item" });
     await drawer.getByLabel("Name").fill("Bucket hat");
     await drawer.getByLabel("Price (points)").fill("250");
-    await drawer.getByLabel("Starting stock").fill("6");
     await drawer.getByRole("button", { name: "Save item" }).click();
     await expect(page.locator(".admin-callout--success")).toContainText("Bucket hat added.");
     await expect(table.getByRole("rowheader", { name: /Bucket hat/ })).toBeVisible();
@@ -102,7 +90,7 @@ test.describe("volunteer shop purchase", () => {
     const customer = page.getByRole("region", { name: "Participant" });
     await expect(customer).toContainText("Riley Ready");
     await expect(customer).toContainText("1,250");
-    await expect(page.getByRole("button", { name: /Insulated bottle/ })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /Insulated bottle/ })).toBeEnabled();
 
     await page.getByRole("button", { name: /HackUTA 2026 T-shirt/ }).click();
     await page.getByRole("button", { name: "More" }).click();
@@ -144,9 +132,7 @@ test.describe("volunteer shop purchase", () => {
     const refund = page.getByRole("dialog", { name: "Refund purchase" });
     await refund.getByLabel("Reason").fill("Wrong size");
     await refund.getByRole("button", { name: "Refund points" }).click();
-    await expect(page.locator(".admin-callout--success")).toContainText("600 points returned to Riley Ready and stock restored.");
+    await expect(page.locator(".admin-callout--success")).toContainText("600 points returned to Riley Ready.");
     await expect(purchases).toContainText("Refunded");
-    await page.getByText("Stock changes").click();
-    await expect(page.getByRole("cell", { name: "Refund restock" })).toBeVisible();
   });
 });

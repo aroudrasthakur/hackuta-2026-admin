@@ -57,7 +57,7 @@ function ItemPicker({ items, maxQuantity, selection, onSelect }: {
   onSelect: (selection: ShopSelection | null) => void;
 }) {
   const selected = items.find((item) => item.itemId === selection?.itemId);
-  const max = selected ? Math.max(1, Math.min(maxQuantity, selected.stockQuantity)) : 1;
+  const max = maxQuantity;
   const quantity = Math.min(selection?.quantity ?? 1, max);
   if (items.length === 0) return <p className="admin-callout text-base">No items are for sale right now. Ask an administrator to add or activate items.</p>;
   return (
@@ -65,7 +65,6 @@ function ItemPicker({ items, maxQuantity, selection, onSelect }: {
       <h2 className="volunteer-section-title">Choose an item</h2>
       <ul className="grid gap-2">
         {items.map((item) => {
-          const soldOut = item.stockQuantity === 0;
           const onSale = item.unitPointsCost < item.basePointsCost;
           return (
             <li key={item.itemId}>
@@ -73,13 +72,12 @@ function ItemPicker({ items, maxQuantity, selection, onSelect }: {
                 type="button"
                 className="shop-pick"
                 aria-pressed={selected?.itemId === item.itemId}
-                disabled={soldOut}
                 onClick={() => onSelect({ itemId: item.itemId, quantity: 1 })}
               >
                 <ShopItemThumb imageUrl={item.imageUrl} />
                 <span className="min-w-0">
                   <span className="shop-pick__name">{item.name}</span>
-                  <span className="shop-pick__stock">{soldOut ? "Sold out" : `${formatPoints(item.stockQuantity)} left`}{item.stockStatus === "low" ? " · Low" : ""}</span>
+                  {item.description ? <span className="shop-pick__description">{item.description}</span> : null}
                 </span>
                 <span className="text-right">
                   <span className="shop-price block"><span>{formatPoints(item.unitPointsCost)}</span>{onSale ? <span className="shop-price__was">{formatPoints(item.basePointsCost)}</span> : null}</span>
@@ -94,7 +92,7 @@ function ItemPicker({ items, maxQuantity, selection, onSelect }: {
         <div className="shop-panel flex items-center justify-between">
           <div>
             <p className="font-semibold text-night">Quantity</p>
-            <p className="text-sm">Up to {max}{max < maxQuantity ? " (stock limit)" : " per purchase"}</p>
+            <p className="text-sm">Up to {max} per purchase</p>
           </div>
           <span className="shop-stepper shop-stepper--lg">
             <button type="button" aria-label="Fewer" disabled={quantity <= 1} onClick={() => onSelect({ itemId: selected.itemId, quantity: quantity - 1 })}>−</button>
@@ -173,14 +171,13 @@ function ShopWorkflow() {
         const item = items.find((candidate) => candidate.itemId === state.selection.itemId);
         const ready = preview?.status === "ok" ? preview : null;
         const short = ready ? !ready.hasEnoughPoints : false;
-        const noStock = ready ? !ready.hasEnoughStock : false;
         const blocked = preview && preview.status !== "ok";
         return (
           <section aria-labelledby="shop-review-heading" className="shop-panel">
             <h2 id="shop-review-heading" ref={headingRef} tabIndex={-1} className="volunteer-section-title">Review purchase</h2>
             <div className="shop-item-cell">
               <ShopItemThumb imageUrl={item?.imageUrl ?? null} />
-              <div><strong>{item?.name ?? "Selected item"}</strong>{ready ? <span>{formatPoints(ready.stockQuantity)} in stock{ready.flashSaleId ? " · sale price" : ""}</span> : null}</div>
+              <div><strong>{item?.name ?? "Selected item"}</strong>{ready?.flashSaleId ? <span>Sale price</span> : null}</div>
             </div>
             {ready ? (
               <dl className="shop-summary">
@@ -196,14 +193,13 @@ function ShopWorkflow() {
                 <p>{customer?.name} has {formatPoints(ready.points)} points and needs {formatPoints(ready.totalPointsCost)}. Lower the quantity or pick another item.</p>
               </div>
             ) : null}
-            {noStock && ready ? <div role="alert" className="admin-callout admin-callout--alert text-base"><p className="font-semibold">Not enough stock</p><p>Only {formatPoints(ready.stockQuantity)} left. Lower the quantity or pick another item.</p></div> : null}
             {blocked ? <div role="alert" className="admin-callout admin-callout--alert text-base"><p className="font-semibold">This purchase can't go ahead</p><p>The item or participant is no longer available. Go back and choose again.</p></div> : null}
-            {state.error ? <Notice outcome={state.error} /> : ready && !short && !noStock ? <p className="text-base">Hand over the item after you confirm. The points come off right away.</p> : null}
+            {state.error ? <Notice outcome={state.error} /> : ready && !short ? <p className="text-base">Hand over the item after you confirm. The points come off right away.</p> : null}
             <div className="volunteer-confirm__actions">
               <button
                 type="button"
                 className={scanConfirmButtonClass}
-                disabled={!ready || short || noStock || state.submitting || live === null}
+                disabled={!ready || short || state.submitting || live === null}
                 aria-busy={state.submitting || undefined}
                 onClick={() => ready && void confirm(ready.unitPointsCost)}
               >
