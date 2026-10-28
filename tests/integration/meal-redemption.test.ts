@@ -167,7 +167,7 @@ describe("meal redemption", () => {
       if (change === "inactive") await ctx.db.patch(s.volunteer.adminId, { active: false });
       else if (change === "expired") await ctx.db.patch(s.volunteer.sessionId, { expiresAt: NOW });
       else if (change === "deleted_session") await ctx.db.delete(s.volunteer.sessionId);
-      else await ctx.db.patch(s.volunteer.adminId, { role: "admin" });
+      else await ctx.db.patch(s.volunteer.adminId, { role: "reviewer" });
     });
     const before = await s.rates();
     const code = change === "changed_role" ? "VOLUNTEER_ONLY" : "NOT_AUTHENTICATED";
@@ -176,12 +176,22 @@ describe("meal redemption", () => {
     expect(await s.rates()).toEqual(before); expect((await s.data()).redemptions).toEqual([]);
   });
 
-  it.each(["admin", "reviewer"] as const)("denies a %s account on every meal scan entry point", async (role) => {
-    const s = await scene(); const staff = await seedStaff(s.t, { role }); const args = { ...s.args, sessionToken: staff.sessionToken };
-    await expectAdminErrorCode(s.t.query(listActiveMealPeriodsRef, { sessionToken: staff.sessionToken }), "VOLUNTEER_ONLY");
-    await expectAdminErrorCode(s.t.mutation(resolveQrForMealRef, args), "VOLUNTEER_ONLY");
-    await expectAdminErrorCode(s.t.mutation(redeemMealRef, args), "VOLUNTEER_ONLY");
+  it("denies a reviewer account on every meal scan entry point and allows an admin without canFoodCheckIn", async () => {
+    const s = await scene();
+    const reviewer = await seedStaff(s.t, { role: "reviewer" });
+    const reviewerArgs = { ...s.args, sessionToken: reviewer.sessionToken };
+    await expectAdminErrorCode(s.t.query(listActiveMealPeriodsRef, { sessionToken: reviewer.sessionToken }), "VOLUNTEER_ONLY");
+    await expectAdminErrorCode(s.t.mutation(resolveQrForMealRef, reviewerArgs), "VOLUNTEER_ONLY");
+    await expectAdminErrorCode(s.t.mutation(redeemMealRef, reviewerArgs), "VOLUNTEER_ONLY");
     expect(await s.rates()).toEqual([]);
+
+    const adminArgs = { ...s.args, sessionToken: s.admin.sessionToken };
+    expect((await s.t.query(listActiveMealPeriodsRef, { sessionToken: s.admin.sessionToken })).map((m) => m.mealPeriodId)).toEqual([s.mealPeriodId]);
+    expect(await s.t.mutation(resolveQrForMealRef, adminArgs)).toMatchObject({ status: "ok", meal: { mealPeriodId: s.mealPeriodId } });
+    expect(await s.t.mutation(redeemMealRef, adminArgs)).toEqual({ status: "success", redeemedAt: NOW, meal: { mealPeriodId: s.mealPeriodId, name: "Lunch" } });
+    expect((await s.data()).logs).toEqual([expect.objectContaining({
+      action: "food_check_in", actorAdminId: s.admin.adminId, participantId: s.participantId, mealPeriodId: s.mealPeriodId,
+    })]);
   });
 
   it("provides only enabled schedule metadata, including upcoming windows for automatic clock updates", async () => {

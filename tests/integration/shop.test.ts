@@ -294,7 +294,7 @@ describe("volunteer shop access", () => {
     expect((await state(shop, itemId)).redemptions).toBe(0);
   });
 
-  it("rejects reviewers, admins, and expired sessions", async () => {
+  it("rejects reviewers and expired sessions while allowing admins without canRedeemShop", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop);
     const reviewer = await seedStaff(shop.t, { role: "reviewer" });
@@ -302,8 +302,14 @@ describe("volunteer shop access", () => {
     await shop.t.run((ctx) => ctx.db.patch(expired.adminId, { canRedeemShop: true }));
 
     await expectAdminErrorCode(purchase(shop, itemId, { sessionToken: reviewer.sessionToken }), "VOLUNTEER_ONLY");
-    await expectAdminErrorCode(purchase(shop, itemId, { sessionToken: shop.admin.sessionToken }), "VOLUNTEER_ONLY");
     await expectAdminErrorCode(purchase(shop, itemId, { sessionToken: expired.sessionToken }), "NOT_AUTHENTICATED");
+
+    const catalog = await shop.t.query(listShopCatalogForVolunteerRef, { sessionToken: shop.admin.sessionToken });
+    expect(catalog.items).toHaveLength(1);
+    const adminPurchase = await purchase(shop, itemId, { sessionToken: shop.admin.sessionToken });
+    expect(adminPurchase.status).toBe("success");
+    const log = await shop.t.run((ctx) => ctx.db.query("volunteerActionLogs").first());
+    expect(log).toMatchObject({ action: "shop_purchase", actorAdminId: shop.admin.adminId, participantId: shop.participantId });
   });
 
   it("previews a scanned participant with their balance", async () => {
