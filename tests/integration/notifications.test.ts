@@ -38,12 +38,6 @@ const listPublishedNotificationsRef = makeFunctionReference<
   }> | null
 >("admin/participantShop:listPublishedNotifications");
 
-const migrateAnnouncementsRef = makeFunctionReference<
-  "mutation",
-  Record<string, never>,
-  { ok: true; migrated: number; skipped: number }
->("admin/notifications:migrateAnnouncementsToNotifications");
-
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
@@ -387,56 +381,8 @@ describe("admin notifications management & participant notifications", () => {
     expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
   });
 
-  it("preserves and idempotently migrates legacy participantAnnouncements", async () => {
-    const { t, admin, asParticipant } = await seedNotificationsContext();
-
-    const legacyId = await t.run((ctx) =>
-      ctx.db.insert("participantAnnouncements", {
-        kind: "flash_sale",
-        title: "Legacy Merch Drop",
-        body: "Limited stickers at the shop table.",
-        publishedAt: NOW - 5 * MINUTE,
-        expiresAt: NOW + HOUR,
-        createdBy: admin.adminId,
-        createdAt: NOW - 5 * MINUTE,
-      }),
-    );
-
-    // Accessible even before migration runs
-    const preMigrationFeed = await asParticipant.query(listPublishedNotificationsRef, {});
-    expect(preMigrationFeed).toEqual([
-      {
-        notificationId: String(legacyId),
-        title: "Legacy Merch Drop",
-        message: "Limited stickers at the shop table.",
-        type: "flash_sale",
-        publishedAt: NOW - 5 * MINUTE,
-        expiresAt: NOW + HOUR,
-        linkUrl: "/dashboard",
-        linkLabel: "Open dashboard",
-      },
-    ]);
-
-    // Run migration once
-    const firstRun = await t.mutation(migrateAnnouncementsRef, {});
-    expect(firstRun).toEqual({ ok: true, migrated: 1, skipped: 0 });
-
-    // Running migration a second time skips already-migrated rows
-    const secondRun = await t.mutation(migrateAnnouncementsRef, {});
-    expect(secondRun).toEqual({ ok: true, migrated: 0, skipped: 1 });
-
-    // No duplicate appears in participant feed after migration
-    const postMigrationFeed = await asParticipant.query(listPublishedNotificationsRef, {});
-    expect(postMigrationFeed).toHaveLength(1);
-    expect(postMigrationFeed?.[0]).toMatchObject({
-      title: "Legacy Merch Drop",
-      message: "Limited stickers at the shop table.",
-      type: "flash_sale",
-    });
-  });
-
-  it("covers relatedEvent validation, scheduleNotification on existing rows, updateNotification on drafts, and migration edge cases", async () => {
-    const { t, admin, asParticipant } = await seedNotificationsContext();
+  it("covers relatedEvent validation, scheduleNotification on existing rows, and updateNotification on drafts", async () => {
+    const { t, admin } = await seedNotificationsContext();
 
     const eventId = await t.run((ctx) =>
       ctx.db.insert("events", {
@@ -502,31 +448,6 @@ describe("admin notifications management & participant notifications", () => {
     });
     expect(filtered.page).toHaveLength(1);
     expect(filtered.page[0]?.relatedEvent).toEqual({ eventId, name: "Keynote Panel" });
-
-    // Legacy announcements migration for general, scheduled, and withdrawn rows
-    await t.run(async (ctx) => {
-      await ctx.db.insert("participantAnnouncements", {
-        kind: "general",
-        title: "Legacy Scheduled General",
-        body: "Future general announcement",
-        publishedAt: NOW + 45 * MINUTE,
-        createdBy: admin.adminId,
-        createdAt: NOW,
-      });
-      await ctx.db.insert("participantAnnouncements", {
-        kind: "flash_sale",
-        title: "Legacy Withdrawn Sale",
-        body: "   ",
-        publishedAt: NOW - MINUTE,
-        withdrawnAt: NOW,
-        createdBy: admin.adminId,
-        createdAt: NOW - MINUTE,
-      });
-    });
-
-    const mig = await t.mutation(migrateAnnouncementsRef, {});
-    expect(mig).toEqual({ ok: true, migrated: 2, skipped: 0 });
-    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
   });
 
   it("restricts notification management to admins and returns null for signed-out participants", async () => {

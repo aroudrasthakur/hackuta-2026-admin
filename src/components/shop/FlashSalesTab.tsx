@@ -155,7 +155,7 @@ export function FlashSalesTab() {
       };
       if (draft.flashSaleId) await update({ ...fields, flashSaleId: draft.flashSaleId });
       else await create(fields);
-      setNotice(draft.flashSaleId ? "Sale updated." : "Sale scheduled. Participants get the announcement when it starts.");
+      setNotice(draft.flashSaleId ? "Sale updated." : "Sale scheduled. Participants get the notification when it starts.");
       setDraft(emptyDraft());
     } catch (caught) {
       setError(reportUserFacingError("Unable to save flash sale", caught, "We couldn't save this sale. Please try again.", { source: "FlashSalesTab.submit" }));
@@ -170,7 +170,7 @@ export function FlashSalesTab() {
     setError(null);
     try {
       await cancel({ sessionToken, flashSaleId: sale.flashSaleId });
-      setNotice(`${sale.title} cancelled. Normal prices are back and the announcement was withdrawn.`);
+      setNotice(`${sale.title} cancelled. Normal prices are back and the notification was withdrawn.`);
       if (draft.flashSaleId === sale.flashSaleId) setDraft(emptyDraft());
     } catch (caught) {
       setError(reportUserFacingError("Unable to cancel flash sale", caught, "We couldn't cancel this sale. Please try again.", { source: "FlashSalesTab.cancel" }));
@@ -210,7 +210,7 @@ export function FlashSalesTab() {
             <input id={field("title")} className="admin-field__control" maxLength={FLASH_SALE_TITLE_MAX_LENGTH} value={draft.title} onChange={(event) => patch({ title: event.target.value })} />
           </label>
           <label className="admin-field" htmlFor={field("message")}>
-            Announcement
+            Notification message
             <textarea id={field("message")} className="admin-field__control min-h-20" maxLength={FLASH_SALE_MESSAGE_MAX_LENGTH} value={draft.message} onChange={(event) => patch({ message: event.target.value })} />
           </label>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">

@@ -398,7 +398,7 @@ describe("Flash sales tab", () => {
     expect(alert).toContain("Add at least one item to the sale.");
 
     await type("Title", "Late-night drop");
-    await type("Announcement", "Tees are cheap");
+    await type("Notification message", "Tees are cheap");
     await type("Starts", "");
     await submit(form);
     expect(text()).toContain("Choose a start and end date and time.");

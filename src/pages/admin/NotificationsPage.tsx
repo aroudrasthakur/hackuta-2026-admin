@@ -724,7 +724,7 @@ function NotificationsManager({ sessionToken }: { sessionToken: string }) {
               Notification Management
             </h2>
             <p className="shop-tablet__hint">
-              Drafts, scheduled announcements, flash sale alerts, and published notification history.
+              Drafts, scheduled notifications, flash sale alerts, and published notification history.
             </p>
           </div>
           <p className="text-sm text-muted">
@@ -1005,7 +1005,7 @@ export function NotificationsPage() {
       <AdminPageHeader
         id="notifications-heading"
         title="Send notifications"
-        description="Compose, preview, schedule, and manage live participant announcements across the event."
+        description="Compose, preview, schedule, and manage live participant notifications across the event."
       />
       {staff?.role === "admin" && sessionToken ? (
         <ErrorBoundary

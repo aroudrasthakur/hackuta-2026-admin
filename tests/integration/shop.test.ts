@@ -36,7 +36,7 @@ const MINUTE = 60_000;
 
 const listShopRef = makeFunctionReference<"query">("admin/participantShop:listShop");
 const getMyShopHistoryRef = makeFunctionReference<"query">("admin/participantShop:getMyShopHistory");
-const listMyAnnouncementsRef = makeFunctionReference<"query">("admin/participantShop:listMyAnnouncements");
+const listPublishedNotificationsRef = makeFunctionReference<"query">("admin/participantShop:listPublishedNotifications");
 
 let keyCounter = 0;
 function newKey() {
@@ -650,14 +650,14 @@ describe("flash sales", () => {
     );
   });
 
-  it("cancels a live sale, restoring prices and withdrawing the announcement", async () => {
+  it("cancels a live sale, restoring prices and withdrawing the notification", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop, { pointsCost: 20 });
     const { flashSaleId } = await createSale(shop, itemId);
     const asParticipant = shop.t.withIdentity({ subject: shop.userId, email: "taylor@example.com" });
 
-    expect(await asParticipant.query(listMyAnnouncementsRef, {})).toMatchObject([
-      { kind: "flash_sale", title: "Lunch rush", body: "Stickers half off", publishedAt: NOW, active: true },
+    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toMatchObject([
+      { type: "flash_sale", title: "Lunch rush", message: "Stickers half off", publishedAt: NOW, linkUrl: "/dashboard" },
     ]);
     const live = await asParticipant.query(listShopRef, {});
     expect(live).toMatchObject({
@@ -667,7 +667,7 @@ describe("flash sales", () => {
     });
 
     await shop.t.mutation(cancelFlashSaleRef, { sessionToken: shop.admin.sessionToken, flashSaleId });
-    expect(await asParticipant.query(listMyAnnouncementsRef, {})).toEqual([]);
+    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
     expect(await asParticipant.query(listShopRef, {})).toMatchObject({ items: [{ pointsCost: 20, onSale: false }], activeSales: [] });
     await expectAdminErrorCode(
       shop.t.mutation(cancelFlashSaleRef, { sessionToken: shop.admin.sessionToken, flashSaleId }),
@@ -676,7 +676,7 @@ describe("flash sales", () => {
     expect(await createSale(shop, itemId)).toEqual({ flashSaleId: expect.any(String) });
   });
 
-  it("edits only scheduled sales and publishes the announcement at the start", async () => {
+  it("edits only scheduled sales and publishes the notification at the start", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop, { pointsCost: 20 });
     const { flashSaleId } = await createSale(shop, itemId, { startsAt: NOW + 10 * MINUTE, endsAt: NOW + 20 * MINUTE });
@@ -686,10 +686,13 @@ describe("flash sales", () => {
       startsAt: NOW + 15 * MINUTE, endsAt: NOW + 25 * MINUTE, items: [{ itemId, salePointsCost: 15 }],
     };
 
-    expect(await asParticipant.query(listMyAnnouncementsRef, {})).toEqual([]);
+    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
     expect(await shop.t.mutation(updateFlashSaleRef, edit)).toEqual({ ok: true });
-    vi.setSystemTime(NOW + 15 * MINUTE);
-    expect(await asParticipant.query(listMyAnnouncementsRef, {})).toMatchObject([{ title: "Dinner rush", publishedAt: NOW + 15 * MINUTE }]);
+    await shop.t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(Date.now()).toBe(NOW + 15 * MINUTE);
+    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toMatchObject([
+      { type: "flash_sale", title: "Dinner rush", message: "Cheaper stickers", publishedAt: NOW + 15 * MINUTE, expiresAt: NOW + 25 * MINUTE },
+    ]);
     expect((await asParticipant.query(listShopRef, {}))?.items[0]).toMatchObject({ pointsCost: 15 });
     await expectAdminErrorCode(shop.t.mutation(updateFlashSaleRef, edit), "FLASH_SALE_NOT_EDITABLE");
   });
@@ -703,7 +706,7 @@ describe("participant shop API", () => {
     const asParticipant = shop.t.withIdentity({ subject: shop.userId, email: "taylor@example.com" });
 
     expect(await shop.t.query(listShopRef, {})).toBeNull();
-    expect(await shop.t.query(listMyAnnouncementsRef, {})).toBeNull();
+    expect(await shop.t.query(listPublishedNotificationsRef, {})).toBeNull();
     expect(await shop.t.query(getMyShopHistoryRef, {})).toEqual([]);
     const history = await asParticipant.query(getMyShopHistoryRef, {});
     expect(history).toMatchObject([{ itemName: "Sticker pack", quantity: 1, totalPointsSpent: 20, onSale: false, refunded: false }]);
