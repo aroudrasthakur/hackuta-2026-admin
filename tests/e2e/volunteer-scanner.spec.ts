@@ -206,7 +206,7 @@ test.describe("volunteer camera scanner", () => {
     await signInScanVolunteer(page);
     await openTab(page, "Check-in");
     const video = page.getByLabel("Camera preview");
-    await expect(video).toBeHidden();
+    await expect(video).toBeVisible();
     expect(await video.evaluate((element: HTMLVideoElement) => element.srcObject)).toBeNull();
 
     await page.getByRole("button", { name: "Scan with camera" }).click();
@@ -223,7 +223,8 @@ test.describe("volunteer camera scanner", () => {
     expect(tracks).toBeGreaterThan(0);
 
     await page.getByRole("button", { name: "Stop camera" }).click();
-    await expect(video).toBeHidden();
+    await expect(video).toBeVisible();
+    expect(await video.evaluate((element: HTMLVideoElement) => element.srcObject)).toBeNull();
     expect(await page.evaluate(() => (window as unknown as { scanTracks: MediaStreamTrack[] }).scanTracks.every((track) => track.readyState === "ended"))).toBe(true);
 
     await page.getByRole("button", { name: "Scan with camera" }).click();
@@ -281,7 +282,7 @@ test.describe("admin QR scanner", () => {
 
     const adminNav = page.getByRole("navigation", { name: "Admin" });
     await adminNav.getByRole("link", { name: "Scan", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Scan", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /Participant check-in/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /Food distribution/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /Event points/ })).toBeVisible();
