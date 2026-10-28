@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import {
   E2E_ADMIN,
   E2E_APPLICATION_IDS,
-  E2E_REVIEWER,
   applicationsListStatus,
   signInOrganizer,
   signInOrganizerOnLoginPage,
@@ -15,7 +14,7 @@ import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 test.describe("applications queue", () => {
   test.beforeEach(async ({ page }) => {
     await resetE2eMockBackend(page);
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInOrganizer(page, E2E_ADMIN);
   });
 
   test("lists seeded applications with filters and search", async ({ page }) => {
@@ -166,9 +165,9 @@ test.describe("applications queue", () => {
 
   test("filters assignments and continues reviewing with the original queue controls", async ({ page }) => {
     await selectAdminListbox(page, "Review assignment", "mine");
-    await expect(page.getByRole("status")).toContainText("2 matching applications (4 total)");
+    await expect(page.getByRole("status")).toContainText("1 matching applications (4 total)");
     await selectAdminListbox(page, "Review assignment", "available");
-    await expect(page.getByRole("status")).toContainText("3 matching applications (4 total)");
+    await expect(page.getByRole("status")).toContainText("2 matching applications (4 total)");
     await selectAdminListbox(page, "Submission time", "newest");
     const queueUrl = page.url();
     await page.getByRole("link", { name: "Review application for Casey Decision" }).click();
@@ -178,11 +177,11 @@ test.describe("applications queue", () => {
     await expect(page.locator(".application-review-identity")).toContainText("In review");
     await expect(page.getByText("Queued: Accepted — not released")).toBeVisible();
     await page.getByRole("link", { name: "Review next application", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Jordan Review", exact: true })).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Taylor Unreviewed", exact: true })).toBeFocused();
     await page.getByRole("link", { name: "Back to Applications" }).click();
     await expect(page).toHaveURL(queueUrl);
     await expectAdminListboxValue(page, "Review assignment", "available");
     await expectAdminListboxValue(page, "Submission time", "newest");
-    await expect(page.getByRole("status")).toContainText("3 matching applications (4 total)");
+    await expect(page.getByRole("status")).toContainText("2 matching applications (4 total)");
   });
 });

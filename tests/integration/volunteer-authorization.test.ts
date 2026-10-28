@@ -49,7 +49,7 @@ describe("volunteer API boundaries", () => {
       sessionToken, email: "sample@example.com", firstName: "Sample", lastName: "Person", school: "UTA",
     }), "NOT_AUTHORIZED");
     await expectAdminErrorCode(t.mutation(provision, {
-      sessionToken, email: "elevated@example.com", name: "Elevated", role: "admin", password: ORGANIZER_TEST_PASSWORD,
+      sessionToken, email: "elevated@example.com", name: "Elevated", password: ORGANIZER_TEST_PASSWORD,
     }), "NOT_AUTHORIZED");
     expect(await t.run((ctx) => ctx.db.query("applications").collect())).toEqual([]);
     expect(await t.run((ctx) => ctx.db.query("admins").collect())).toHaveLength(1);

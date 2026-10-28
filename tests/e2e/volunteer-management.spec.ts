@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { PASSWORD_REQUIREMENTS_MESSAGE } from "../../shared/auth/password";
 import { ADMIN_ERROR_MESSAGES } from "../../shared/admin/errors";
-import { E2E_ADMIN, signInOrganizer } from "./fixtures/auth";
+import { E2E_ADMIN, E2E_VOLUNTEER, signInOrganizer, signOutOrganizer } from "./fixtures/auth";
 
 test.beforeEach(async ({ page }) => {
   await signInOrganizer(page, E2E_ADMIN);
@@ -68,6 +68,34 @@ test("admins review volunteers, open one volunteer's log, and assign events", as
 
   await page.getByRole("link", { name: "← All volunteers" }).click();
   await expect(page.getByRole("table").first().getByRole("row", { name: /E2E Volunteer volunteer@/ })).toContainText("Intro to Hardware");
+});
+
+test("admins assign all current and future events to a volunteer", async ({ page }) => {
+  await adminNav(page).getByRole("link", { name: "Volunteers", exact: true }).click();
+  await page.getByRole("link", { name: "E2E Volunteer", exact: true }).click();
+  await page.getByRole("switch", { name: "All events" }).click();
+  await page.getByRole("button", { name: "Save event assignments" }).click();
+  await expect(page.getByRole("status")).toHaveText("This volunteer can award points for every event, including ones added later.");
+  await expect(page.getByText("Points: all events")).toBeVisible();
+
+  await page.getByRole("link", { name: "← All volunteers" }).click();
+  await expect(page.getByRole("table").first().getByRole("row", { name: /E2E Volunteer volunteer@/ })).toContainText("All events");
+
+  await adminNav(page).getByRole("link", { name: "Events", exact: true }).click();
+  await page.getByRole("button", { name: "Add event", exact: true }).click();
+  await page.getByLabel("Event name").fill("Lightning Talks");
+  await page.getByLabel("Points per participant").fill("15");
+  await page.getByLabel("Starts").fill("2026-10-25T14:00");
+  await page.getByLabel("Ends").fill("2026-10-25T15:00");
+  await page.getByRole("button", { name: "Create event" }).click();
+  await expect(page.getByRole("status")).toHaveText("“Lightning Talks” was created and switched on.");
+
+  await signOutOrganizer(page);
+  await page.getByLabel("Email").fill(E2E_VOLUNTEER.email);
+  await page.getByLabel("Password", { exact: true }).fill(E2E_VOLUNTEER.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin\/scan$/);
+  await expect(page.getByRole("link", { name: /Scan points for Lightning Talks/ })).toBeVisible();
 });
 
 test("admins create a standalone volunteer with an email and password", async ({ page }) => {

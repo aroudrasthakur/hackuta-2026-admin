@@ -44,7 +44,6 @@ const finishDecisionEmailReleaseRef = makeFunctionReference<
 
 async function setup() {
   const t = createConvexTest();
-  const reviewer = await seedStaff(t, { role: "reviewer", name: "Riley Reviewer" });
   const admin = await seedStaff(t, { role: "admin", name: "Avery Admin" });
   const applicant = await seedApplicant(t, { email: "taylor@example.com" });
   const decide = (
@@ -58,7 +57,7 @@ async function setup() {
       sessionToken: admin.sessionToken,
       ...(itemIds ? { itemIds: itemIds as never } : {}),
     });
-  return { t, reviewer, admin, applicant, decide, release };
+  return { t, admin, applicant, decide, release };
 }
 
 describe("decision email queue", () => {
@@ -83,11 +82,11 @@ describe("decision email queue", () => {
     expect(email.sentEmails()).toHaveLength(1);
   });
 
-  it("lets a reviewer read the queue and blocks them from sending", async () => {
-    const { t, reviewer, applicant, decide } = await setup();
-    await decide(reviewer.sessionToken, applicant.applicationId, "accepted");
+  it("lets an admin read the queue before sending", async () => {
+    const { t, admin, applicant, decide } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "accepted");
 
-    const queue = await t.query(listDecisionEmailQueueRef, { sessionToken: reviewer.sessionToken });
+    const queue = await t.query(listDecisionEmailQueueRef, { sessionToken: admin.sessionToken });
     expect(queue.counts).toMatchObject({ queued: 1, held: 0, sending: 0, failed: 0 });
     expect(queue.active).toHaveLength(1);
     expect(queue.active[0]).toMatchObject({
@@ -96,11 +95,6 @@ describe("decision email queue", () => {
       applicantName: "Taylor Student",
       status: "queued",
     });
-
-    await expectAdminErrorCode(
-      t.action(releaseDecisionEmailsRef, { sessionToken: reviewer.sessionToken }),
-      "ADMIN_ONLY",
-    );
     expect((await getReview(t, applicant.applicationId))?.status).not.toBe("accepted");
     expect(email.fetchMock).not.toHaveBeenCalled();
   });

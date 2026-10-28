@@ -74,7 +74,7 @@ afterEach(async () => {
 });
 
 describe("staff route policy", () => {
-  it.each(["admin", "reviewer", "volunteer"] as const)("restricts every route for %s", (role) => {
+  it.each(["admin", "volunteer"] as const)("restricts every route for %s", (role) => {
     const profile = { ...staff, role };
     for (const route of [ADMIN_ROUTES.applications, ADMIN_ROUTES.decisionEmails, ADMIN_ROUTES.applicationReview("abc")]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role !== "volunteer");
@@ -104,7 +104,7 @@ describe("staff route policy", () => {
   });
 
   it("limits the shop to admins and shop redemption to admins or volunteers with shop access", () => {
-    for (const role of ["admin", "reviewer", "volunteer"] as const) {
+    for (const role of ["admin", "volunteer"] as const) {
       expect(canAccessStaffRoute(ADMIN_ROUTES.shop, { ...staff, role }, allOptions)).toBe(role === "admin");
       expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, { ...staff, role, canRedeemShop: true }, { ...allOptions, canRedeemShop: true })).toBe(role === "volunteer" || role === "admin");
     }
@@ -135,24 +135,20 @@ describe("protected staff screens", () => {
     expect(links()).toEqual(["Dashboard", "Check-in", "Food", "Points"]);
   });
 
-  it.each(["admin", "reviewer"] as const)("shows the correct %s navigation and management routes", async (role) => {
-    await render(ADMIN_ROUTES.participants, auth({ staff: { ...staff, role } }));
-    expect(path()).toBe(role === "admin" ? ADMIN_ROUTES.participants : ADMIN_ROUTES.applications);
-    expect(links()).toEqual(
-      role === "admin"
-        ? [
-            "Applications",
-            "Decision emails",
-            "Participants",
-            "Volunteers",
-            "Events",
-            "Meals",
-            "Shop",
-            "Send notifications",
-            "Scan",
-          ]
-        : ["Applications", "Decision emails"],
-    );
+  it("shows administrator navigation and management routes", async () => {
+    await render(ADMIN_ROUTES.participants, auth({ staff: { ...staff, role: "admin" } }));
+    expect(path()).toBe(ADMIN_ROUTES.participants);
+    expect(links()).toEqual([
+      "Applications",
+      "Decision emails",
+      "Participants",
+      "Volunteers",
+      "Events",
+      "Meals",
+      "Shop",
+      "Send notifications",
+      "Scan",
+    ]);
     expect(query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
   });
 
@@ -201,9 +197,9 @@ describe("protected staff screens", () => {
     expect(current?.textContent).toBe("Volunteers");
   });
 
-  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop, ADMIN_ROUTES.meals, ADMIN_ROUTES.notifications])("sends reviewers away from %s", async (route) => {
-    await render(route, auth({ staff: { ...staff, role: "reviewer" } }));
-    expect(path()).toBe(ADMIN_ROUTES.applications);
+  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop, ADMIN_ROUTES.meals, ADMIN_ROUTES.notifications])("sends volunteers away from %s", async (route) => {
+    await render(route, auth({ staff: { ...staff, role: "volunteer" } }));
+    expect(path()).toBe(ADMIN_ROUTES.scan);
   });
 
   it.each(["/unknown", "/", "/admin", "/volunteer"])("resolves %s to the volunteer home", async (route) => {
@@ -302,7 +298,7 @@ describe("protected staff screens", () => {
   });
 
   it("clears an authenticated account's destination when its session ends", async () => {
-    await render("/admin/applications?status=waitlisted", auth({ staff: { ...staff, role: "reviewer" } }));
+    await render("/admin/applications?status=waitlisted", auth({ staff: { ...staff, role: "admin" } }));
     await render("/admin/applications?status=waitlisted", auth({ isAuthenticated: false, sessionToken: null, staff: null }));
     expect(path()).toBe(ADMIN_ROUTES.login);
     expect(container.querySelector("output")?.getAttribute("data-state")).toBe("null");
@@ -317,7 +313,7 @@ describe("protected staff screens", () => {
     expect(path()).toBe(route);
     expect(container.querySelector("h1")).toBeNull();
 
-    await render(route, auth({ staff: { ...staff, role: "reviewer" } }));
+    await render(route, auth({ staff: { ...staff, role: "admin" } }));
     expect(container.querySelector("h1")?.textContent).toBe("Applications queue");
     await render(route, { ...loading, sessionReady: true, sessionToken: "token" });
     expect(path()).toBe(route);

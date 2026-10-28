@@ -161,30 +161,21 @@ describe("meal redemption", () => {
     expect((await s.rates()).filter((row) => row.bucket.includes("failure"))).toHaveLength(2);
   });
 
-  it.each(["inactive", "expired", "deleted_session", "changed_role"])("revalidates a %s session after preview", async (change) => {
+  it.each(["inactive", "expired", "deleted_session"])("revalidates a %s session after preview", async (change) => {
     const s = await scene(); await s.preview();
     await s.t.run(async (ctx) => {
       if (change === "inactive") await ctx.db.patch(s.volunteer.adminId, { active: false });
       else if (change === "expired") await ctx.db.patch(s.volunteer.sessionId, { expiresAt: NOW });
-      else if (change === "deleted_session") await ctx.db.delete(s.volunteer.sessionId);
-      else await ctx.db.patch(s.volunteer.adminId, { role: "reviewer" });
+      else await ctx.db.delete(s.volunteer.sessionId);
     });
     const before = await s.rates();
-    const code = change === "changed_role" ? "VOLUNTEER_ONLY" : "NOT_AUTHENTICATED";
-    await expectAdminErrorCode(s.redeem(), code); await expectAdminErrorCode(s.preview(), code);
-    await expectAdminErrorCode(s.t.query(listActiveMealPeriodsRef, { sessionToken: s.volunteer.sessionToken }), code);
+    await expectAdminErrorCode(s.redeem(), "NOT_AUTHENTICATED"); await expectAdminErrorCode(s.preview(), "NOT_AUTHENTICATED");
+    await expectAdminErrorCode(s.t.query(listActiveMealPeriodsRef, { sessionToken: s.volunteer.sessionToken }), "NOT_AUTHENTICATED");
     expect(await s.rates()).toEqual(before); expect((await s.data()).redemptions).toEqual([]);
   });
 
-  it("denies a reviewer account on every meal scan entry point and allows an admin without canFoodCheckIn", async () => {
+  it("allows an admin without canFoodCheckIn", async () => {
     const s = await scene();
-    const reviewer = await seedStaff(s.t, { role: "reviewer" });
-    const reviewerArgs = { ...s.args, sessionToken: reviewer.sessionToken };
-    await expectAdminErrorCode(s.t.query(listActiveMealPeriodsRef, { sessionToken: reviewer.sessionToken }), "VOLUNTEER_ONLY");
-    await expectAdminErrorCode(s.t.mutation(resolveQrForMealRef, reviewerArgs), "VOLUNTEER_ONLY");
-    await expectAdminErrorCode(s.t.mutation(redeemMealRef, reviewerArgs), "VOLUNTEER_ONLY");
-    expect(await s.rates()).toEqual([]);
-
     const adminArgs = { ...s.args, sessionToken: s.admin.sessionToken };
     expect((await s.t.query(listActiveMealPeriodsRef, { sessionToken: s.admin.sessionToken })).map((m) => m.mealPeriodId)).toEqual([s.mealPeriodId]);
     expect(await s.t.mutation(resolveQrForMealRef, adminArgs)).toMatchObject({ status: "ok", meal: { mealPeriodId: s.mealPeriodId } });

@@ -395,11 +395,11 @@ describe("promoteParticipantToVolunteer", () => {
 });
 
 describe("participant admin access", () => {
-  it.each(["reviewer", "volunteer", "invalid"] as const)("denies every participant admin API to a %s caller without writes", async (condition) => {
+  it.each(["volunteer", "invalid"] as const)("denies every participant admin API to a %s caller without writes", async (condition) => {
     const { t, admin } = await fixture();
     const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 5 } });
-    const sessionToken = condition === "invalid" ? "" : (await seedStaff(t, { role: condition })).sessionToken;
-    const code = condition === "reviewer" ? "ADMIN_ONLY" : condition === "volunteer" ? "NOT_AUTHORIZED" : "NOT_AUTHENTICATED";
+    const sessionToken = condition === "invalid" ? "" : (await seedStaff(t, { role: "volunteer" })).sessionToken;
+    const code = condition === "volunteer" ? "NOT_AUTHORIZED" : "NOT_AUTHENTICATED";
     const snapshot = () => t.run(async (ctx) => ({
       participants: await ctx.db.query("participants").collect(),
       logs: await ctx.db.query("volunteerActionLogs").collect(),

@@ -64,7 +64,7 @@ function VolunteerRoster({ sessionToken }: { sessionToken: string }) {
                     </AdminStatusBadge>
                   </td>
                   <td>{volunteerPermissions(volunteer)}</td>
-                  <td>{volunteer.events.length === 0 ? "None" : volunteer.events.map((event) => event.name).join(", ")}</td>
+                  <td>{volunteer.canScanAllEvents ? "All events" : volunteer.events.length === 0 ? "None" : volunteer.events.map((event) => event.name).join(", ")}</td>
                 </tr>
               ))}
             </tbody>

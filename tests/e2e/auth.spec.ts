@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
+import { E2E_ADMIN, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 test.describe("organizer authentication", () => {
@@ -27,8 +27,8 @@ test.describe("organizer authentication", () => {
   test("preserves an authorized review deep link through sign-in", async ({ page }) => {
     await page.goto("/admin/applications/e2e-app-unreviewed?source=direct");
     await expect(page).toHaveURL(/\/admin\/login$/);
-    await page.getByLabel("Email").fill(E2E_REVIEWER.email);
-    await page.getByLabel("Password", { exact: true }).fill(E2E_REVIEWER.password);
+    await page.getByLabel("Email").fill(E2E_ADMIN.email);
+    await page.getByLabel("Password", { exact: true }).fill(E2E_ADMIN.password);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/admin\/applications\/e2e-app-unreviewed\?source=direct$/);
     await expect(page.getByRole("heading", { name: "Taylor Unreviewed" })).toBeVisible();
@@ -37,14 +37,6 @@ test.describe("organizer authentication", () => {
   });
 
   test("restricts management pages to administrators", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
-    await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Applications", "Decision emails"]);
-    for (const path of ["/admin/participants", "/admin/volunteers", "/admin/volunteers/e2e-admin-lead", "/admin/events", "/admin/meals", "/admin/shop", "/admin/notifications"]) {
-      await page.goto(path);
-      await expect(page).toHaveURL(/\/admin\/applications$/);
-      await expect(page.getByRole("alert")).toContainText("current permissions");
-    }
-    await signOutOrganizer(page);
     await signInOrganizer(page, E2E_ADMIN);
     await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText([
       "Applications",
@@ -90,14 +82,14 @@ test.describe("organizer authentication", () => {
   });
 
   test("redirects home to applications after sign-in", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInOrganizer(page, E2E_ADMIN);
     await page.goto("/");
     await expect(page).toHaveURL(/\/admin\/applications$/);
   });
 
   test("rejects invalid credentials", async ({ page }) => {
     await page.goto("/admin/login");
-    await page.getByLabel("Email").fill(E2E_REVIEWER.email);
+    await page.getByLabel("Email").fill(E2E_ADMIN.email);
     await page.getByLabel("Password", { exact: true }).fill("WrongPassword1!");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByText(/incorrect email or password/i)).toBeVisible();
@@ -120,8 +112,8 @@ test.describe("organizer authentication", () => {
   });
 
   test("signs in and signs out", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
-    await expect(page.locator(".admin-topbar__identity-name")).toHaveText(E2E_REVIEWER.name);
+    await signInOrganizer(page, E2E_ADMIN);
+    await expect(page.locator(".admin-topbar__identity-name")).toHaveText(E2E_ADMIN.name);
     await signOutOrganizer(page);
     await page.goto("/admin/applications");
     await expect(page).toHaveURL(/\/admin\/login$/);
@@ -129,7 +121,7 @@ test.describe("organizer authentication", () => {
 
   for (const failure of ["network", "HTTP"] as const) {
     test(`shows a retryable error after a ${failure} sign-out failure`, async ({ page }) => {
-      await signInOrganizer(page, E2E_REVIEWER);
+      await signInOrganizer(page, E2E_ADMIN);
       await page.route("**/api/admin/sign-out", (route) => failure === "network"
         ? route.abort("failed")
         : route.fulfill({ status: 503, contentType: "text/plain", body: "Temporarily unavailable" }));

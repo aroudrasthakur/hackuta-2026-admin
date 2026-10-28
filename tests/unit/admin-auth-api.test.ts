@@ -5,7 +5,7 @@ import signOutRoute from "../../api/admin/sign-out";
 import { ADMIN_SESSION_COOKIE, isSecureRequest, readAdminSessionCookie, serializeAdminSessionCookie } from "../../server/adminAuthCookie";
 import { routeAdminAuthRequest } from "../../server/adminAuthHandlers";
 import { viteAdminAuthApiPlugin } from "../../server/viteAdminAuthApiPlugin";
-import { E2E_REVIEWER } from "../../shared/admin/e2e/credentials";
+import { E2E_ADMIN } from "../../shared/admin/e2e/credentials";
 import { ADMIN_ERROR_MESSAGES, SIGN_IN_FAILED_MESSAGE } from "../../shared/admin/errors";
 
 const convex = vi.hoisted(() => ({ mutation: vi.fn(), urls: [] as string[] }));
@@ -138,14 +138,14 @@ describe("sign-in API", () => {
 
   it("returns the same failure shape from the E2E mock as from Convex", async () => {
     vi.stubEnv("VITE_E2E_MOCK", "true");
-    const mocked = await signInRoute(post("/api/admin/sign-in", { email: E2E_REVIEWER.email, password: "wrong" }));
+    const mocked = await signInRoute(post("/api/admin/sign-in", { email: E2E_ADMIN.email, password: "wrong" }));
     vi.stubEnv("VITE_E2E_MOCK", "false");
     convex.mutation.mockResolvedValue({
       ok: false,
       code: "INVALID_CREDENTIALS",
       error: ADMIN_ERROR_MESSAGES.INVALID_CREDENTIALS,
     });
-    const real = await signInRoute(post("/api/admin/sign-in", { email: E2E_REVIEWER.email, password: "wrong" }));
+    const real = await signInRoute(post("/api/admin/sign-in", { email: E2E_ADMIN.email, password: "wrong" }));
 
     expect(mocked.status).toBe(real.status);
     expect(await mocked.json()).toEqual(await real.json());

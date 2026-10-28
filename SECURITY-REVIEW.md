@@ -32,7 +32,7 @@ or role verification. Any unauthenticated caller could invoke it to create an ad
 account or reset the password and credentials of existing admin accounts.
 
 The mutation now requires a valid caller session (`requireAdminSession`), validates
-that the caller has `role: "admin"`, and rejects unauthenticated or reviewer callers.
+that the caller has `role: "admin"`, and rejects unauthenticated or volunteer callers.
 Unit tests verify both unauthorized rejection and authorized execution.
 
 ## Finding 3: Unauthenticated Sample Application Injection via Public Mutation
@@ -47,7 +47,7 @@ authentication or session checks. Any unauthenticated caller could invoke it to 
 arbitrary user records, applications with submitted status, and arbitrary review decisions.
 
 The mutation now requires a valid caller session (`requireAdminSession`) with `admin`
-role, rejecting unauthenticated callers and reviewers. Unit tests verify unauthorized
+role, rejecting unauthenticated callers and volunteers. Unit tests verify unauthorized
 rejection and authorized execution.
 
 ## Finding 4: Account Enumeration via Timing Side-Channel in Organizer Sign-In

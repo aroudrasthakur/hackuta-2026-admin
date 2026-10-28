@@ -22,10 +22,10 @@ Vite, React 19, TypeScript, React Router, Convex, Tailwind CSS v4.
 | `/admin/meals` | Admin-only meal schedules, serving availability, live counts, and collection history |
 | `/admin/shop` | Admin shop: items and stock, flash sales (`?tab=sales`), purchase history (`?tab=history`) |
 | `/admin/applications` | Submitted application queue |
-| `/admin/decision-emails` | Decision email queue for admins and reviewers |
+| `/admin/decision-emails` | Decision email queue for admins |
 | `/admin/applications/:id` | Application review, decisions, history (admin) |
 
-`/admin` redirects admins and reviewers to applications and volunteers to the scanner dashboard. Participant and volunteer management pages currently show protected placeholders.
+`/admin` redirects admins to applications and volunteers to the scanner dashboard. Participant and volunteer management pages currently show protected placeholders.
 
 ## Commands
 

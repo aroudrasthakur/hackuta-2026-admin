@@ -34,7 +34,7 @@ const ref = {
 describe("organizer sign-in edge cases", () => {
   it("normalizes the email before looking up the account", async () => {
     const t = createConvexTest();
-    await seedAdminAccount(t, { email: "case@hackuta.org", role: "reviewer", active: true });
+    await seedAdminAccount(t, { email: "case@hackuta.org", role: "admin", active: true });
     const { sessionToken } = await signInOrganizer(t, "  CASE@HackUTA.org ");
     expect(await t.query(ref.getCurrentStaff, { sessionToken })).toMatchObject({ email: "case@hackuta.org" });
   });

@@ -16,7 +16,7 @@
 | [`ShopPage.tsx`](ShopPage.tsx) | `/admin/shop` (admins): items, flash sales, history |
 | [`VolunteerShopPage.tsx`](VolunteerShopPage.tsx) | `/admin/scan/shop` (volunteers with shop access) |
 
-Admins and reviewers land on applications; volunteers land on `/admin/scan`.
+Admins land on applications; volunteers land on `/admin/scan`.
 Login restores authorized internal destinations; unknown routes return home.
 
 Scan access follows `listMyScanOptions`: check-in, food, and shop need explicit grants,

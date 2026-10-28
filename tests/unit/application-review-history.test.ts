@@ -4,27 +4,29 @@ import { hashSessionToken } from "../../convex/admin/staffAuth";
 import { listApplicationReviewLogsRef, type ReviewHistoryEvent } from "../../src/convex/adminApi";
 import { createConvexTest } from "../helpers/convexTestContext";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
-const tokens = { admin: "a".repeat(64), reviewer: "b".repeat(64) };
+const tokens = { admin: "a".repeat(64), other: "b".repeat(64), volunteer: "c".repeat(64) };
 const firstPage = { numItems: 25, cursor: null };
 
 async function createFixture() {
   const t = createConvexTest();
   const hashes = {
     admin: await hashSessionToken(tokens.admin),
-    reviewer: await hashSessionToken(tokens.reviewer),
+    other: await hashSessionToken(tokens.other),
+    volunteer: await hashSessionToken(tokens.volunteer),
   };
   const ids = await t.run(async (ctx) => {
-    const addStaff = async (role: "admin" | "reviewer", name: string) => {
+    const addStaff = async (key: keyof typeof hashes, role: "admin" | "volunteer", name: string) => {
       const adminId = await ctx.db.insert("admins", {
-        email: `${role}@hackuta.org`, name, role, active: true, createdAt: 1, updatedAt: 1,
+        email: `${key}@hackuta.org`, name, role, active: true, createdAt: 1, updatedAt: 1,
       });
       await ctx.db.insert("adminSessions", {
-        adminId, sessionTokenHash: hashes[role], createdAt: Date.now(), expiresAt: Date.now() + 60_000,
+        adminId, sessionTokenHash: hashes[key], createdAt: Date.now(), expiresAt: Date.now() + 60_000,
       });
       return adminId;
     };
-    const adminId = await addStaff("admin", "Avery Admin");
-    const reviewerId = await addStaff("reviewer", "Riley Reviewer");
+    const adminId = await addStaff("admin", "admin", "Avery Admin");
+    const reviewerId = await addStaff("other", "admin", "Riley Reviewer");
+    await addStaff("volunteer", "volunteer", "Riley Volunteer");
     const userId = await ctx.db.insert("users", { email: "applicant@example.com" });
     const applicationId = await ctx.db.insert("applications", {
       authUserId: userId, email: "applicant@example.com", createdAt: 1, formSubmitted: true, submittedAt: 2,
@@ -63,12 +65,12 @@ const withoutIds = (page: ReviewHistoryEvent[]) =>
   page.map(({ actorName, action, createdAt }) => ({ actorName, action, createdAt }));
 
 describe("admin-only application review history", () => {
-  it("rejects direct backend requests from reviewer sessions", async () => {
+  it("rejects direct backend requests from volunteer sessions", async () => {
     const fixture = await createFixture();
     await seedHistory(fixture);
     await expectAdminErrorCode(fixture.t.query(listApplicationReviewLogsRef, {
-      sessionToken: tokens.reviewer, applicationId: fixture.applicationId, paginationOpts: firstPage,
-    }), "ADMIN_ONLY");
+      sessionToken: tokens.volunteer, applicationId: fixture.applicationId, paginationOpts: firstPage,
+    }), "NOT_AUTHORIZED");
   });
 
   it("returns every event newest first with organizer names, scoped to the application", async () => {

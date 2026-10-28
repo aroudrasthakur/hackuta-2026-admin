@@ -9,7 +9,7 @@ import {
 } from "../helpers/staffTestFixtures";
 import { stubEmailService } from "../helpers/reviewTestKit";
 
-async function fixture(role: "reviewer" | "admin" = "admin") {
+async function fixture(role: "admin" = "admin") {
   const t = createConvexTest();
   return { t, ...await createStaffAuthorizationFixture(t, role) };
 }
@@ -39,7 +39,7 @@ describe("confirmed acceptance participant creation (#17)", () => {
     vi.unstubAllGlobals();
   });
 
-  it.each(["reviewer", "admin"] as const)(
+  it.each(["admin"] as const)(
     "%s confirmation queues acceptance without a participant or email job",
     async (role) => {
       const { t, applicationId, adminId, sessionToken } = await fixture(role);

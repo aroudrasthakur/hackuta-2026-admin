@@ -83,7 +83,7 @@ function fixtures(): SubmittedApplicationSummary[] {
   ];
 }
 
-function staffContext(role: "reviewer" | "admin"): AdminAuthContextValue {
+function staffContext(role: "admin"): AdminAuthContextValue {
   return {
     staff: {
       adminId: "staff",
@@ -102,7 +102,7 @@ function staffContext(role: "reviewer" | "admin"): AdminAuthContextValue {
   };
 }
 
-describe.each(["reviewer", "admin"] as const)(
+describe.each(["admin"] as const)(
   "applications controls for %s",
   (role) => {
     let container: HTMLDivElement;

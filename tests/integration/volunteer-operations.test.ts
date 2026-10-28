@@ -352,6 +352,17 @@ describe("awardEventPoints", () => {
     })).toEqual({ status: "success", pointsAwarded: 10 });
   });
 
+  it("awards an unassigned later event when canScanAllEvents is on", async () => {
+    const t = createConvexTest();
+    const volunteer = await seedVolunteer(t);
+    await seedParticipant(t, { fields: { checkedInAt: 1 } });
+    await t.run((ctx) => ctx.db.patch(volunteer.adminId, { canScanAllEvents: true }));
+    const later = await seedEvent(t);
+    expect(await t.mutation(awardEventPointsRef, {
+      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, eventId: later,
+    })).toEqual({ status: "success", pointsAwarded: 10 });
+  });
+
   it("applies event changes and revoked assignments on the next scan", async () => {
     const t = createConvexTest();
     const { assignmentId, eventId, scan } = await seedAwardScene(t);
@@ -426,16 +437,14 @@ describe("throttling and sessions", () => {
     expect(await logs(t)).toEqual([]);
   });
 
-  it("throws for missing and reviewer sessions before writing anything, and allows admins without assignments", async () => {
+  it("throws for missing sessions before writing anything, and allows admins without assignments", async () => {
     const t = createConvexTest();
     const { eventId, participantId } = await seedAwardScene(t);
-    const reviewer = await seedStaff(t, { role: "reviewer" });
     const admin = await seedStaff(t, { role: "admin" });
     const calls = (sessionToken: string) => [
       t.mutation(foodCheckInParticipantRef, { sessionToken, qrCodeToken: QR_TOKEN }),
       t.mutation(awardEventPointsRef, { sessionToken, qrCodeToken: QR_TOKEN, eventId }),
     ];
-    for (const call of calls(reviewer.sessionToken)) await expectAdminErrorCode(call, "VOLUNTEER_ONLY");
     for (const call of calls("missing")) await expectAdminErrorCode(call, "NOT_AUTHENTICATED");
     expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual([]);
 

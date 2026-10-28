@@ -193,11 +193,10 @@ describe("admin shop items", () => {
 
   it("is admin only", async () => {
     const shop = await seedShop();
-    const reviewer = await seedStaff(shop.t, { role: "reviewer" });
     const itemId = await createItem(shop);
     await expectAdminErrorCode(
-      shop.t.query(listShopItemsAdminRef, { sessionToken: reviewer.sessionToken }),
-      "ADMIN_ONLY",
+      shop.t.query(listShopItemsAdminRef, { sessionToken: shop.volunteer.sessionToken }),
+      "NOT_AUTHORIZED",
     );
     await expectAdminErrorCode(
       shop.t.mutation(adjustShopStockRef, { sessionToken: shop.volunteer.sessionToken, itemId, kind: "manual", delta: 1, reason: "x" }),
@@ -294,14 +293,12 @@ describe("volunteer shop access", () => {
     expect((await state(shop, itemId)).redemptions).toBe(0);
   });
 
-  it("rejects reviewers and expired sessions while allowing admins without canRedeemShop", async () => {
+  it("rejects expired sessions while allowing admins without canRedeemShop", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop);
-    const reviewer = await seedStaff(shop.t, { role: "reviewer" });
     const expired = await seedStaff(shop.t, { role: "volunteer", expiresAt: NOW - 1 });
     await shop.t.run((ctx) => ctx.db.patch(expired.adminId, { canRedeemShop: true }));
 
-    await expectAdminErrorCode(purchase(shop, itemId, { sessionToken: reviewer.sessionToken }), "VOLUNTEER_ONLY");
     await expectAdminErrorCode(purchase(shop, itemId, { sessionToken: expired.sessionToken }), "NOT_AUTHENTICATED");
 
     const catalog = await shop.t.query(listShopCatalogForVolunteerRef, { sessionToken: shop.admin.sessionToken });

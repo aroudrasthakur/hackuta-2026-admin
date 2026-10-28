@@ -33,14 +33,14 @@ async function serve(t: ConvexTestInstance, mealPeriodId: GenericId<"mealPeriods
 }
 
 describe("admin meal management", () => {
-  it.each(["reviewer", "volunteer", "inactive", "expired", "missing"])("denies %s access to every endpoint", async (kind) => {
+  it.each(["volunteer", "inactive", "expired", "missing"])("denies %s access to every endpoint", async (kind) => {
     const { t, mealPeriodId } = await setup();
     const staff = await seedStaff(t, {
-      role: kind === "reviewer" || kind === "volunteer" ? kind : "admin",
+      role: kind === "volunteer" ? "volunteer" : "admin",
       active: kind !== "inactive", expiresAt: kind === "expired" ? 1 : Date.now() + 60_000,
     });
     const sessionToken = kind === "missing" ? "" : staff.sessionToken;
-    const code = kind === "reviewer" ? "ADMIN_ONLY" : kind === "volunteer" ? "NOT_AUTHORIZED" : "NOT_AUTHENTICATED";
+    const code = kind === "volunteer" ? "NOT_AUTHORIZED" : "NOT_AUTHENTICATED";
     for (const operation of [
       () => t.query(listMealPeriodsRef, { sessionToken }),
       () => t.query(listMealRedemptionsRef, { sessionToken, mealPeriodId, paginationOpts }),

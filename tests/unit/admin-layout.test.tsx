@@ -16,7 +16,7 @@ vi.mock("../../src/components/HackUtaLogo", () => ({
   HackUtaLogo: () => <div data-testid="logo" />,
 }));
 vi.mock("../../src/hooks/useAdminAuth", () => ({
-  useAdminAuth: () => ({ staff: { role: "reviewer" } }),
+  useAdminAuth: () => ({ staff: { role: "admin" } }),
 }));
 vi.mock("../../src/hooks/useVolunteerAccess", () => ({ useVolunteerAccess: () => undefined }));
 

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
+import { E2E_ADMIN, signInOrganizer, signInVolunteer } from "./fixtures/auth";
 
 test.describe("admin notifications management", () => {
   test("composes, previews, drafts, publishes with confirmation, filters, edits, and cancels notifications", async ({
@@ -88,17 +88,12 @@ test.describe("admin notifications management", () => {
   });
 
   test("restricts Send notifications tab to administrators", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInVolunteer(page);
     await expect(
       page
         .getByRole("navigation", { name: "Admin", exact: true })
         .getByRole("link", { name: "Send notifications" }),
     ).toHaveCount(0);
-    await page.goto("/admin/notifications");
-    await expect(page).toHaveURL(/\/admin\/applications$/);
-
-    await signOutOrganizer(page);
-    await signInVolunteer(page);
     await page.goto("/admin/notifications");
     await expect(page).toHaveURL(/\/admin\/scan$/);
   });

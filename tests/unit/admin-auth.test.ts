@@ -28,7 +28,7 @@ const ref = {
       adminId: string;
       email: string;
       name: string;
-      role: "reviewer" | "admin";
+      role: "admin";
       expiresAt: number;
     } | null
   >("admin/auth:getCurrentStaff"),
@@ -65,7 +65,6 @@ const ref = {
       sessionToken: string;
       email: string;
       name: string;
-      role: "reviewer" | "admin";
       password: string;
     },
     { adminId: string; email: string; ok: true }
@@ -96,7 +95,7 @@ async function expectSignInFailure(
   expect(result).toEqual({ ok: false, code, error: ADMIN_ERROR_MESSAGES[code] });
 }
 
-async function createAuthorizationFixture(role: "reviewer" | "admin" = "reviewer") {
+async function createAuthorizationFixture(role: "admin" = "admin") {
   const t = createTest();
   const fixture = await createStaffAuthorizationFixture(t, role);
   return { t, ...fixture };
@@ -163,14 +162,14 @@ describe("organizer auth boundary", () => {
 
   it("signs in with valid credentials and resolves staff from session token", async () => {
     const t = createTest();
-    await seedAdminAccount(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
+    await seedAdminAccount(t, { email: "admin@hackuta.org", role: "admin", active: true });
 
-    const { sessionToken } = await signInOrganizer(t, "reviewer@hackuta.org");
+    const { sessionToken } = await signInOrganizer(t, "admin@hackuta.org");
 
     const staff = await t.query(ref.getCurrentStaff, { sessionToken });
     expect(staff).toMatchObject({
-      email: "reviewer@hackuta.org",
-      role: "reviewer",
+      email: "admin@hackuta.org",
+      role: "admin",
       name: "Test Organizer",
     });
   });
@@ -239,11 +238,11 @@ describe("organizer auth boundary", () => {
     });
   });
 
-  it("blocks reviewer role from admin-only review history", async () => {
+  it("blocks volunteers from admin-only review history", async () => {
     const t = createTest();
-    await seedAdminAccount(t, { email: "reviewer@hackuta.org", role: "reviewer", active: true });
+    await seedAdminAccount(t, { email: "volunteer@hackuta.org", role: "volunteer", active: true });
     const applicationId = await seedSubmittedApplication(t);
-    const { sessionToken } = await signInOrganizer(t, "reviewer@hackuta.org");
+    const { sessionToken } = await signInOrganizer(t, "volunteer@hackuta.org");
 
     await expectAdminErrorCode(
       t.query(ref.listApplicationReviewLogs, {
@@ -251,7 +250,7 @@ describe("organizer auth boundary", () => {
         applicationId,
         paginationOpts: { numItems: 25, cursor: null },
       }),
-      "ADMIN_ONLY",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -301,38 +300,36 @@ describe("organizer auth boundary", () => {
         sessionToken: "invalid_session_token_that_does_not_exist_32",
         email: "newadmin@hackuta.org",
         name: "New Admin",
-        role: "admin",
         password: ORGANIZER_TEST_PASSWORD,
       }),
       "NOT_AUTHENTICATED",
     );
 
-    // 2. Reviewer role must be rejected
-    await seedAdminAccount(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
-    const { sessionToken: reviewerToken } = await signInOrganizer(t, "reviewer1@hackuta.org");
+    // 2. Volunteer role must be rejected
+    await seedAdminAccount(t, { email: "volunteer1@hackuta.org", role: "volunteer", active: true });
+    const { sessionToken: volunteerToken } = await signInOrganizer(t, "volunteer1@hackuta.org");
     await expectAdminErrorCode(
       t.mutation(ref.createAndProvisionAdmin, {
-        sessionToken: reviewerToken,
+        sessionToken: volunteerToken,
         email: "newadmin@hackuta.org",
         name: "New Admin",
-        role: "admin",
         password: ORGANIZER_TEST_PASSWORD,
       }),
-      "ADMIN_ONLY",
+      "NOT_AUTHORIZED",
     );
 
-    // 3. Admin role succeeds
+    // 3. Admin role succeeds and always writes the admin role
     await seedAdminAccount(t, { email: "superadmin@hackuta.org", role: "admin", active: true });
     const { sessionToken: adminToken } = await signInOrganizer(t, "superadmin@hackuta.org");
     const result = await t.mutation(ref.createAndProvisionAdmin, {
       sessionToken: adminToken,
       email: "newadmin@hackuta.org",
       name: "New Admin",
-      role: "admin",
       password: ORGANIZER_TEST_PASSWORD,
     });
     expect(result.ok).toBe(true);
     expect(result.email).toBe("newadmin@hackuta.org");
+    expect(await t.run((ctx) => ctx.db.get(result.adminId))).toMatchObject({ role: "admin" });
   });
 
   it("requires an active admin session to call createSampleApplication", async () => {
@@ -350,18 +347,18 @@ describe("organizer auth boundary", () => {
       "NOT_AUTHENTICATED",
     );
 
-    // 2. Reviewer role must be rejected
-    await seedAdminAccount(t, { email: "reviewer1@hackuta.org", role: "reviewer", active: true });
-    const { sessionToken: reviewerToken } = await signInOrganizer(t, "reviewer1@hackuta.org");
+    // 2. Volunteer role must be rejected
+    await seedAdminAccount(t, { email: "volunteer1@hackuta.org", role: "volunteer", active: true });
+    const { sessionToken: volunteerToken } = await signInOrganizer(t, "volunteer1@hackuta.org");
     await expectAdminErrorCode(
       t.mutation(ref.createSampleApplication, {
-        sessionToken: reviewerToken,
+        sessionToken: volunteerToken,
         firstName: "Test",
         lastName: "Applicant",
         email: "applicant@test.edu",
         school: "Test University",
       }),
-      "ADMIN_ONLY",
+      "NOT_AUTHORIZED",
     );
 
     // 3. Admin role succeeds
@@ -455,7 +452,7 @@ describe("organizer auth boundary", () => {
   });
 });
 
-async function signInAs(t: TestInstance, email: string, role: "reviewer" | "admin" = "reviewer") {
+async function signInAs(t: TestInstance, email: string, role: "admin" = "admin") {
   const adminId = await seedAdminAccount(t, { email, role, active: true });
   const { sessionToken } = await signInOrganizer(t, email);
   return { adminId, sessionToken };
@@ -830,7 +827,7 @@ describe("organizer session lifetime", () => {
 });
 
 describe("centralized staff authorization", () => {
-  describe.each(["reviewer", "admin"] as const)("%s decisions on drafts", (role) => {
+  describe.each(["admin"] as const)("%s decisions on drafts", (role) => {
     it.each(["accepted", "rejected", "waitlisted"] as const)(
       "rejects %s without changing application, review, logs, or participants",
       async (decision) => {
@@ -865,7 +862,7 @@ describe("centralized staff authorization", () => {
     });
   });
 
-  it.each(["reviewer", "admin"] as const)(
+  it.each(["admin"] as const)(
     "allows %s review activity and decisions with session-derived attribution",
     async (role) => {
       const { t, adminId, applicationId, sessionToken } = await createAuthorizationFixture(role);
@@ -902,7 +899,7 @@ describe("centralized staff authorization", () => {
     },
   );
 
-  describe.each(["reviewer", "admin"] as const)("%s session rejection", (role) => {
+  describe.each(["admin"] as const)("%s session rejection", (role) => {
     it.each(["missing", "fake", "expired", "revoked", "orphaned", "inactive"] as const)(
       "denies %s sessions before reading history or changing application state",
       async (condition) => {
@@ -955,11 +952,13 @@ describe("centralized staff authorization", () => {
 
   it("applies role changes to existing sessions", async () => {
     const { t, adminId, applicationId, sessionToken } = await createAuthorizationFixture("admin");
-    await t.run((ctx) => ctx.db.patch(adminId, { role: "reviewer" }));
+    await t.run((ctx) => ctx.db.patch(adminId, { role: "volunteer" }));
     await expectAdminErrorCode(t.query(ref.listApplicationReviewLogs, {
       sessionToken, applicationId, paginationOpts: { numItems: 25, cursor: null },
-    }), "ADMIN_ONLY");
-    await t.mutation(ref.logApplicationReviewAction, { sessionToken, applicationId, action: "viewed" });
+    }), "NOT_AUTHORIZED");
+    await expectAdminErrorCode(t.mutation(ref.logApplicationReviewAction, {
+      sessionToken, applicationId, action: "viewed",
+    }), "NOT_AUTHORIZED");
   });
 
   it("rejects forged acting admin IDs and role escalation arguments", async () => {

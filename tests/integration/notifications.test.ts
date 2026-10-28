@@ -50,11 +50,10 @@ afterEach(() => {
 async function seedNotificationsContext() {
   const t = createConvexTest();
   const admin = await seedStaff(t, { role: "admin" });
-  const reviewer = await seedStaff(t, { role: "reviewer" });
   const volunteer = await seedStaff(t, { role: "volunteer" });
   const { userId } = await seedApplicant(t, { review: { status: "accepted" } });
   const asParticipant = t.withIdentity({ subject: userId, email: "taylor@example.com" });
-  return { t, admin, reviewer, volunteer, userId, asParticipant };
+  return { t, admin, volunteer, userId, asParticipant };
 }
 
 describe("admin notifications management & participant notifications", () => {
@@ -451,39 +450,34 @@ describe("admin notifications management & participant notifications", () => {
   });
 
   it("restricts notification management to admins and returns null for signed-out participants", async () => {
-    const { t, reviewer, volunteer } = await seedNotificationsContext();
+    const { t, volunteer } = await seedNotificationsContext();
 
     expect(await t.query(listPublishedNotificationsRef, {})).toBeNull();
 
-    for (const [staff, expectedCode] of [
-      [reviewer, "ADMIN_ONLY"],
-      [volunteer, "NOT_AUTHORIZED"],
-    ] as const) {
-      await expectAdminErrorCode(
-        t.mutation(saveNotificationDraftRef, {
-          sessionToken: staff.sessionToken,
-          title: "Unauthorized",
-          message: "Should fail",
-          type: "general",
-        }),
-        expectedCode,
-      );
-      await expectAdminErrorCode(
-        t.mutation(publishNotificationNowRef, {
-          sessionToken: staff.sessionToken,
-          title: "Unauthorized",
-          message: "Should fail",
-          type: "general",
-        }),
-        expectedCode,
-      );
-      await expectAdminErrorCode(
-        t.query(listNotificationsAdminRef, {
-          sessionToken: staff.sessionToken,
-          paginationOpts: { numItems: 10, cursor: null },
-        }),
-        expectedCode,
-      );
-    }
+    await expectAdminErrorCode(
+      t.mutation(saveNotificationDraftRef, {
+        sessionToken: volunteer.sessionToken,
+        title: "Unauthorized",
+        message: "Should fail",
+        type: "general",
+      }),
+      "NOT_AUTHORIZED",
+    );
+    await expectAdminErrorCode(
+      t.mutation(publishNotificationNowRef, {
+        sessionToken: volunteer.sessionToken,
+        title: "Unauthorized",
+        message: "Should fail",
+        type: "general",
+      }),
+      "NOT_AUTHORIZED",
+    );
+    await expectAdminErrorCode(
+      t.query(listNotificationsAdminRef, {
+        sessionToken: volunteer.sessionToken,
+        paginationOpts: { numItems: 10, cursor: null },
+      }),
+      "NOT_AUTHORIZED",
+    );
   });
 });
