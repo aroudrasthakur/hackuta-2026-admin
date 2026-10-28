@@ -13,6 +13,7 @@ export const ADMIN_ROUTES = {
   applications: "/admin/applications",
   decisionEmails: "/admin/decision-emails",
   shop: "/admin/shop",
+  notifications: "/admin/notifications",
   applicationReview: (applicationId: string) =>
     `/admin/applications/${applicationId}`,
   volunteerDetail: (volunteerAdminId: string) =>

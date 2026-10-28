@@ -48,6 +48,7 @@ import type {
 import type * as shopAdmin from "../../convex/admin/shopAdmin";
 import type * as shopFlashSales from "../../convex/admin/shopFlashSales";
 import type * as shopRedemption from "../../convex/admin/shopRedemption";
+import type * as notificationsAdmin from "../../convex/admin/notifications";
 
 /** Shared wrapper around `makeFunctionReference` for typed admin client refs. */
 function adminModuleRef<
@@ -292,6 +293,26 @@ export const createFlashSaleRef = flashSaleRef("createFlashSale");
 export const updateFlashSaleRef = flashSaleRef("updateFlashSale");
 export const cancelFlashSaleRef = flashSaleRef("cancelFlashSale");
 export const listFlashSalesRef = flashSaleRef("listFlashSales");
+
+type NotificationsAdmin = ApiFromModules<{ notifications: typeof notificationsAdmin }>["notifications"];
+export type AdminNotificationPage = FunctionReturnType<NotificationsAdmin["listNotificationsAdmin"]>;
+export type AdminNotificationRow = AdminNotificationPage["page"][number];
+
+function notificationAdminRef<Name extends keyof NotificationsAdmin>(name: Name) {
+  return adminModuleRef<
+    NotificationsAdmin[Name]["_type"],
+    FunctionArgs<NotificationsAdmin[Name]>,
+    FunctionReturnType<NotificationsAdmin[Name]>
+  >(`admin/notifications:${name}`);
+}
+
+export const saveNotificationDraftRef = notificationAdminRef("saveNotificationDraft");
+export const publishNotificationNowRef = notificationAdminRef("publishNotificationNow");
+export const scheduleNotificationRef = notificationAdminRef("scheduleNotification");
+export const updateNotificationRef = notificationAdminRef("updateNotification");
+export const cancelNotificationRef = notificationAdminRef("cancelNotification");
+export const listNotificationsAdminRef = notificationAdminRef("listNotificationsAdmin");
+export const getNotificationAdminRef = notificationAdminRef("getNotificationAdmin");
 
 type ShopRedemption = ApiFromModules<{ redeem: typeof shopRedemption }>["redeem"];
 export type ShopCatalog = FunctionReturnType<ShopRedemption["listShopCatalogForVolunteer"]>;
