@@ -71,7 +71,7 @@ describe("scanErrorOutcome", () => {
 
 describe("previewOutcome", () => {
   it("ends the flow for failed lookups", () => {
-    for (const status of ["qr_not_found", "participant_not_eligible", "not_authorized", "rate_limited"] as const) {
+    for (const status of ["qr_not_found", "participant_not_eligible", "not_authorized", "rate_limited", "self_scan_denied"] as const) {
       expect(previewOutcome({ status })).toBe(scanFailureOutcome(status));
     }
   });
@@ -132,6 +132,7 @@ describe("operation outcomes", () => {
     for (const status of [
       "qr_not_found", "participant_not_eligible", "not_authorized", "rate_limited",
       "badge_invalid", "badge_is_registration", "badge_in_use", "badge_retired",
+      "self_scan_denied",
     ] as const) {
       expect(checkInStepOutcome({ status })).toBe(scanFailureOutcome(status));
     }
@@ -155,7 +156,7 @@ describe("operation outcomes", () => {
     });
     expect(awardOutcome({ status: "already_awarded" }, "Sam", "Workshop").title).toBe("Points already awarded");
     expect(awardOutcome({ status: "participant_not_checked_in" }, "Sam", "Workshop")).toMatchObject({ tone: "error", title: "Not checked in yet" });
-    for (const status of ["event_denied", "event_inactive", "qr_not_found", "participant_not_eligible", "rate_limited"] as const) {
+    for (const status of ["event_denied", "event_inactive", "qr_not_found", "participant_not_eligible", "rate_limited", "self_scan_denied"] as const) {
       expect(awardOutcome({ status }, "Sam", "Workshop")).toBe(scanFailureOutcome(status));
     }
   });

@@ -149,6 +149,11 @@ const OUTCOMES = {
     title: "Can't sell to yourself",
     detail: "Volunteers can't complete shop purchases for their own account. Ask another shop volunteer to help.",
   },
+  self_scan_denied: {
+    tone: "error",
+    title: "Can't scan your own badge",
+    detail: "You can't scan your own badge. Ask another volunteer.",
+  },
   rate_limited: {
     tone: "error",
     title: "Too many scans",

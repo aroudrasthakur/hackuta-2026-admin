@@ -20,9 +20,9 @@ type Status = ShopItemAdminRow["status"];
 type Errors = Partial<Record<"name" | "price" | "stock" | "low", string | undefined>>;
 
 const STATUS_OPTIONS: Array<{ value: Status; label: string }> = [
-  { value: "active", label: "Active: shown and sellable" },
-  { value: "inactive", label: "Inactive: hidden, kept for later" },
-  { value: "archived", label: "Archived: retired, history kept" },
+  { value: "active", label: "Active: Shown and sellable" },
+  { value: "inactive", label: "Inactive: Hidden, kept for later" },
+  { value: "archived", label: "Archived: Retired, history kept" },
 ];
 
 /** Add or edit drawer. Stock is set only on create; later changes go through Adjust so they are logged. */

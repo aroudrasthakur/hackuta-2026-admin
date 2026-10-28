@@ -338,6 +338,37 @@ describe("volunteer shop access", () => {
     expect((await state(shop, itemId)).redemptions).toBe(0);
   });
 
+  it("blocks an unlinked volunteer whose email matches the participant", async () => {
+    const email = "shop-self@hackuta.org";
+    const shop = await seedShop();
+    const { applicationId, userId } = await seedApplicant(shop.t, { email, review: { status: "accepted" } });
+    await shop.t.run((ctx) => ctx.db.patch(shop.volunteer.adminId, { email }));
+    const participantId = await shop.t.run((ctx) =>
+      ctx.db.insert("participants", {
+        applicationId,
+        authUserId: userId,
+        acceptedAt: 1,
+        acceptedBy: shop.admin.adminId,
+        qrCodeToken: UNKNOWN_TOKEN,
+        badgeQrCodeToken: UNKNOWN_TOKEN,
+        checkedInAt: 1,
+        points: 100,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    const itemId = await createItem(shop);
+
+    expect(await shop.t.mutation(resolveQrForScanRef, {
+      sessionToken: shop.volunteer.sessionToken, qrCodeToken: UNKNOWN_TOKEN, purpose: "shop",
+    })).toEqual({ status: "self_purchase_denied" });
+    expect(await shop.t.query(previewShopPurchaseRef, {
+      sessionToken: shop.volunteer.sessionToken, participantId, itemId, quantity: 1,
+    })).toEqual({ status: "self_purchase_denied" });
+    expect(await purchase(shop, itemId, { qr: UNKNOWN_TOKEN })).toEqual({ status: "self_purchase_denied" });
+    expect((await state(shop, itemId)).redemptions).toBe(0);
+  });
+
   it("toggles canRedeemShop from the admin panel with an audit row", async () => {
     const shop = await seedShop();
     const target = await seedStaff(shop.t, { role: "volunteer", name: "Avery" });

@@ -202,6 +202,57 @@ describe("awardEventPoints", () => {
     expect(await snapshot(t)).toEqual(state);
   });
 
+  it("rejects a promoted volunteer from awarding their own points", async () => {
+    const t = createConvexTest();
+    const { volunteer, participantId, scan } = await seedAwardScene(t);
+    await t.run((ctx) => ctx.db.patch(volunteer.adminId, { participantId }));
+    const before = await snapshot(t);
+    expect(await scan()).toEqual({ status: "self_scan_denied" });
+    expect(await snapshot(t)).toEqual(before);
+  });
+
+  it("rejects an unlinked volunteer whose email matches the participant", async () => {
+    const t = createConvexTest();
+    const volunteer = await seedVolunteer(t);
+    const email = "self-scan@hackuta.org";
+    const { applicationId, userId } = await seedApplicant(t, { email, review: { status: "accepted" } });
+    const admin = await seedStaff(t, { role: "admin" });
+    await t.run((ctx) => ctx.db.patch(volunteer.adminId, { email }));
+    const participantId = await t.run((ctx) =>
+      ctx.db.insert("participants", {
+        applicationId,
+        authUserId: userId,
+        acceptedAt: 1,
+        acceptedBy: admin.adminId,
+        qrCodeToken: QR_TOKEN,
+        registrationQrCodeToken: REGISTRATION_TOKEN,
+        badgeQrCodeToken: QR_TOKEN,
+        checkedInAt: CHECKED_IN_AT,
+        points: 25,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    const eventId = await seedEvent(t);
+    await assign(t, volunteer.adminId, eventId, admin.adminId);
+    expect(await t.mutation(awardEventPointsRef, {
+      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, eventId,
+    })).toEqual({ status: "self_scan_denied" });
+    expect(await getParticipant(t, participantId)).toMatchObject({ points: 25 });
+    expect(await snapshot(t)).toMatchObject({ awards: [], logs: [] });
+  });
+
+  it("rejects an administrator from awarding their own participant", async () => {
+    const t = createConvexTest();
+    const { participantId, eventId } = await seedAwardScene(t);
+    const admin = await seedStaff(t, { role: "admin" });
+    await t.run((ctx) => ctx.db.patch(admin.adminId, { participantId }));
+    expect(await t.mutation(awardEventPointsRef, {
+      sessionToken: admin.sessionToken, qrCodeToken: QR_TOKEN, eventId,
+    })).toEqual({ status: "self_scan_denied" });
+    expect(await snapshot(t)).toMatchObject({ awards: [], logs: [] });
+  });
+
   it("requires door check-in first", async () => {
     const t = createConvexTest();
     const { scan } = await seedAwardScene(t, { checkedInAt: undefined });

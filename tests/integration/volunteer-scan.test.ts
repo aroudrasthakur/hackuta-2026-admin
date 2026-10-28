@@ -232,6 +232,18 @@ describe("resolveQrForScan", () => {
     expect(await t.mutation(resolveQrForScanRef, args)).toMatchObject({ status: "ok", alreadyAwarded: true });
   });
 
+  it("rejects a volunteer from previewing a point scan of their own badge", async () => {
+    const t = createConvexTest();
+    const volunteer = await seedVolunteer(t);
+    const { participantId, adminId } = await seedParticipant(t);
+    const eventId = await seedEvent(t);
+    await assign(t, volunteer.adminId, eventId, adminId);
+    await t.run((ctx) => ctx.db.patch(volunteer.adminId, { participantId }));
+    expect(await t.mutation(resolveQrForScanRef, {
+      sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "point_scan", eventId,
+    })).toEqual({ status: "self_scan_denied" });
+  });
+
   it("previews a point scan for an assigned event outside its reference schedule", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t);

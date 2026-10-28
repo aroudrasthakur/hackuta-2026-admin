@@ -19,7 +19,7 @@ vi.mock("../../src/pages/admin/VolunteersPage", () => ({ VolunteersPage: () => <
 vi.mock("../../src/pages/admin/VolunteerDetailPage", () => ({ VolunteerDetailPage: () => <h1>Volunteer detail</h1> }));
 vi.mock("../../src/pages/admin/EventsPage", () => ({ EventsPage: () => <h1>Events</h1> }));
 vi.mock("../../src/pages/admin/ShopPage", () => ({ ShopPage: () => <h1>Shop</h1> }));
-vi.mock("../../src/pages/admin/NotificationsPage", () => ({ NotificationsPage: () => <h1>Send Notifications</h1> }));
+vi.mock("../../src/pages/admin/NotificationsPage", () => ({ NotificationsPage: () => <h1>Send notifications</h1> }));
 vi.mock("../../src/pages/admin/VolunteerShopPage", () => ({ VolunteerShopPage: () => <h1>Shop redemption</h1> }));
 const query = vi.hoisted(() => vi.fn());
 vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query, useMutation: () => vi.fn() }));
@@ -148,7 +148,7 @@ describe("protected staff screens", () => {
             "Events",
             "Meals",
             "Shop",
-            "Send Notifications",
+            "Send notifications",
             "Scan",
           ]
         : ["Applications", "Decision emails"],
@@ -188,7 +188,7 @@ describe("protected staff screens", () => {
     [ADMIN_ROUTES.volunteerDetail("volunteer-1"), "Volunteer detail"],
     [ADMIN_ROUTES.events, "Events"],
     [ADMIN_ROUTES.meals, "Meals"],
-    [ADMIN_ROUTES.notifications, "Send Notifications"],
+    [ADMIN_ROUTES.notifications, "Send notifications"],
   ])("opens %s for administrators", async (route, heading) => {
     await render(route, auth({ staff: { ...staff, role: "admin" } }));
     expect(path()).toBe(route);

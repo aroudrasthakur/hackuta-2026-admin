@@ -84,7 +84,7 @@ export function ScanConfirmation({
             disabled={submitting}
             aria-busy={submitting || undefined}
           >
-            {submitting ? "Saving…" : error ? `Try again: ${confirmLabel(preview).toLowerCase()}` : confirmLabel(preview)}
+            {submitting ? "Saving…" : error ? `Try again: ${confirmLabel(preview)}` : confirmLabel(preview)}
           </button>
           <button type="button" className={scanSecondaryButtonClass} onClick={onCancel} disabled={submitting}>
             Cancel

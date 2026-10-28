@@ -70,6 +70,30 @@ function expectNoQrValues(value: unknown) {
 }
 
 describe("two-step badge check-in", () => {
+  it("rejects a volunteer from checking in their own registration", async () => {
+    const s = await scene();
+    await s.t.run((ctx) => ctx.db.patch(s.volunteer.adminId, { participantId: s.participantId }));
+    const before = await s.snapshot();
+    expect(await s.registration()).toEqual({ status: "self_scan_denied" });
+    expect(await s.checkIn()).toEqual({ status: "self_scan_denied" });
+    expect(await s.snapshot()).toEqual(before);
+  });
+
+  it("rejects an unlinked volunteer whose email matches the participant", async () => {
+    const s = await scene();
+    const email = "check-in-self@hackuta.org";
+    const { applicationId, userId } = await seedApplicant(s.t, { email, review: { status: "accepted" } });
+    await s.t.run((ctx) => ctx.db.patch(s.volunteer.adminId, { email }));
+    const participantId = await s.t.run((ctx) => ctx.db.insert("participants", {
+      applicationId, authUserId: userId, acceptedBy: s.admin.adminId, acceptedAt: 1,
+      qrCodeToken: OTHER_REGISTRATION, points: 25, createdAt: 1, updatedAt: 1,
+    }));
+    const before = await s.participant(participantId);
+    expect(await s.registration(OTHER_REGISTRATION)).toEqual({ status: "self_scan_denied" });
+    expect(await s.checkIn(BADGE, OTHER_REGISTRATION)).toEqual({ status: "self_scan_denied" });
+    expect(await s.participant(participantId)).toEqual(before);
+  });
+
   it("identifies, then checks in and assigns the badge in one write", async () => {
     const s = await scene();
     const before = await s.snapshot();

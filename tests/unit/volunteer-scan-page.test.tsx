@@ -271,10 +271,10 @@ describe("check-in workflow", () => {
   it("goes back one step at a time and starts over without keeping values", async () => {
     await render("check-in");
     await reachConfirmStep();
-    await click("Back: scan a different badge");
+    await click("Back: Scan a different badge");
     expect(currentStep()).toBe("2. Badge QR");
     expect(text()).toContain("Sam Lee");
-    await click("Back: scan a different registration");
+    await click("Back: Scan a different registration");
     expect(currentStep()).toBe("1. Registration QR");
     expect(text()).not.toContain("Sam Lee");
 
@@ -322,7 +322,7 @@ describe("check-in workflow", () => {
     expect(saving.disabled).toBe(true);
     expect(saving.getAttribute("aria-busy")).toBe("true");
     expect(button("Start over")!.disabled).toBe(true);
-    expect(button("Back: scan a different badge")!.disabled).toBe(true);
+    expect(button("Back: Scan a different badge")!.disabled).toBe(true);
     await act(async () => saving.click());
     await act(async () => saving.click());
     expect(mocks.checkIn).toHaveBeenCalledTimes(1);
@@ -339,9 +339,9 @@ describe("check-in workflow", () => {
     await reachConfirmStep();
     await click("Confirm check-in");
     expect(alertText()).toContain("Too many scans");
-    await click("Try again: confirm check-in");
+    await click("Try again: Confirm check-in");
     expect(alertText()).toContain("Connection problem");
-    await click("Try again: confirm check-in");
+    await click("Try again: Confirm check-in");
     expect(result()?.textContent).toContain("Checked in");
     expect(mocks.checkIn).toHaveBeenCalledTimes(3);
   });

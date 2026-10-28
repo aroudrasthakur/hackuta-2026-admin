@@ -40,7 +40,7 @@ const NOTIFICATION_TYPE_META: Record<
   general: { label: "General", tone: "neutral" },
   event: { label: "Event", tone: "info" },
   reminder: { label: "Reminder", tone: "warning" },
-  flash_sale: { label: "Flash Sale", tone: "positive" },
+  flash_sale: { label: "Flash sale", tone: "positive" },
   important: { label: "Important", tone: "negative" },
 };
 
@@ -1004,7 +1004,7 @@ export function NotificationsPage() {
     <section aria-labelledby="notifications-heading" className="space-y-6">
       <AdminPageHeader
         id="notifications-heading"
-        title="Send Notifications"
+        title="Send notifications"
         description="Compose, preview, schedule, and manage live participant announcements across the event."
       />
       {staff?.role === "admin" && sessionToken ? (
