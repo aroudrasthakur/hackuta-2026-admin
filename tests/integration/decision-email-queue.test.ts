@@ -345,4 +345,60 @@ describe("decision email queue", () => {
       "application_accepted",
     ]);
   });
+
+  it("updates a failed queue row in place when a decision is changed so retry cannot send two decisions", async () => {
+    const { t, admin, applicant, decide, release } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "accepted");
+    email.fetchMock.mockRejectedValueOnce(new Error("smtp down"));
+    await release();
+    const callsAfterFailedAttempt = email.sentEmails().length;
+
+    await decide(admin.sessionToken, applicant.applicationId, "rejected");
+    await t.mutation(retryFailedDecisionEmailsRef, { sessionToken: admin.sessionToken });
+    const rows = await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ decision: "rejected", status: "queued" });
+
+    const sent = await release();
+    expect(sent).toEqual({ sent: 1, failed: 0, total: 1 });
+    expect(email.sentEmails().slice(callsAfterFailedAttempt).map((item) => item.body.note)).toEqual([
+      "application_rejected",
+    ]);
+    expect((await getReview(t, applicant.applicationId))?.status).toBe("rejected");
+  });
+
+  it("recovers stale sending rows instead of deadlocking future releases", async () => {
+    const { t, admin, applicant, decide, release } = await setup();
+    const second = await seedApplicant(t, { email: "second@example.com" });
+    await decide(admin.sessionToken, applicant.applicationId, "rejected");
+    await decide(admin.sessionToken, second.applicationId, "accepted");
+
+    await t.run(async (ctx) => {
+      const firstRow = await ctx.db
+        .query("decisionEmailQueue")
+        .withIndex("by_application", (q) => q.eq("applicationId", applicant.applicationId))
+        .unique();
+      await ctx.db.patch(firstRow!._id, {
+        status: "sending",
+        updatedAt: Date.now() - 15 * 60 * 1000,
+      });
+    });
+
+    const result = await release();
+    expect(result).toEqual({ sent: 1, failed: 0, total: 1 });
+    expect((await getReview(t, second.applicationId))?.status).toBe("accepted");
+
+    const retried = await t.mutation(retryFailedDecisionEmailsRef, { sessionToken: admin.sessionToken });
+    expect(retried).toEqual({ retried: 1 });
+  });
+
+  it("deduplicates duplicate itemIds in a single release call", async () => {
+    const { t, admin, applicant, decide, release } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "accepted");
+    const row = await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique());
+
+    const result = await release([row!._id, row!._id]);
+    expect(result).toEqual({ sent: 1, failed: 0, total: 1 });
+    expect(email.sentEmails()).toHaveLength(1);
+  });
 });
