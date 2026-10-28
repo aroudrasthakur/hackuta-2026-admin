@@ -4,26 +4,36 @@ import { setDecisionQueue } from "./fixtures/decisionQueue";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 const widths = [320, 375, 768, 1024, 1440];
-const adminPages = ["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Meals", "Shop", "Send Notifications"] as const;
+const adminPages = [
+  { link: "Applications", heading: "Applications" },
+  { link: "Decision emails", heading: "Decision emails" },
+  { link: "Participants", heading: "Participants" },
+  { link: "Volunteers", heading: "Volunteers" },
+  { link: "Events", heading: "Events" },
+  { link: "Meals", heading: "Meals" },
+  { link: "Shop", heading: "Shop" },
+  { link: "Send Notifications", heading: "Send Notifications" },
+  { link: "Scan", heading: /Good (morning|afternoon|evening),/ },
+] as const;
 
 test("keeps page headers and role navigation usable at every dashboard width", async ({ page }, testInfo) => {
   await signInOrganizer(page, E2E_ADMIN);
   await page.getByRole("button", { name: "Calm", exact: true }).click();
   const navigation = page.getByRole("navigation", { name: "Admin", exact: true });
   await page.setViewportSize({ width: 1440, height: 900 });
-  for (const name of adminPages) {
-    await navigation.getByRole("link", { name, exact: true }).click();
-    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(name);
-    await expect(navigation.locator('[aria-current="page"]')).toHaveText(name);
-    await expect(navigation.getByRole("link")).toHaveCount(8);
+  for (const { link, heading } of adminPages) {
+    await navigation.getByRole("link", { name: link, exact: true }).click();
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText(heading);
+    await expect(navigation.locator('[aria-current="page"]')).toHaveText(link);
+    await expect(navigation.getByRole("link")).toHaveCount(adminPages.length);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await reviewScreenshot(page, `${name.toLowerCase().replaceAll(" ", "-")}-1440.png`, testInfo);
+    await reviewScreenshot(page, `${link.toLowerCase().replaceAll(" ", "-")}-1440.png`, testInfo);
   }
   await navigation.getByRole("link", { name: "Applications", exact: true }).click();
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toHaveText("Applications");
-    await expect(navigation.getByRole("link")).toHaveCount(8);
+    await expect(navigation.getByRole("link")).toHaveCount(adminPages.length);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width === 375) await reviewScreenshot(page, "applications-375.png", testInfo);
   }
