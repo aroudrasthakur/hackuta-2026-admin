@@ -1,17 +1,29 @@
+import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { AdminStatusBadge } from "../../components/AdminStatusBadge";
 import { VolunteerActivityLog } from "../../components/admin/VolunteerActivityLog";
 import { EmptyState } from "../../components/states/EmptyState";
 import { LoadingState } from "../../components/states/LoadingState";
-import { usePaginatedQuery } from "../../convex/reactBindings";
-import { listVolunteersRef } from "../../convex/adminApi";
+import { useMutation, usePaginatedQuery } from "../../convex/reactBindings";
+import { createVolunteerRef, listVolunteersRef } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
-import { reviewPrimaryButtonClass } from "../../lib/reviewButtonClasses";
+import { reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { volunteerPermissions } from "../../lib/staffLogFormat";
+import { reportUserFacingError } from "../../lib/userFacingError";
 import { ADMIN_ROUTES } from "../../types/routes";
+import { PASSWORD_MIN_LENGTH, PASSWORD_REQUIREMENTS_MESSAGE } from "../../../shared/auth/password";
 
 const PAGE_SIZE = 25;
+
+function meetsPasswordRequirements(password: string) {
+  return (
+    password.length >= PASSWORD_MIN_LENGTH &&
+    /\d/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password)
+  );
+}
 
 function VolunteerRoster({ sessionToken }: { sessionToken: string }) {
   const { results, status, loadMore } = usePaginatedQuery(listVolunteersRef, { sessionToken }, { initialNumItems: PAGE_SIZE });
@@ -23,7 +35,7 @@ function VolunteerRoster({ sessionToken }: { sessionToken: string }) {
       {status !== "LoadingFirstPage" && results.length === 0 ? (
         <EmptyState
           title="No volunteers yet"
-          description="Promote an accepted participant from the Participants page to create a volunteer account."
+          description="Add a volunteer here, or promote an accepted participant from the Participants page."
         />
       ) : null}
       {results.length > 0 ? (
@@ -70,6 +82,155 @@ function VolunteerRoster({ sessionToken }: { sessionToken: string }) {
   );
 }
 
+function AddVolunteerSection({ sessionToken }: { sessionToken: string }) {
+  const createVolunteer = useMutation(createVolunteerRef);
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ email: string; adminId: string } | null>(null);
+
+  function resetForm() {
+    setName("");
+    setEmail("");
+    setPassword("");
+    setShowPassword(false);
+  }
+
+  function closeForm() {
+    setAdding(false);
+    setError(null);
+    resetForm();
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    if (!meetsPasswordRequirements(password)) {
+      setError(PASSWORD_REQUIREMENTS_MESSAGE);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await createVolunteer({
+        sessionToken,
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
+      resetForm();
+      setAdding(false);
+      setCreated({ email: result.email, adminId: result.adminId });
+    } catch (caught) {
+      setError(reportUserFacingError(
+        "Unable to create volunteer",
+        caught,
+        "The volunteer account was not created. Check the name, email, and password, then try again.",
+        { source: "VolunteersPage.createVolunteer" },
+      ));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {error ? <p role="alert" className="admin-callout admin-callout--alert">{error}</p> : null}
+      {created ? (
+        <p role="status" className="admin-callout">
+          Volunteer account created for {created.email}.{" "}
+          <Link className="font-semibold text-night underline" to={ADMIN_ROUTES.volunteerDetail(created.adminId)}>
+            Manage access
+          </Link>
+        </p>
+      ) : null}
+
+      {adding ? (
+        <section aria-labelledby="add-volunteer-heading" className="admin-card admin-card__body space-y-4">
+          <h2 id="add-volunteer-heading" className="admin-card__title">Add volunteer</h2>
+          <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => void submit(event)} noValidate>
+            <label className="admin-field" htmlFor="new-volunteer-name">
+              Full name
+              <input
+                id="new-volunteer-name"
+                className="admin-field__control"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoComplete="off"
+                required
+              />
+            </label>
+            <label className="admin-field" htmlFor="new-volunteer-email">
+              Sign-in email
+              <input
+                id="new-volunteer-email"
+                type="email"
+                className="admin-field__control"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="off"
+                required
+              />
+            </label>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="admin-field" htmlFor="new-volunteer-password">
+                Initial password
+                <input
+                  id="new-volunteer-password"
+                  type={showPassword ? "text" : "password"}
+                  className="admin-field__control"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={PASSWORD_MIN_LENGTH}
+                  aria-describedby="new-volunteer-password-help"
+                  required
+                />
+              </label>
+              <button
+                type="button"
+                className={reviewSecondaryButtonClass}
+                aria-pressed={showPassword}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                {showPassword ? "Hide password" : "Show password"}
+              </button>
+              <p id="new-volunteer-password-help" className="text-sm text-ocean">{PASSWORD_REQUIREMENTS_MESSAGE}</p>
+            </div>
+            <p className="admin-callout text-sm sm:col-span-2">
+              New volunteers start with no access. Grant check-in, food, shop, or event points from their volunteer page.
+            </p>
+            <div className="flex flex-wrap gap-2 sm:col-span-2">
+              <button type="submit" disabled={saving} className={reviewPrimaryButtonClass}>
+                {saving ? "Creating…" : "Create volunteer"}
+              </button>
+              <button type="button" disabled={saving} className={reviewSecondaryButtonClass} onClick={closeForm}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : (
+        <button
+          type="button"
+          className={reviewPrimaryButtonClass}
+          onClick={() => {
+            setError(null);
+            setAdding(true);
+          }}
+        >
+          Add volunteer
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function VolunteersPage() {
   const { sessionToken, staff } = useAdminAuth();
   return (
@@ -81,6 +242,7 @@ export function VolunteersPage() {
       />
       {staff?.role === "admin" && sessionToken ? (
         <>
+          <AddVolunteerSection sessionToken={sessionToken} />
           <VolunteerRoster sessionToken={sessionToken} />
           <VolunteerActivityLog sessionToken={sessionToken} headingId="volunteer-activity-heading" title="Activity log" />
         </>

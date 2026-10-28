@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { PASSWORD_REQUIREMENTS_MESSAGE } from "../../shared/auth/password";
+import { ADMIN_ERROR_MESSAGES } from "../../shared/admin/errors";
 import { E2E_ADMIN, signInOrganizer } from "./fixtures/auth";
 
 test.beforeEach(async ({ page }) => {
@@ -66,4 +68,33 @@ test("admins review volunteers, open one volunteer's log, and assign events", as
 
   await page.getByRole("link", { name: "← All volunteers" }).click();
   await expect(page.getByRole("table").first().getByRole("row", { name: /E2E Volunteer volunteer@/ })).toContainText("Intro to Hardware");
+});
+
+test("admins create a standalone volunteer with an email and password", async ({ page }) => {
+  await adminNav(page).getByRole("link", { name: "Volunteers", exact: true }).click();
+  await page.getByRole("button", { name: "Add volunteer", exact: true }).click();
+  await page.getByLabel("Full name").fill("Pat Standalone");
+  await page.getByLabel("Sign-in email").fill("standalone@e2e.hackuta.test");
+  await page.getByLabel("Initial password").fill("weak");
+  await page.getByRole("button", { name: "Create volunteer" }).click();
+  await expect(page.getByRole("alert")).toHaveText(PASSWORD_REQUIREMENTS_MESSAGE);
+
+  await page.getByLabel("Initial password").fill("Standalone1");
+  await page.getByRole("button", { name: "Show password" }).click();
+  await expect(page.getByLabel("Initial password")).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Create volunteer" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Volunteer account created for standalone@e2e.hackuta.test." })).toBeVisible();
+  const roster = page.getByRole("table").first();
+  await expect(roster.getByRole("row", { name: /Pat Standalone/ })).toContainText("None");
+
+  await page.getByRole("button", { name: "Add volunteer", exact: true }).click();
+  await page.getByLabel("Full name").fill("Pat Duplicate");
+  await page.getByLabel("Sign-in email").fill("standalone@e2e.hackuta.test");
+  await page.getByLabel("Initial password").fill("Standalone1");
+  await page.getByRole("button", { name: "Create volunteer" }).click();
+  await expect(page.getByRole("alert")).toHaveText(ADMIN_ERROR_MESSAGES.STAFF_ACCOUNT_EXISTS);
+
+  await page.getByRole("link", { name: "Manage access" }).click();
+  await expect(page).toHaveURL(/\/admin\/volunteers\/e2e-volunteer-/);
+  await expect(page.getByRole("heading", { name: "Pat Standalone", level: 1 })).toBeVisible();
 });
