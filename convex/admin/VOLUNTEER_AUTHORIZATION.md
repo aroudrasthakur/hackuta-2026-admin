@@ -14,11 +14,11 @@ Applicant Convex Auth (`convex/auth.ts`) never satisfies staff guards.
 | --- | --- | --- |
 | `requireReviewerAccess` | Active reviewer or admin | Application list/detail, review activity, decisions, decision-email queue reads |
 | `requireAdminRole` | Active admin | Review history, sample apps, organizer provisioning, decision-email hold/retry/release, all of `volunteers.ts` |
-| `requireVolunteerAccess` | Active volunteer only | Any volunteer-only participant/event operation (check-in, food, point scan UI) |
-| `requireVolunteerCapability` | Volunteer with explicit `true` on `canCheckIn` or `canFoodCheckIn` | Door check-in or food scan mutations (missing flag = denied) |
-| `requireVolunteerEventAccess` | Volunteer with a **current** `volunteerEventAccess` row and an **active** event | Point scan mutations that award event-fixed points |
+| `requireVolunteerAccess` | Active volunteer or admin | Any participant/event scan operation (check-in, food, point scan, shop) |
+| `requireVolunteerCapability` | Admin, or volunteer with explicit `true` on `canCheckIn`, `canFoodCheckIn`, or `canRedeemShop` | Door check-in, food scan, or shop mutations (missing flag on a volunteer = denied) |
+| `requireVolunteerEventAccess` | Admin, or volunteer with a **current** `volunteerEventAccess` row, plus an **active** event | Point scan mutations that award event-fixed points |
 
-Admins and reviewers **cannot** call volunteer guards: they receive `VOLUNTEER_ONLY`. Volunteers **cannot** call review guards: they receive `NOT_AUTHORIZED`.
+Reviewers **cannot** call volunteer guards: they receive `VOLUNTEER_ONLY`. Volunteers **cannot** call review guards: they receive `NOT_AUTHORIZED`. Administrators automatically satisfy all scan capability and event-access checks.
 
 Acting identity always comes from the guard return value (`admin._id`). Never trust client-supplied admin ids, roles, or capabilities.
 

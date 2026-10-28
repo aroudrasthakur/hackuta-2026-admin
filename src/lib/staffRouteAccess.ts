@@ -25,10 +25,14 @@ export function canAccessStaffRoute(
     /^\/admin\/applications\/[^/]+$/.test(pathname)) {
     return staff.role === "admin" || staff.role === "reviewer";
   }
-  if (pathname === ADMIN_ROUTES.scan || pathname === ADMIN_ROUTES.volunteer) {
+  if (pathname === ADMIN_ROUTES.volunteer) {
     return staff.role === "volunteer";
   }
+  if (pathname === ADMIN_ROUTES.scan) {
+    return staff.role === "volunteer" || staff.role === "admin";
+  }
   if ([ADMIN_ROUTES.scanCheckIn, ADMIN_ROUTES.scanFood, ADMIN_ROUTES.scanPoints, ADMIN_ROUTES.scanShop].some((path) => path === pathname)) {
+    if (staff.role === "admin") return true;
     if (staff.role !== "volunteer") return false;
     if (!options) return undefined;
     if (pathname === ADMIN_ROUTES.scanCheckIn) return staff.canCheckIn === true && options.canCheckIn;

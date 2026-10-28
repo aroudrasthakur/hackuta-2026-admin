@@ -82,25 +82,31 @@ describe("staff route policy", () => {
     for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.events, ADMIN_ROUTES.shop, ADMIN_ROUTES.notifications]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role === "admin");
     }
-    for (const route of [ADMIN_ROUTES.scan, ADMIN_ROUTES.volunteer, ADMIN_ROUTES.scanCheckIn, ADMIN_ROUTES.scanFood, ADMIN_ROUTES.scanPoints]) {
-      expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role === "volunteer");
+    expect(canAccessStaffRoute(ADMIN_ROUTES.volunteer, profile, allOptions)).toBe(role === "volunteer");
+    for (const route of [ADMIN_ROUTES.scan, ADMIN_ROUTES.scanCheckIn, ADMIN_ROUTES.scanFood, ADMIN_ROUTES.scanPoints]) {
+      expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role === "volunteer" || role === "admin");
     }
     expect(canAccessStaffRoute("/unknown", profile, allOptions)).toBe(false);
     expect(canAccessStaffRoute("/admin", profile, allOptions)).toBe(true);
     expect(staffHome(profile)).toBe(role === "volunteer" ? ADMIN_ROUTES.scan : ADMIN_ROUTES.applications);
   });
 
-  it("denies missing flags and waits for assignment information", () => {
+  it("denies missing flags on volunteers, waits for assignment information, and grants admins full scan access", () => {
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanCheckIn, staff, undefined)).toBeUndefined();
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanCheckIn, { ...staff, canCheckIn: undefined }, allOptions)).toBe(false);
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanFood, { ...staff, canFoodCheckIn: false }, allOptions)).toBe(false);
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanPoints, staff, { ...allOptions, events: [] })).toBe(false);
+    const adminProfile: StaffProfile = { ...staff, role: "admin", canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false };
+    for (const route of [ADMIN_ROUTES.scan, ADMIN_ROUTES.scanCheckIn, ADMIN_ROUTES.scanFood, ADMIN_ROUTES.scanPoints, ADMIN_ROUTES.scanShop]) {
+      expect(canAccessStaffRoute(route, adminProfile, undefined)).toBe(true);
+      expect(canAccessStaffRoute(route, adminProfile, { canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false, events: [] })).toBe(true);
+    }
   });
 
-  it("limits the shop to admins and shop redemption to volunteers with shop access", () => {
+  it("limits the shop to admins and shop redemption to admins or volunteers with shop access", () => {
     for (const role of ["admin", "reviewer", "volunteer"] as const) {
       expect(canAccessStaffRoute(ADMIN_ROUTES.shop, { ...staff, role }, allOptions)).toBe(role === "admin");
-      expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, { ...staff, role, canRedeemShop: true }, { ...allOptions, canRedeemShop: true })).toBe(role === "volunteer");
+      expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, { ...staff, role, canRedeemShop: true }, { ...allOptions, canRedeemShop: true })).toBe(role === "volunteer" || role === "admin");
     }
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, { ...staff, canRedeemShop: true }, undefined)).toBeUndefined();
     expect(canAccessStaffRoute(ADMIN_ROUTES.scanShop, staff, { ...allOptions, canRedeemShop: true })).toBe(false);
@@ -132,8 +138,36 @@ describe("protected staff screens", () => {
   it.each(["admin", "reviewer"] as const)("shows the correct %s navigation and management routes", async (role) => {
     await render(ADMIN_ROUTES.participants, auth({ staff: { ...staff, role } }));
     expect(path()).toBe(role === "admin" ? ADMIN_ROUTES.participants : ADMIN_ROUTES.applications);
-    expect(links()).toEqual(role === "admin" ? ["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Meals", "Shop", "Send Notifications"] : ["Applications", "Decision emails"]);
+    expect(links()).toEqual(
+      role === "admin"
+        ? [
+            "Applications",
+            "Decision emails",
+            "Participants",
+            "Volunteers",
+            "Events",
+            "Meals",
+            "Shop",
+            "Send Notifications",
+            "Scan",
+          ]
+        : ["Applications", "Decision emails"],
+    );
     expect(query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
+  });
+
+  it.each([
+    [ADMIN_ROUTES.scan, /Good (morning|afternoon|evening),/],
+    [ADMIN_ROUTES.scanCheckIn, "Participant check-in"],
+    [ADMIN_ROUTES.scanFood, "Food distribution"],
+    [ADMIN_ROUTES.scanPoints, "Event points"],
+    [ADMIN_ROUTES.scanShop, "Shop redemption"],
+  ] as const)("opens scan route %s for administrators and highlights the Scan tab", async (route, heading) => {
+    const adminAuth = auth({ staff: { ...staff, role: "admin", canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false } });
+    await render(route, adminAuth);
+    expect(path()).toBe(route);
+    expect(container.querySelector("h1")?.textContent).toMatch(heading);
+    expect(container.querySelector('nav a[aria-current="page"]')?.textContent).toBe("Scan");
   });
 
   it("opens the shop for administrators and shop redemption for shop volunteers", async () => {

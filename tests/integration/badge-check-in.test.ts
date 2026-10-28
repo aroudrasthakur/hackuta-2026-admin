@@ -179,10 +179,18 @@ describe("two-step badge check-in", () => {
 
     await s.t.run((ctx) => ctx.db.patch(s.volunteer.adminId, { canCheckIn: false }));
     expect(await s.checkIn()).toEqual({ status: "not_authorized" });
-    const admin = await seedStaff(s.t, { role: "admin" });
+    const reviewer = await seedStaff(s.t, { role: "reviewer" });
     await expectAdminErrorCode(s.t.mutation(checkInWithBadgeRef, {
-      sessionToken: admin.sessionToken, registrationQrCodeToken: REGISTRATION, badgeQrCodeToken: BADGE,
+      sessionToken: reviewer.sessionToken, registrationQrCodeToken: REGISTRATION, badgeQrCodeToken: BADGE,
     }), "VOLUNTEER_ONLY");
+
+    const freshId = await seedParticipant(s.t, s.admin.adminId, { qrCodeToken: "99".repeat(32) });
+    expect(await s.t.mutation(checkInWithBadgeRef, {
+      sessionToken: s.admin.sessionToken, registrationQrCodeToken: "99".repeat(32), badgeQrCodeToken: OTHER_BADGE,
+    })).toEqual({ status: "success", checkedInAt: NOW });
+    expect((await s.snapshot()).logs.at(-1)).toMatchObject({
+      actorAdminId: s.admin.adminId, participantId: freshId, action: "check_in",
+    });
   });
 });
 

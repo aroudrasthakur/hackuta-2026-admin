@@ -78,7 +78,7 @@ describe("volunteer session guards", () => {
     );
   });
 
-  it("rejects reviewers, admins, and signed-out callers from volunteer operations", async () => {
+  it("rejects reviewers and signed-out callers from volunteer operations while allowing admins", async () => {
     const t = createConvexTest();
     const reviewer = await seedStaff(t, { role: "reviewer" });
     const admin = await seedStaff(t, { role: "admin" });
@@ -87,10 +87,12 @@ describe("volunteer session guards", () => {
       t.run((ctx) => requireVolunteerAccess(ctx, reviewer.sessionToken)),
       "VOLUNTEER_ONLY",
     );
-    await expectAdminErrorCode(
-      t.run((ctx) => requireVolunteerAccess(ctx, admin.sessionToken)),
-      "VOLUNTEER_ONLY",
-    );
+    const resolvedAdmin = await t.run((ctx) => requireVolunteerAccess(ctx, admin.sessionToken));
+    expect(resolvedAdmin._id).toBe(admin.adminId);
+    for (const capability of ["canCheckIn", "canFoodCheckIn", "canRedeemShop"] as const) {
+      const capableAdmin = await t.run((ctx) => requireVolunteerCapability(ctx, admin.sessionToken, capability));
+      expect(capableAdmin._id).toBe(admin.adminId);
+    }
     await expectAdminErrorCode(
       t.run((ctx) => requireVolunteerAccess(ctx, "")),
       "NOT_AUTHENTICATED",
@@ -195,10 +197,13 @@ describe("volunteer event authorization", () => {
     await expectAdminErrorCode(check(), "EVENT_NOT_FOUND");
   });
 
-  it.each(["admin", "reviewer"] as const)("rejects an assigned %s", async (role) => {
+  it("allows an admin without an assignment and rejects a reviewer even with an assignment", async () => {
     const { t, adminId, eventId, check } = await fixture();
+    await t.run((ctx) => ctx.db.patch(adminId, { role: "admin" }));
+    expect((await check()).volunteer._id).toBe(adminId);
+
     await t.run(async (ctx) => {
-      await ctx.db.patch(adminId, { role });
+      await ctx.db.patch(adminId, { role: "reviewer" });
       await ctx.db.insert("volunteerEventAccess", {
         volunteerAdminId: adminId, eventId, grantedBy: adminId, createdAt: 1,
       });

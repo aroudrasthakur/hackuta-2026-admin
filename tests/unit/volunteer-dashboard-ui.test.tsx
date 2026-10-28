@@ -140,4 +140,44 @@ describe("VolunteerDashboardPage UI", () => {
     await render(<VolunteerDashboardPage />);
     expect(container.textContent).toContain("Loading your responsibilities");
   });
+
+  it("shows all four action cards and active events for an administrator without volunteer capability flags", async () => {
+    await render(
+      <VolunteerDashboardPage />,
+      auth({
+        staff: {
+          adminId: "admin-1",
+          email: "admin@example.com",
+          name: "Ada Admin",
+          role: "admin",
+          canCheckIn: false,
+          canFoodCheckIn: false,
+          canRedeemShop: false,
+          expiresAt: Date.now() + 60_000,
+        },
+      }),
+    );
+    expect(container.querySelector("h1")?.textContent).toMatch(/Ada/);
+    expect(container.textContent).toContain("Participant check-in");
+    expect(container.textContent).toContain("Food distribution");
+    expect(container.textContent).toContain("Event points");
+    expect(container.textContent).toContain("Shop redemption");
+    expect(container.textContent).toContain("Active events");
+    expect(container.textContent).toContain("Workshop");
+
+    options = { canCheckIn: true, canFoodCheckIn: true, canRedeemShop: true, events: [] };
+    await render(
+      <VolunteerDashboardPage />,
+      auth({
+        staff: {
+          adminId: "admin-1",
+          email: "admin@example.com",
+          name: "Ada Admin",
+          role: "admin",
+          expiresAt: Date.now() + 60_000,
+        },
+      }),
+    );
+    expect(container.textContent).toContain("No active events yet");
+  });
 });

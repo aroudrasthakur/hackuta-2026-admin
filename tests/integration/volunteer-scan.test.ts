@@ -120,10 +120,25 @@ describe("listMyScanOptions", () => {
     expect(JSON.stringify(options)).not.toMatch(/email|points"|participant|Other/);
   });
 
-  it("rejects non-volunteers and missing sessions", async () => {
+  it("returns all capabilities and all active events for admins and rejects reviewers and missing sessions", async () => {
     const t = createConvexTest();
     const admin = await seedStaff(t, { role: "admin" });
-    await expectAdminErrorCode(t.query(listMyScanOptionsRef, { sessionToken: admin.sessionToken }), "VOLUNTEER_ONLY");
+    const reviewer = await seedStaff(t, { role: "reviewer" });
+    const early = await seedEvent(t, { name: "Early", startsAt: 10, endsAt: 20 });
+    const late = await seedEvent(t, { name: "Late", startsAt: 50, endsAt: 60 });
+    await seedEvent(t, { name: "Closed", active: false });
+
+    const adminOptions = await t.query(listMyScanOptionsRef, { sessionToken: admin.sessionToken });
+    expect(adminOptions).toEqual({
+      canCheckIn: true,
+      canFoodCheckIn: true,
+      canRedeemShop: true,
+      events: [
+        { eventId: early, name: "Early", pointsAwarded: 10, startsAt: 10, endsAt: 20 },
+        { eventId: late, name: "Late", pointsAwarded: 10, startsAt: 50, endsAt: 60 },
+      ],
+    });
+    await expectAdminErrorCode(t.query(listMyScanOptionsRef, { sessionToken: reviewer.sessionToken }), "VOLUNTEER_ONLY");
     await expectAdminErrorCode(t.query(listMyScanOptionsRef, { sessionToken: "missing" }), "NOT_AUTHENTICATED");
   });
 });
@@ -318,15 +333,27 @@ describe("resolveQrForScan", () => {
     await expectAdminErrorCode(scan("shop"), "NOT_AUTHENTICATED");
   });
 
-  it("throws for non-volunteer sessions without writing counters", async () => {
+  it("allows admins across all purposes without capability or event grants and rejects reviewers", async () => {
     const t = createConvexTest();
-    for (const role of ["admin", "reviewer"] as const) {
-      const staff = await seedStaff(t, { role });
-      await expectAdminErrorCode(t.mutation(resolveQrForScanRef, {
-        sessionToken: staff.sessionToken, qrCodeToken: QR_TOKEN, purpose: "shop",
-      }), "VOLUNTEER_ONLY");
-    }
+    const reviewer = await seedStaff(t, { role: "reviewer" });
+    await expectAdminErrorCode(t.mutation(resolveQrForScanRef, {
+      sessionToken: reviewer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "shop",
+    }), "VOLUNTEER_ONLY");
     expect(await scanRows(t)).toEqual([]);
+
+    const admin = await seedStaff(t, { role: "admin" });
+    await seedParticipant(t);
+    const mealPeriodId = await seedMealPeriod(t, admin.adminId);
+    const unassignedEventId = await seedEvent(t, { name: "Unassigned Event" });
+    for (const purpose of ["shop", "food_check_in", "point_scan"] as const) {
+      expect(await t.mutation(resolveQrForScanRef, {
+        sessionToken: admin.sessionToken,
+        qrCodeToken: QR_TOKEN,
+        purpose,
+        eventId: unassignedEventId,
+        mealPeriodId,
+      })).toMatchObject({ status: "ok", purpose });
+    }
   });
 
   it("throttles repeated invalid tokens, persists counters, and recovers after the window", async () => {

@@ -584,6 +584,17 @@ describe("points workflow", () => {
     expect(container.querySelector('[data-testid="scanner"]')).toBeNull();
   });
 
+  it("shows an empty state when no active events exist", async () => {
+    options = { canCheckIn: true, canFoodCheckIn: true, canRedeemShop: true, events: [] };
+    await render(
+      "points",
+      "/admin/scan/points",
+      auth({ staff: { adminId: "admin", email: "a@example.com", name: "Ada", role: "admin", expiresAt: Date.now() + 60_000 } }),
+    );
+    expect(text()).toContain("No active events");
+    expect(container.querySelector('[data-testid="scanner"]')).toBeNull();
+  });
+
   it.each([
     [{ status: "participant_not_checked_in" }, "Not checked in yet"],
     [{ status: "already_awarded" }, "Points already awarded"],

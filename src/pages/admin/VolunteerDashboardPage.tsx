@@ -46,7 +46,7 @@ const ACTIONS = [
 
 export function VolunteerDashboardPage() {
   const { staff } = useAdminAuth();
-  const options = useVolunteerAccess();
+  const options = useVolunteerAccess(true);
   const now = useNow();
   const firstName = staff?.name?.trim().split(/\s+/)[0] || "Volunteer";
 
@@ -91,11 +91,15 @@ export function VolunteerDashboardPage() {
       )}
 
       <section aria-labelledby="assigned-events-heading">
-        <h2 id="assigned-events-heading" className="volunteer-section-title">Assigned events</h2>
+        <h2 id="assigned-events-heading" className="volunteer-section-title">
+          {staff.role === "admin" ? "Active events" : "Assigned events"}
+        </h2>
         <p className="volunteer-dashboard__hint">
           {options.events.length
             ? "Events you can award points for. Times are for reference only."
-            : "No events assigned. Contact an administrator if you need event access."}
+            : staff.role === "admin"
+              ? "No active events yet. Create or activate an event on the Events page to award points."
+              : "No events assigned. Contact an administrator if you need event access."}
         </p>
         {options.events.length ? (
           <ul className="volunteer-event-summary">

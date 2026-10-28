@@ -46,7 +46,17 @@ test.describe("organizer authentication", () => {
     }
     await signOutOrganizer(page);
     await signInOrganizer(page, E2E_ADMIN);
-    await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Applications", "Decision emails", "Participants", "Volunteers", "Events", "Meals", "Shop", "Send Notifications"]);
+    await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText([
+      "Applications",
+      "Decision emails",
+      "Participants",
+      "Volunteers",
+      "Events",
+      "Meals",
+      "Shop",
+      "Send Notifications",
+      "Scan",
+    ]);
     await page.getByRole("link", { name: "Participants", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Participants", exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Volunteers", exact: true }).click();
