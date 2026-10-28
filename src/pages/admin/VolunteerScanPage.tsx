@@ -10,13 +10,13 @@ import { ScanResult } from "../../components/volunteer/ScanResult";
 import { ScanSteps } from "../../components/volunteer/ScanSteps";
 import { LoadingState } from "../../components/states/LoadingState";
 import { useScanWorkflow, type ScanWorkflowState } from "../../hooks/useScanWorkflow";
+import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { useVolunteerAccess } from "../../hooks/useVolunteerAccess";
 import type { ScanPurpose } from "../../lib/scanResults";
 import { scanSecondaryButtonClass } from "../../lib/scanButtonClasses";
 import { ADMIN_ROUTES } from "../../types/routes";
 import { useQuery } from "../../convex/reactBindings";
 import { listActiveMealPeriodsRef, type VolunteerMealPeriod } from "../../convex/adminApi";
-import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { useMealClock } from "../../hooks/useMealClock";
 import { EmptyState } from "../../components/states/EmptyState";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
@@ -180,7 +180,10 @@ function FoodMealScanner() {
 /** Volunteer scanner for check-in, food, or event points. Route guards already require the matching access. */
 export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) {
   const page = PAGES[workflow];
+  const { staff } = useAdminAuth();
   const options = useVolunteerAccess(true);
+  const scanHubBackLabel =
+    staff?.role === "admin" ? "Back to Scan" : "Back to volunteer dashboard";
   const [searchParams, setSearchParams] = useSearchParams();
   const [choosingEvent, setChoosingEvent] = useState(false);
   const [mealRetry, setMealRetry] = useState(0);
@@ -252,7 +255,7 @@ export function VolunteerScanPage({ workflow }: { workflow: ScanWorkflowName }) 
         />
       )}
 
-      <Link className="volunteer-back-link" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link>
+      <Link className="volunteer-back-link" to={ADMIN_ROUTES.scan}>{scanHubBackLabel}</Link>
     </section>
   );
 }

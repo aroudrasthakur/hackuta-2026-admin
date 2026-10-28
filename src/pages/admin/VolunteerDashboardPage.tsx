@@ -49,12 +49,19 @@ export function VolunteerDashboardPage() {
   const options = useVolunteerAccess(true);
   const now = useNow();
   const firstName = staff?.name?.trim().split(/\s+/)[0] || "Volunteer";
+  const isAdmin = staff?.role === "admin";
 
   if (!staff || !options) {
     return (
       <div className="space-y-6">
-        <AdminPageHeader id="volunteer-dashboard-heading" title="Volunteer dashboard" />
-        <LoadingState layout="rows" message="Loading your responsibilities…" />
+        <AdminPageHeader
+          id="volunteer-dashboard-heading"
+          title={isAdmin ? "Scan" : "Volunteer dashboard"}
+        />
+        <LoadingState
+          layout="rows"
+          message={isAdmin ? "Loading scan tools…" : "Loading your responsibilities…"}
+        />
       </div>
     );
   }
@@ -65,13 +72,25 @@ export function VolunteerDashboardPage() {
     <div className="volunteer-dashboard space-y-8">
       <AdminPageHeader
         id="volunteer-dashboard-heading"
-        title={`${greetingFor(now)}, ${firstName}`}
-        description="Choose a responsibility to start scanning."
+        title={isAdmin ? "Scan" : `${greetingFor(now)}, ${firstName}`}
+        description={
+          isAdmin
+            ? "Open a scan workflow for check-in, food, points, or shop."
+            : "Choose a responsibility to start scanning."
+        }
       />
 
       {actions.length ? (
-        <section aria-labelledby="volunteer-responsibilities">
-          <h2 id="volunteer-responsibilities" className="volunteer-section-title">Your responsibilities</h2>
+        <section
+          {...(isAdmin
+            ? { "aria-label": "Scan workflows" }
+            : { "aria-labelledby": "volunteer-responsibilities" })}
+        >
+          {isAdmin ? null : (
+            <h2 id="volunteer-responsibilities" className="volunteer-section-title">
+              Your responsibilities
+            </h2>
+          )}
           <ul className="volunteer-action-grid">
             {actions.map(({ to, title, icon, description }) => (
               <li key={to}>

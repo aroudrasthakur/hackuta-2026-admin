@@ -13,7 +13,7 @@ const adminPages = [
   { link: "Meals", heading: "Meals" },
   { link: "Shop", heading: "Shop" },
   { link: "Send Notifications", heading: "Send Notifications" },
-  { link: "Scan", heading: /Good (morning|afternoon|evening),/ },
+  { link: "Scan", heading: "Scan" },
 ] as const;
 
 test("keeps page headers and role navigation usable at every dashboard width", async ({ page }, testInfo) => {

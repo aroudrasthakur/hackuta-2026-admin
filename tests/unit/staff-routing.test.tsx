@@ -157,7 +157,7 @@ describe("protected staff screens", () => {
   });
 
   it.each([
-    [ADMIN_ROUTES.scan, /Good (morning|afternoon|evening),/],
+    [ADMIN_ROUTES.scan, "Scan"],
     [ADMIN_ROUTES.scanCheckIn, "Participant check-in"],
     [ADMIN_ROUTES.scanFood, "Food distribution"],
     [ADMIN_ROUTES.scanPoints, "Event points"],

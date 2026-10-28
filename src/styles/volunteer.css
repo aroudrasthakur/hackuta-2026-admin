@@ -264,21 +264,25 @@
   .volunteer-camera__viewport {
     position: relative;
     overflow: hidden;
-    aspect-ratio: 3 / 4;
-    max-height: min(58dvh, 28rem);
-    border-radius: 1.1rem;
-    border: 1px solid rgb(48 88 115 / 0.2);
+    box-sizing: border-box;
+    width: 100vw;
+    max-width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    aspect-ratio: 4 / 3;
+    height: auto;
+    flex-shrink: 0;
+    border-radius: 0;
+    border-block: 1px solid rgb(48 88 115 / 0.2);
     background: #102f46;
   }
 
-  .volunteer-camera__viewport--idle {
-    display: none;
-  }
-
   .volunteer-camera__video {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center;
   }
 
   .volunteer-camera__frame {
@@ -640,8 +644,11 @@
 
   @media (min-width: 768px) {
     .volunteer-camera__viewport {
-      aspect-ratio: 4 / 3;
-      max-height: min(52dvh, 26rem);
+      width: 100%;
+      max-width: 100%;
+      margin-inline: 0;
+      border-radius: 1.1rem;
+      border: 1px solid rgb(48 88 115 / 0.2);
     }
 
     .volunteer-action-grid {

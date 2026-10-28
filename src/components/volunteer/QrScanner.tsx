@@ -79,7 +79,8 @@ export function QrScanner({
   const hintId = useId();
   const errorId = useId();
   const cameraActive = status === "starting" || status === "scanning";
-  const showViewport = cameraActive || PROBLEM_STATUSES.has(status);
+  const showCameraOverlay =
+    status !== "scanning" && (status === "starting" || PROBLEM_STATUSES.has(status));
   const canPaste = typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function";
 
   useEffect(() => {
@@ -119,6 +120,7 @@ export function QrScanner({
   const baseMessage = status === "scanning" ? copy.aim : CAMERA_MESSAGES[status];
   const problem = PROBLEM_STATUSES.has(status);
   const message = problem && allowManualEntry && baseMessage ? `${baseMessage} You can also enter the code below.` : baseMessage;
+  const showOutsideCallout = problem && !showCameraOverlay && message;
   const focusManual = () => {
     stop();
     document.getElementById(inputId)?.focus();
@@ -127,9 +129,7 @@ export function QrScanner({
   return (
     <div className="space-y-5">
       <section aria-label="Camera scanner" className="volunteer-camera">
-        <div
-          className={`volunteer-camera__viewport${showViewport ? "" : " volunteer-camera__viewport--idle"}`}
-        >
+        <div className="volunteer-camera__viewport">
           <video
             ref={videoRef}
             className="volunteer-camera__video"
@@ -143,7 +143,7 @@ export function QrScanner({
             <span className="volunteer-camera__corner volunteer-camera__corner--bl" />
             <span className="volunteer-camera__corner volunteer-camera__corner--br" />
           </div>
-          {status !== "scanning" && showViewport ? (
+          {showCameraOverlay ? (
             <div className="volunteer-camera__overlay" role={problem ? "alert" : "status"}>
               <CameraIcon className="h-8 w-8" />
               <p className="volunteer-camera__overlay-title">
@@ -167,11 +167,8 @@ export function QrScanner({
         {status === "scanning" && message ? (
           <p role="status" className="volunteer-camera__caption">{message}</p>
         ) : null}
-        {!showViewport && message ? (
-          <p
-            role={problem ? "alert" : "status"}
-            className={problem ? "admin-callout admin-callout--alert text-base" : "admin-callout text-base"}
-          >
+        {showOutsideCallout ? (
+          <p role="alert" className="admin-callout admin-callout--alert text-base">
             {message}
           </p>
         ) : null}

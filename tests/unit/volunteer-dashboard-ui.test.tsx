@@ -157,7 +157,8 @@ describe("VolunteerDashboardPage UI", () => {
         },
       }),
     );
-    expect(container.querySelector("h1")?.textContent).toMatch(/Ada/);
+    expect(container.querySelector("h1")?.textContent).toBe("Scan");
+    expect(container.textContent).not.toContain("Your responsibilities");
     expect(container.textContent).toContain("Participant check-in");
     expect(container.textContent).toContain("Food distribution");
     expect(container.textContent).toContain("Event points");

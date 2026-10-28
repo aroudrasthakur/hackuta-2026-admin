@@ -230,11 +230,15 @@ function ShopWorkflow() {
 
 /** Volunteer shop sales. The route guard already requires `canRedeemShop`. */
 export function VolunteerShopPage() {
+  const { staff } = useAdminAuth();
+  const scanHubBackLabel =
+    staff?.role === "admin" ? "Back to Scan" : "Back to volunteer dashboard";
+
   return (
     <section aria-labelledby="shop-scan-heading" className="volunteer-ops volunteer-scan-shell space-y-6">
       <AdminPageHeader id="shop-scan-heading" title="Shop redemption" description="Scan the participant's badge, choose their item, then confirm the purchase." />
       <ShopWorkflow />
-      <Link className="volunteer-back-link" to={ADMIN_ROUTES.scan}>Back to volunteer dashboard</Link>
+      <Link className="volunteer-back-link" to={ADMIN_ROUTES.scan}>{scanHubBackLabel}</Link>
     </section>
   );
 }
