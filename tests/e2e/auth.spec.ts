@@ -54,7 +54,7 @@ test.describe("organizer authentication", () => {
       "Events",
       "Meals",
       "Shop",
-      "Send Notifications",
+      "Send notifications",
       "Scan",
     ]);
     await page.getByRole("link", { name: "Participants", exact: true }).click();

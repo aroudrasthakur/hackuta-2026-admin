@@ -103,6 +103,13 @@ describe("volunteer authorization contract (public entry points)", () => {
     expect(exportSection(source, exportName)).toContain(guard);
   });
 
+  it("blocks self-scans through isOwnParticipant on volunteer write paths", () => {
+    expect(readFileSync(join(adminDir, "participantQr.ts"), "utf8")).toContain("export async function isOwnParticipant");
+    for (const file of ["volunteerScan.ts", "volunteerOperations.ts", "badgeCheckIn.ts", "shopRedemption.ts"]) {
+      expect(readFileSync(join(adminDir, file), "utf8"), file).toContain("isOwnParticipant");
+    }
+  });
+
   it("guards the shared revoke/restore factory with requireAdminRole", () => {
     const source = readFileSync(join(adminDir, "volunteers.ts"), "utf8");
     const factory = source.slice(

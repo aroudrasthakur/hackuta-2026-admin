@@ -116,7 +116,7 @@ export function CheckInWorkflow() {
           <StepError error={state.error} />
           <QrScanner key="badge" mode="badge" onScan={onScan(scanBadge)} autoStart={cameraPreferred} />
           <div className="volunteer-confirm__actions">
-            <button type="button" className={scanSecondaryButtonClass} onClick={back}>Back: scan a different registration</button>
+            <button type="button" className={scanSecondaryButtonClass} onClick={back}>Back: Scan a different registration</button>
             <button type="button" className={scanSecondaryButtonClass} onClick={restart}>Start over</button>
           </div>
         </>
@@ -153,10 +153,10 @@ export function CheckInWorkflow() {
               disabled={state.submitting}
               aria-busy={state.submitting || undefined}
             >
-              {state.submitting ? "Checking in…" : state.error ? "Try again: confirm check-in" : "Confirm check-in"}
+              {state.submitting ? "Checking in…" : state.error ? "Try again: Confirm check-in" : "Confirm check-in"}
             </button>
             <button type="button" className={scanSecondaryButtonClass} onClick={back} disabled={state.submitting}>
-              Back: scan a different badge
+              Back: Scan a different badge
             </button>
             <button type="button" className={scanSecondaryButtonClass} onClick={restart} disabled={state.submitting}>
               Start over

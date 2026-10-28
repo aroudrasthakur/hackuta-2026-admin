@@ -8,11 +8,11 @@ test.describe("admin notifications management", () => {
     await signInOrganizer(page, E2E_ADMIN);
     await page
       .getByRole("navigation", { name: "Admin", exact: true })
-      .getByRole("link", { name: "Send Notifications", exact: true })
+      .getByRole("link", { name: "Send notifications", exact: true })
       .click();
 
     await expect(
-      page.getByRole("main").getByRole("heading", { level: 1, name: "Send Notifications" }),
+      page.getByRole("main").getByRole("heading", { level: 1, name: "Send notifications" }),
     ).toBeVisible();
 
     const table = page.getByRole("table", { name: "Participant notifications" });
@@ -87,12 +87,12 @@ test.describe("admin notifications management", () => {
     await expect(page.getByLabel("Title")).toHaveValue("Lunch is Ready");
   });
 
-  test("restricts Send Notifications tab to administrators", async ({ page }) => {
+  test("restricts Send notifications tab to administrators", async ({ page }) => {
     await signInOrganizer(page, E2E_REVIEWER);
     await expect(
       page
         .getByRole("navigation", { name: "Admin", exact: true })
-        .getByRole("link", { name: "Send Notifications" }),
+        .getByRole("link", { name: "Send notifications" }),
     ).toHaveCount(0);
     await page.goto("/admin/notifications");
     await expect(page).toHaveURL(/\/admin\/applications$/);
