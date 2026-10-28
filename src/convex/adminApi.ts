@@ -36,6 +36,7 @@ import type {
   setParticipantPoints,
 } from "../../convex/admin/participantsAdmin";
 import type {
+  createVolunteer,
   getVolunteer,
   listStaffConfigLogs,
   listVolunteerActionLogs,
@@ -421,6 +422,7 @@ export const promoteParticipantToVolunteerRef = adminModuleRef<
 
 type VolunteerManagement = ApiFromModules<{
   volunteers: {
+    createVolunteer: typeof createVolunteer;
     getVolunteer: typeof getVolunteer;
     listStaffConfigLogs: typeof listStaffConfigLogs;
     listVolunteerActionLogs: typeof listVolunteerActionLogs;
@@ -435,6 +437,12 @@ type VolunteerManagement = ApiFromModules<{
 export type VolunteerRow = FunctionReturnType<VolunteerManagement["listVolunteers"]>["page"][number];
 export type VolunteerActionLogRow = FunctionReturnType<VolunteerManagement["listVolunteerActionLogs"]>["page"][number];
 export type StaffConfigLogRow = FunctionReturnType<VolunteerManagement["listStaffConfigLogs"]>["page"][number];
+
+export const createVolunteerRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<VolunteerManagement["createVolunteer"]>,
+  FunctionReturnType<VolunteerManagement["createVolunteer"]>
+>("admin/volunteers:createVolunteer");
 
 export const listVolunteersRef = adminModuleRef<
   "query",

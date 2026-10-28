@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminAuthContext, type AdminAuthContextValue } from "../../src/contexts/adminAuthContext";
 import {
   createEventRef,
+  createVolunteerRef,
   getVolunteerRef,
   listEventsRef,
   listStaffConfigLogsRef,
@@ -33,6 +34,7 @@ import { EventsPage } from "../../src/pages/admin/EventsPage";
 import { VolunteerDetailPage } from "../../src/pages/admin/VolunteerDetailPage";
 import { VolunteersPage } from "../../src/pages/admin/VolunteersPage";
 import { ADMIN_ERROR_MESSAGES, adminError } from "../../shared/admin/errors";
+import { PASSWORD_REQUIREMENTS_MESSAGE } from "../../shared/auth/password";
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
@@ -271,13 +273,56 @@ describe("VolunteersPage", () => {
     paginated.set(listVolunteerActionLogsRef, { results: [], status: "LoadingFirstPage" });
     await render(<VolunteersPage />);
     expect(text()).toContain("No volunteers yet");
+    expect(text()).toContain("Add a volunteer here, or promote an accepted participant from the Participants page.");
     expect(text()).toContain("Loading activity…");
+    expect(button("Add volunteer")).toBeDefined();
+  });
+
+  it("creates a standalone volunteer, reveals the password, and keeps the success link after a duplicate", async () => {
+    const create = mutation(createVolunteerRef, async () => ({ ok: true, adminId: "volunteer-new", email: "pat@example.com" }));
+    await render(<VolunteersPage />);
+    await click("Add volunteer");
+    const form = () => Array.from(container.querySelectorAll("form")).find((candidate) => candidate.closest("section")?.querySelector("h2")?.textContent === "Add volunteer") ?? null;
+
+    await fill("Full name", "Pat Standalone");
+    await fill("Sign-in email", "pat@example.com");
+    await fill("Initial password", "weak");
+    await submit(form());
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(PASSWORD_REQUIREMENTS_MESSAGE);
+    expect(create).not.toHaveBeenCalled();
+
+    await fill("Initial password", "Standalone1");
+    expect((field("Initial password") as HTMLInputElement).type).toBe("password");
+    await click("Show password");
+    expect((field("Initial password") as HTMLInputElement).type).toBe("text");
+    await submit(form());
+    expect(create).toHaveBeenCalledWith({
+      sessionToken: "session-token",
+      name: "Pat Standalone",
+      email: "pat@example.com",
+      password: "Standalone1",
+    });
+    expect(text()).toContain("Volunteer account created for pat@example.com.");
+    expect(container.querySelector('a[href="/admin/volunteers/volunteer-new"]')?.textContent).toBe("Manage access");
+    expect(form()).toBeNull();
+
+    create.mockRejectedValueOnce(adminError("STAFF_ACCOUNT_EXISTS"));
+    await click("Add volunteer");
+    await fill("Full name", "Pat Duplicate");
+    await fill("Sign-in email", "pat@example.com");
+    await fill("Initial password", "Standalone1");
+    await submit(form());
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(ADMIN_ERROR_MESSAGES.STAFF_ACCOUNT_EXISTS);
+    expect(text()).toContain("Volunteer account created for pat@example.com.");
+    await click("Cancel");
+    expect(form()).toBeNull();
   });
 
   it("waits for administrator access before querying", async () => {
     await render(<VolunteersPage />, "/", { ...adminAuth, staff: { ...adminAuth.staff!, role: "reviewer" } });
     expect(text()).toContain("Verifying administrator access…");
     expect(mocks.paginatedQuery).not.toHaveBeenCalled();
+    expect(button("Add volunteer")).toBeUndefined();
   });
 });
 
