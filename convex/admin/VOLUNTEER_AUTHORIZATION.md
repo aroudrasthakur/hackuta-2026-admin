@@ -139,8 +139,8 @@ These mutations do the real work. Each one re-checks everything itself and share
 ## Meal redemption (`volunteerScan.ts`)
 
 `listActiveMealPeriods` exposes enabled schedules (including future windows) to
-volunteers with explicit `canFoodCheckIn === true`; volunteers without it receive
-an empty list. The scanner filters by `startsAt <= now < endsAt` and wakes at
+administrators and to volunteers with explicit `canFoodCheckIn === true`;
+volunteers without that grant receive an empty list. The scanner filters by `startsAt <= now < endsAt` and wakes at
 serving boundaries even without database writes. Returning schedule metadata lets
 the UI update time-based availability without polling queries that would interrupt
 an in-progress confirmation. This query returns no participant or dietary data.
@@ -170,7 +170,7 @@ meals are checked before duplicates, so an unavailable meal cannot be redeemed.
 
 ## Shop sales (`shopRedemption.ts`)
 
-Selling needs `canRedeemShop === true`. A missing flag means denied, and admins turn it on with `setVolunteerShopAccess`.
+Selling needs `canRedeemShop === true` for volunteers (administrators bypass that flag). Admins turn volunteer shop access on with `setVolunteerShopAccess`.
 
 - `resolveQrForScan` with `purpose: "shop"` returns the participant's id, name, and balance.
 - `purchaseShopItem` needs the scanned badge again, so a participant id alone cannot be charged. Registration QRs are rejected as in preview step 5.

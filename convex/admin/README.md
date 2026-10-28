@@ -86,9 +86,9 @@ Protected queries and mutations accept `sessionToken`. The helpers take `(ctx, s
 - `getCurrentAdmin` returns the active `admins` record, or `null` for an invalid, expired, revoked, or orphaned session.
 - `requireReviewerAccess` allows active reviewers and admins; activity logging and application decisions use it.
 - `requireAdminRole` allows only active admins; historical review log queries use it.
-- `requireVolunteerAccess` allows only active volunteers; admins and reviewers cannot act as volunteers.
-- `requireVolunteerCapability` checks an explicit `true` for `canCheckIn` or `canFoodCheckIn` on each request.
-- `requireVolunteerEventAccess` checks the caller's own assignment and an active event. Schedule times are reference only. Removing an assignment takes effect on the next request.
+- `requireVolunteerAccess` allows active volunteers and administrators; reviewers cannot act as volunteers.
+- `requireVolunteerCapability` grants administrators every scan capability; volunteers need an explicit `true` for `canCheckIn`, `canFoodCheckIn`, or `canRedeemShop` on each request.
+- `requireVolunteerEventAccess` grants administrators every active event; volunteers need their own assignment. Schedule times are reference only. Removing an assignment takes effect on the next request.
 
 Each protected request resolves the current stored role and active status. Acting identity always comes from the returned `admin._id`, including `applicationReviews.reviewedBy`, `applicationReviewLogs.adminId`, and `participants.acceptedBy`; public operations never accept an acting admin ID or role. Applicant authentication cannot satisfy these guards.
 
@@ -156,10 +156,10 @@ Accounting: `participants.points` = event awards + admin adjustments. Correction
 | Session profile/sign-out | The caller's staff session only |
 | Participant creation | Internal only; accepting staff must be active reviewer/admin |
 | Point ledger and participant eligibility helpers | Ordinary server helpers, not public Convex APIs |
-| Own scan options and QR scan preview | Volunteer, plus the purpose's capability or event assignment |
-| Two-step badge check-in (`badgeCheckIn.ts`) | Volunteer with `canCheckIn`, re-checked on every call |
+| Own scan options and QR scan preview | Admin, or volunteer with the purpose's capability or event assignment |
+| Two-step badge check-in (`badgeCheckIn.ts`) | Admin, or volunteer with `canCheckIn`, re-checked on every call |
 | Badge replacement or late assignment (`badgeAdmin.ts`) | Admin |
-| Food redemption, event point award (`volunteerOperations.ts`) | Volunteer, plus the capability or event assignment, re-checked on every call |
+| Food redemption, event point award (`volunteerOperations.ts`) | Admin, or volunteer with the capability or event assignment, re-checked on every call |
 
 The participant roster and point corrections (`participantsAdmin.ts`) are admin-only. Scanner endpoints must independently call the relevant volunteer guard **inside their query/mutation** before using participant or ledger helpers. In particular, `awardEventPoints` is a ledger helper, not an authorization boundary: its caller must use `requireVolunteerEventAccess` and derive the actor and timestamp on the server. Scanner and management screens are separate work from this authentication foundation.
 
@@ -171,7 +171,7 @@ After detail loads, the page calls `logApplicationReviewAction` with `action: "v
 
 ## Volunteer QR scan preview (#60)
 
-`listMyScanOptions` returns the caller's own `canCheckIn` / `canFoodCheckIn` and their assigned active events (name, points, schedule). `resolveQrForScan` previews one scanned badge for `food_check_in`, `point_scan`, or `shop` and returns a typed status instead of throwing, so its rate-limit rows persist. It changes no participant, award, or log rows; the later state-changing scan mutations must re-check everything. Dietary info appears only in food previews; point totals, emails, applications, and tokens never appear. Order of checks, response fields, and the rate-limit thresholds and cleanup are in [VOLUNTEER_AUTHORIZATION.md](VOLUNTEER_AUTHORIZATION.md#qr-scan-preview-volunteerscants).
+`listMyScanOptions` returns scan capabilities and switched-on events. Administrators receive every capability and every active event; volunteers receive their own grants and assigned events (name, points, schedule). `resolveQrForScan` previews one scanned badge for `food_check_in`, `point_scan`, or `shop` and returns a typed status instead of throwing, so its rate-limit rows persist. It changes no participant, award, or log rows; the later state-changing scan mutations must re-check everything. Dietary info appears only in food previews; point totals, emails, applications, and tokens never appear. Order of checks, response fields, and the rate-limit thresholds and cleanup are in [VOLUNTEER_AUTHORIZATION.md](VOLUNTEER_AUTHORIZATION.md#qr-scan-preview-volunteerscants).
 
 Door check-in is a separate two-scan flow (registration QR, then a preprinted badge, then confirm) that assigns the badge and checks the participant in atomically. After that, food, points, and the shop accept only the badge. See [badge check-in](VOLUNTEER_AUTHORIZATION.md#badge-check-in-badgecheckints).
 
