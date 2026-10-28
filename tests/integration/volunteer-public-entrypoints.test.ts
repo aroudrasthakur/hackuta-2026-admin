@@ -58,7 +58,7 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "volunteerOperations.ts", exportName: "foodCheckInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "awardEventPoints", guard: "requireVolunteerAccess" },
   ...[
-    "generateShopImageUploadUrl", "createShopItem", "updateShopItem", "setShopItemStatus",
+    "createShopItem", "updateShopItem", "setShopItemStatus",
     "listShopItemsAdmin", "listShopRedemptions", "refundShopRedemption",
     "listShopVolunteers", "setVolunteerShopAccess",
   ].map((exportName) => ({ file: "shopAdmin.ts", exportName, guard: "requireAdminRole" })),

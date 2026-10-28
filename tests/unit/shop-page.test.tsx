@@ -50,10 +50,10 @@ vi.mock("../../src/convex/reactBindings", () => ({
 
 const now = Date.now();
 const row = (overrides: Record<string, unknown>) => ({
-  itemId: "item-x", name: "Item", description: "", imageUrl: null, pointsCost: 100, effectivePointsCost: 100,
+  itemId: "item-x", name: "Item", description: "", pointsCost: 100, effectivePointsCost: 100,
   flashSaleId: null, saleEndsAt: null, status: "active", createdAt: now, updatedAt: now, ...overrides,
 });
-const tee = row({ itemId: "tee", name: "HackUTA 2026 T-shirt", description: "Soft tee", pointsCost: 400, effectivePointsCost: 300, flashSaleId: "sale-live", imageUrl: "https://img.test/tee.png" });
+const tee = row({ itemId: "tee", name: "HackUTA 2026 T-shirt", description: "Soft tee", pointsCost: 400, effectivePointsCost: 300, flashSaleId: "sale-live" });
 const stickers = row({ itemId: "stickers", name: "Sticker pack", pointsCost: 50, effectivePointsCost: 50 });
 const bottle = row({ itemId: "bottle", name: "Insulated bottle", pointsCost: 600, effectivePointsCost: 600 });
 const mug = row({ itemId: "mug", name: "Amphora mug", status: "inactive" });

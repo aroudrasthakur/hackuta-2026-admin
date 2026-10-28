@@ -74,7 +74,7 @@ function ItemPicker({ items, maxQuantity, selection, onSelect }: {
                 aria-pressed={selected?.itemId === item.itemId}
                 onClick={() => onSelect({ itemId: item.itemId, quantity: 1 })}
               >
-                <ShopItemThumb imageUrl={item.imageUrl} />
+                <ShopItemThumb />
                 <span className="min-w-0">
                   <span className="shop-pick__name">{item.name}</span>
                   {item.description ? <span className="shop-pick__description">{item.description}</span> : null}
@@ -176,7 +176,7 @@ function ShopWorkflow() {
           <section aria-labelledby="shop-review-heading" className="shop-panel">
             <h2 id="shop-review-heading" ref={headingRef} tabIndex={-1} className="volunteer-section-title">Review purchase</h2>
             <div className="shop-item-cell">
-              <ShopItemThumb imageUrl={item?.imageUrl ?? null} />
+              <ShopItemThumb />
               <div><strong>{item?.name ?? "Selected item"}</strong>{ready?.flashSaleId ? <span>Sale price</span> : null}</div>
             </div>
             {ready ? (

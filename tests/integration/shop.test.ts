@@ -5,7 +5,6 @@ import {
   cancelFlashSaleRef,
   createFlashSaleRef,
   createShopItemRef,
-  generateShopImageUploadUrlRef,
   getShopCustomerRef,
   listFlashSalesRef,
   listShopCatalogForVolunteerRef,
@@ -152,28 +151,6 @@ describe("admin shop items", () => {
     expect(active.items).toEqual([]);
     const searched = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken, search: "hoodie" });
     expect(searched.items).toEqual([]);
-  });
-
-  it("rejects non-image uploads and deletes a removed image", async () => {
-    const shop = await seedShop();
-    // convex-test stores no content type, so an upload here always fails the image check.
-    const text = await shop.t.run((ctx) => ctx.storage.store(new Blob(["hello"], { type: "text/plain" })));
-    const base = { sessionToken: shop.admin.sessionToken, name: "Hat", description: "", pointsCost: 5 };
-
-    await expectAdminErrorCode(
-      shop.t.mutation(createShopItemRef, { ...base, imageStorageId: text }),
-      "INVALID_SHOP_IMAGE",
-    );
-    const itemId = await createItem(shop, { name: "Hat", pointsCost: 5 });
-    await shop.t.run((ctx) => ctx.db.patch(itemId, { imageStorageId: text }));
-    const list = await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken });
-    expect(list.items[0]).not.toHaveProperty("imageUrl");
-    expect(await shop.t.run((ctx) => ctx.db.get(itemId))).toMatchObject({ imageStorageId: text });
-
-    await expectAdminErrorCode(shop.t.mutation(updateShopItemRef, { ...base, itemId, imageStorageId: text }), "INVALID_SHOP_IMAGE");
-    await shop.t.mutation(updateShopItemRef, { ...base, itemId, imageStorageId: null });
-    expect(await shop.t.run((ctx) => ctx.db.system.get(text))).toBeNull();
-    expect(await shop.t.mutation(generateShopImageUploadUrlRef, { sessionToken: shop.admin.sessionToken })).toEqual(expect.any(String));
   });
 
   it("is admin only", async () => {

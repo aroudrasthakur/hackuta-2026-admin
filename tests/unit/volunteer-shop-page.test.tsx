@@ -46,7 +46,7 @@ vi.mock("../../src/components/volunteer/QrScanner", () => ({
 const token = "HACKUTA-BADGE-0001";
 const customer = { participantId: "p1", name: "Riley Ready", points: 1250 };
 const catalogItem = (overrides: Record<string, unknown>) => ({
-  itemId: "tee", name: "HackUTA 2026 T-shirt", description: "", imageUrl: null, unitPointsCost: 300, basePointsCost: 400,
+  itemId: "tee", name: "HackUTA 2026 T-shirt", description: "", unitPointsCost: 300, basePointsCost: 400,
   flashSaleId: "sale", saleEndsAt: null, ...overrides,
 });
 const catalog = {

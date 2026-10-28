@@ -266,7 +266,6 @@ function shopAdminRef<Name extends keyof ShopAdmin>(name: Name) {
   >(`admin/shopAdmin:${name}`);
 }
 
-export const generateShopImageUploadUrlRef = shopAdminRef("generateShopImageUploadUrl");
 export const createShopItemRef = shopAdminRef("createShopItem");
 export const updateShopItemRef = shopAdminRef("updateShopItem");
 export const setShopItemStatusRef = shopAdminRef("setShopItemStatus");
