@@ -47,15 +47,15 @@ const token = "HACKUTA-BADGE-0001";
 const customer = { participantId: "p1", name: "Riley Ready", points: 1250 };
 const catalogItem = (overrides: Record<string, unknown>) => ({
   itemId: "tee", name: "HackUTA 2026 T-shirt", description: "", imageUrl: null, unitPointsCost: 300, basePointsCost: 400,
-  flashSaleId: "sale", saleEndsAt: null, stockQuantity: 12, stockStatus: "in_stock", featured: true, ...overrides,
+  flashSaleId: "sale", saleEndsAt: null, ...overrides,
 });
 const catalog = {
   maxQuantity: 10,
   nextPriceChangeAt: null,
   items: [
     catalogItem({}),
-    catalogItem({ itemId: "stickers", name: "Sticker pack", unitPointsCost: 50, basePointsCost: 50, flashSaleId: null, stockQuantity: 2, stockStatus: "low", featured: false }),
-    catalogItem({ itemId: "bottle", name: "Insulated bottle", unitPointsCost: 600, basePointsCost: 600, flashSaleId: null, stockQuantity: 0, stockStatus: "out", featured: false }),
+    catalogItem({ itemId: "stickers", name: "Sticker pack", description: "Six stickers", unitPointsCost: 50, basePointsCost: 50, flashSaleId: null }),
+    catalogItem({ itemId: "bottle", name: "Insulated bottle", unitPointsCost: 600, basePointsCost: 600, flashSaleId: null }),
   ],
 };
 const receipt = { redemptionId: "r1", itemId: "tee", itemName: "HackUTA 2026 T-shirt", quantity: 2, unitPointsCost: 300, basePointsCost: 400, totalPointsSpent: 600, pointsBefore: 1250, pointsAfter: 650, flashSaleId: "sale", redeemedAt: 1 };
@@ -65,8 +65,8 @@ function preview(args: { itemId: string; quantity: number }) {
   const total = item.unitPointsCost * args.quantity;
   return {
     status: "ok", unitPointsCost: item.unitPointsCost, basePointsCost: item.basePointsCost, flashSaleId: item.flashSaleId, saleEndsAt: null,
-    quantity: args.quantity, totalPointsCost: total, stockQuantity: item.stockQuantity, points: customer.points,
-    pointsAfter: customer.points - total, hasEnoughPoints: customer.points >= total, hasEnoughStock: item.stockQuantity >= args.quantity,
+    quantity: args.quantity, totalPointsCost: total, points: customer.points,
+    pointsAfter: customer.points - total, hasEnoughPoints: customer.points >= total,
   };
 }
 
@@ -139,14 +139,14 @@ describe("VolunteerShopPage", () => {
     expect(mocks.resolve).toHaveBeenCalledWith({ sessionToken: "session", qrCodeToken: token, purpose: "shop" });
     expect(container.querySelector("[aria-label=Participant]")?.textContent).toContain("Riley Ready1,250points");
     expect(button("Review purchase").disabled).toBe(true);
-    expect(button("Insulated bottle").disabled).toBe(true);
+    expect(button("Insulated bottle").disabled).toBe(false);
     expect(text()).toContain("Sale");
-    expect(text()).toContain("2 left · Low");
+    expect(text()).toContain("Six stickers");
 
     await click("Sticker pack");
     await click("More");
-    expect(button("More").disabled).toBe(true);
-    expect(text()).toContain("Up to 2 (stock limit)");
+    expect(button("More").disabled).toBe(false);
+    expect(text()).toContain("Up to 10 per purchase");
     await click("Fewer");
     await click("HackUTA 2026 T-shirt");
     expect(text()).toContain("Up to 10 per purchase");
@@ -155,7 +155,7 @@ describe("VolunteerShopPage", () => {
     expect(document.activeElement?.id).toBe("shop-review-heading");
     expect(text()).toContain("Total600 pts");
     expect(text()).toContain("Balance after650 pts");
-    expect(text()).toContain("sale price");
+    expect(text()).toContain("Sale price");
 
     await click("Confirm · 600 pts");
     const call = mocks.purchase.mock.calls[0]![0];
@@ -222,14 +222,10 @@ describe("VolunteerShopPage", () => {
     expect(button("Review purchase").disabled).toBe(true);
   });
 
-  it("explains stock, availability, and eligibility problems before confirming", async () => {
-    mocks.queries.set(previewShopPurchaseRef, (args: { itemId: string; quantity: number }) => ({ ...preview(args), stockQuantity: 1, hasEnoughStock: false }));
+  it("explains availability and eligibility problems before confirming", async () => {
+    mocks.queries.set(previewShopPurchaseRef, { status: "item_unavailable" });
     await render();
     await reviewTee();
-    expect(text()).toContain("Only 1 left.");
-    mocks.queries.set(previewShopPurchaseRef, { status: "item_unavailable" });
-    await click("Change item");
-    await click("Review purchase");
     expect(text()).toContain("This purchase can't go ahead");
     mocks.queries.set(previewShopPurchaseRef, undefined);
     await click("Change item");

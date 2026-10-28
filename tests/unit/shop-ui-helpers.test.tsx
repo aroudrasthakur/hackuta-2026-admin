@@ -11,7 +11,6 @@ import {
   ITEM_STATUS,
   parseWholeNumber,
   SALE_STATUS,
-  STOCK_STATUS,
   toDateTimeInput,
 } from "../../src/lib/shopFormat";
 import { newIdempotencyKey, purchaseOutcome } from "../../src/lib/shopScanResults";
@@ -26,7 +25,6 @@ describe("shop formatting", () => {
   it("formats points, times, and status labels", () => {
     expect(formatPoints(12500)).toBe("12,500");
     expect(formatShopTime(Date.UTC(2026, 9, 25, 18, 0))).toMatch(/Oct/);
-    expect(STOCK_STATUS.low).toEqual({ label: "Low", tone: "warning" });
     expect(ITEM_STATUS.archived.label).toBe("Archived");
     expect(SALE_STATUS.live.tone).toBe("positive");
   });
@@ -66,8 +64,6 @@ describe("purchase outcomes", () => {
 
   it("lets the volunteer choose again when the item or balance is the problem", () => {
     expect(outcome({ status: "insufficient_points", points: 40, totalPointsCost: 300 })).toMatchObject({ next: "choose", outcome: { title: "Not enough points", detail: expect.stringContaining("Riley has 40 points and needs 300") } });
-    expect(outcome({ status: "insufficient_stock", stockQuantity: 0 })).toMatchObject({ next: "choose", outcome: { title: "Sold out" } });
-    expect(outcome({ status: "insufficient_stock", stockQuantity: 2 })).toMatchObject({ next: "choose", outcome: { title: "Not enough stock", detail: expect.stringContaining("Only 2 left") } });
     expect(outcome({ status: "item_unavailable" })).toMatchObject({ next: "choose", outcome: { title: "Item unavailable" } });
     expect(outcome({ status: "invalid_quantity", maxQuantity: 10 })).toMatchObject({ next: "choose", outcome: { detail: expect.stringContaining("Choose 1 to 10") } });
   });

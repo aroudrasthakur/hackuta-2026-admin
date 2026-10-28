@@ -20,7 +20,7 @@ Vite, React 19, TypeScript, React Router, Convex, Tailwind CSS v4.
 | `/admin/participants`, `/admin/volunteers` | Administrator-only management entry pages |
 | `/admin/events` | Administrator-only event schedule and point values |
 | `/admin/meals` | Admin-only meal schedules, serving availability, live counts, and collection history |
-| `/admin/shop` | Admin shop: items and stock, flash sales (`?tab=sales`), purchase history (`?tab=history`) |
+| `/admin/shop` | Admin shop: items, flash sales (`?tab=sales`), purchase history (`?tab=history`) |
 | `/admin/applications` | Submitted application queue |
 | `/admin/decision-emails` | Decision email queue for admins |
 | `/admin/applications/:id` | Application review, decisions, history (admin) |

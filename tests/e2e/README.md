@@ -17,7 +17,7 @@ Browser tests for the organizer admin SPA. They run against **`VITE_E2E_MOCK=tru
 | [applications-queue.spec.ts](applications-queue.spec.ts) | Filters, queue context, claims and navigation |
 | [application-review.spec.ts](application-review.spec.ts) | Review, decisions, resume focus and history |
 | [decision-email-queue.spec.ts](decision-email-queue.spec.ts) | Permissions, hold/send/retry, recovery and scrolling |
-| [shop.spec.ts](shop.spec.ts) | Admin items, stock, flash sales, refunds; volunteer purchase, lost-response duplicate, short balance |
+| [shop.spec.ts](shop.spec.ts) | Admin items, flash sales, refunds; volunteer purchase, lost-response duplicate, short balance |
 | [dashboard-layout.spec.ts](dashboard-layout.spec.ts) | Responsive layout, long content, keyboard, motion, zoom and contrast |
 
 Mock organizer accounts: [shared/admin/e2e/credentials.ts](../../shared/admin/e2e/credentials.ts).

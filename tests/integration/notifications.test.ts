@@ -316,8 +316,6 @@ describe("admin notifications management & participant notifications", () => {
       name: "HackUTA Hoodie",
       description: "Warm hoodie",
       pointsCost: 500,
-      stockQuantity: 10,
-      featured: true,
     });
 
     // Schedule a flash sale in the future

@@ -1,27 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_LOW_STOCK_THRESHOLD,
   isValidIdempotencyKey,
   isValidPurchaseQuantity,
   normalizeFlashSaleInput,
   normalizeShopItemInput,
   normalizeShopReason,
   SHOP_MAX_QUANTITY,
-  stockStatus,
 } from "../../shared/admin/shopRules";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 const sale = { title: "Lunch", message: "", startsAt: 1, endsAt: 2, items: [{ itemId: "a", salePointsCost: 5 }] };
 
 describe("shop rules", () => {
-  it("classifies stock against the threshold", () => {
-    expect(stockStatus(0)).toBe("out");
-    expect(stockStatus(DEFAULT_LOW_STOCK_THRESHOLD)).toBe("low");
-    expect(stockStatus(DEFAULT_LOW_STOCK_THRESHOLD + 1)).toBe("in_stock");
-    expect(stockStatus(3, 2)).toBe("in_stock");
-    expect(stockStatus(2, 2)).toBe("low");
-  });
-
   it("checks purchase quantities and idempotency keys", () => {
     expect(isValidPurchaseQuantity(1)).toBe(true);
     expect(isValidPurchaseQuantity(SHOP_MAX_QUANTITY)).toBe(true);
@@ -33,16 +23,17 @@ describe("shop rules", () => {
   });
 
   it("trims item fields and rejects bad ones", async () => {
-    expect(normalizeShopItemInput({ name: " Hat ", description: " Warm ", pointsCost: 5, lowStockThreshold: null }))
-      .toEqual({ name: "Hat", description: "Warm", pointsCost: 5, lowStockThreshold: undefined });
-    expect(normalizeShopItemInput({ name: "Hat", description: "", pointsCost: 5, lowStockThreshold: 0 }).lowStockThreshold).toBe(0);
+    expect(normalizeShopItemInput({ name: " Hat ", description: " Warm ", pointsCost: 5 }))
+      .toEqual({ name: "Hat", description: "Warm", pointsCost: 5 });
+    expect(normalizeShopItemInput({ name: "Hat", description: "", pointsCost: 5 })).toEqual({
+      name: "Hat", description: "", pointsCost: 5,
+    });
     await expectAdminErrorCode(async () => normalizeShopItemInput({ name: "Hat", description: "x".repeat(501), pointsCost: 5 }), "INVALID_SHOP_ITEM");
-    await expectAdminErrorCode(async () => normalizeShopItemInput({ name: "Hat", description: "", pointsCost: 5, lowStockThreshold: -1 }), "INVALID_SHOP_ITEM");
     await expectAdminErrorCode(async () => normalizeShopItemInput({ name: 5 as never, description: "", pointsCost: 5 }), "INVALID_SHOP_ITEM");
   });
 
   it("requires a short reason", async () => {
-    expect(normalizeShopReason(" Restock ")).toBe("Restock");
+    expect(normalizeShopReason(" Wrong size ")).toBe("Wrong size");
     await expectAdminErrorCode(async () => normalizeShopReason("x".repeat(201)), "INVALID_SHOP_REASON");
   });
 

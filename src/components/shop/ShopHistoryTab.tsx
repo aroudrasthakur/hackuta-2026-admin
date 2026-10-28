@@ -1,7 +1,6 @@
 import { useId, useState } from "react";
 import { useMutation, usePaginatedQuery } from "../../convex/reactBindings";
 import {
-  listInventoryAdjustmentsRef,
   listShopRedemptionsRef,
   refundShopRedemptionRef,
   type ShopRedemptionRow,
@@ -16,14 +15,6 @@ import { ShopDialog } from "./ShopDialog";
 
 const PAGE_SIZE = 25;
 
-const ADJUSTMENT_KINDS = {
-  initial: "Starting stock",
-  manual: "Manual",
-  restock: "Restock",
-  purchase: "Purchase",
-  refund_restock: "Refund restock",
-} as const;
-
 function RefundDialog({ purchase, onClose, onDone }: {
   purchase: ShopRedemptionRow;
   onClose: () => void;
@@ -33,7 +24,6 @@ function RefundDialog({ purchase, onClose, onDone }: {
   const refund = useMutation(refundShopRedemptionRef);
   const id = useId();
   const [reason, setReason] = useState("");
-  const [restock, setRestock] = useState(true);
   const [showErrors, setShowErrors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -44,8 +34,8 @@ function RefundDialog({ purchase, onClose, onDone }: {
     setSaving(true);
     setError(null);
     try {
-      await refund({ sessionToken, redemptionId: purchase.redemptionId, reason: reason.trim(), restock });
-      onDone(`${formatPoints(purchase.totalPointsSpent)} points returned to ${purchase.participant.name}${restock ? " and stock restored" : ""}.`);
+      await refund({ sessionToken, redemptionId: purchase.redemptionId, reason: reason.trim() });
+      onDone(`${formatPoints(purchase.totalPointsSpent)} points returned to ${purchase.participant.name}.`);
     } catch (caught) {
       setError(reportUserFacingError("Unable to refund purchase", caught, "We couldn't refund this purchase. Please try again.", { source: "ShopHistoryTab.refund" }));
     } finally {
@@ -74,48 +64,12 @@ function RefundDialog({ purchase, onClose, onDone }: {
         <textarea id={`${id}-reason`} className="admin-field__control min-h-20" value={reason} maxLength={SHOP_REASON_MAX_LENGTH} placeholder="For example: wrong size, item returned" aria-invalid={showErrors && !reason.trim() ? true : undefined} onChange={(event) => setReason(event.target.value)} />
       </label>
       {showErrors && !reason.trim() ? <p className="shop-field-error">Add a reason for the refund.</p> : <p className="text-sm text-muted">Required. A purchase can be refunded once.</p>}
-      <label className="shop-check" htmlFor={`${id}-restock`}>
-        <input id={`${id}-restock`} type="checkbox" checked={restock} onChange={(event) => setRestock(event.target.checked)} />
-        Put the item back in stock
-      </label>
       {error ? <p role="alert" className="admin-callout admin-callout--alert">{error}</p> : null}
     </ShopDialog>
   );
 }
 
-function StockLog({ sessionToken }: { sessionToken: string }) {
-  const { results, status, loadMore } = usePaginatedQuery(listInventoryAdjustmentsRef, { sessionToken }, { initialNumItems: PAGE_SIZE });
-  return (
-    <details className="shop-tablet admin-disclosure">
-      <summary className="px-4">Stock changes</summary>
-      {status === "LoadingFirstPage" ? <LoadingState message="Loading stock changes…" /> : results.length === 0 ? (
-        <p className="px-4 pb-4 text-sm text-muted">No stock changes yet.</p>
-      ) : (
-        <div className="shop-table-scroll">
-          <table className="admin-table shop-table">
-            <thead><tr><th scope="col">Time</th><th scope="col">Item</th><th scope="col">Change</th><th scope="col">Before → after</th><th scope="col">Type</th><th scope="col">By</th><th scope="col">Reason</th></tr></thead>
-            <tbody>
-              {results.map((row) => (
-                <tr key={row.adjustmentId}>
-                  <td className="whitespace-nowrap tabular-nums">{formatShopTime(row.createdAt)}</td>
-                  <th scope="row" className="font-semibold text-night">{row.itemName}</th>
-                  <td className="font-bold tabular-nums">{row.delta > 0 ? `+${row.delta}` : row.delta}</td>
-                  <td className="tabular-nums">{row.previousQuantity} → {row.newQuantity}</td>
-                  <td>{ADJUSTMENT_KINDS[row.kind]}</td>
-                  <td>{row.admin.name}</td>
-                  <td>{row.reason ?? <span className="text-muted">None</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {status === "CanLoadMore" ? <div className="p-4"><button type="button" className="shop-pill shop-pill--sm" onClick={() => loadMore(PAGE_SIZE)}>Show more</button></div> : null}
-    </details>
-  );
-}
-
-/** Purchase history with refunds, and the stock change log. */
+/** Purchase history with refunds. */
 export function ShopHistoryTab() {
   const { sessionToken } = useAdminAuth();
   const searchId = useId();
@@ -168,7 +122,7 @@ export function ShopHistoryTab() {
                       {row.refund ? (
                         <span className="grid gap-1">
                           <AdminStatusBadge tone="warning">Refunded</AdminStatusBadge>
-                          <span className="text-xs text-muted">{row.refund.reason} · {row.refund.refundedBy.name}{row.refund.restocked ? " · restocked" : ""}</span>
+                          <span className="text-xs text-muted">{row.refund.reason} · {row.refund.refundedBy.name}</span>
                         </span>
                       ) : <AdminStatusBadge tone="positive">Completed</AdminStatusBadge>}
                     </td>
@@ -181,7 +135,6 @@ export function ShopHistoryTab() {
         )}
         {status === "CanLoadMore" ? <div className="p-4"><button type="button" className="shop-pill shop-pill--sm" onClick={() => loadMore(PAGE_SIZE)}>Show more</button></div> : null}
       </section>
-      <StockLog sessionToken={sessionToken} />
       {refunding ? <RefundDialog purchase={refunding} onClose={() => setRefunding(null)} onDone={(message) => { setRefunding(null); setNotice(message); }} /> : null}
     </div>
   );

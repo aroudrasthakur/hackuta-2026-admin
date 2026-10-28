@@ -10,14 +10,13 @@ import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { parseWholeNumber } from "../../lib/shopFormat";
 import { reportUserFacingError } from "../../lib/userFacingError";
 import {
-  DEFAULT_LOW_STOCK_THRESHOLD,
   SHOP_DESCRIPTION_MAX_LENGTH,
   SHOP_NAME_MAX_LENGTH,
 } from "../../../shared/admin/shopRules";
 import { ShopDialog } from "./ShopDialog";
 
 type Status = ShopItemAdminRow["status"];
-type Errors = Partial<Record<"name" | "price" | "stock" | "low", string | undefined>>;
+type Errors = Partial<Record<"name" | "price", string | undefined>>;
 
 const STATUS_OPTIONS: Array<{ value: Status; label: string }> = [
   { value: "active", label: "Active: Shown and sellable" },
@@ -25,7 +24,7 @@ const STATUS_OPTIONS: Array<{ value: Status; label: string }> = [
   { value: "archived", label: "Archived: Retired, history kept" },
 ];
 
-/** Add or edit drawer. Stock is set only on create; later changes go through Adjust so they are logged. */
+/** Add or edit drawer for catalog details. */
 export function ShopItemForm({ item, onClose, onSaved }: {
   item: ShopItemAdminRow | null;
   onClose: () => void;
@@ -39,9 +38,6 @@ export function ShopItemForm({ item, onClose, onSaved }: {
   const [name, setName] = useState(item?.name ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [price, setPrice] = useState(item ? String(item.pointsCost) : "");
-  const [stock, setStock] = useState(item ? String(item.stockQuantity) : "0");
-  const [low, setLow] = useState(String(item?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD));
-  const [featured, setFeatured] = useState(item?.featured ?? false);
   const [status, setStatusValue] = useState<Status>(item?.status ?? "active");
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -50,13 +46,9 @@ export function ShopItemForm({ item, onClose, onSaved }: {
   async function save() {
     if (!sessionToken || saving) return;
     const pointsCost = parseWholeNumber(price, 1);
-    const stockQuantity = parseWholeNumber(stock, 0);
-    const lowStockThreshold = low.trim() === "" ? null : parseWholeNumber(low, 0);
     const next: Errors = {
       ...(name.trim() ? {} : { name: "Enter a name." }),
       ...(pointsCost === null ? { price: "Enter a whole number of 1 point or more." } : {}),
-      ...(!item && stockQuantity === null ? { stock: "Enter a whole number of 0 or more." } : {}),
-      ...(low.trim() !== "" && lowStockThreshold === null ? { low: "Enter a whole number of 0 or more, or leave it empty." } : {}),
     };
     setErrors(next);
     if (Object.values(next).some(Boolean) || pointsCost === null) return;
@@ -69,8 +61,6 @@ export function ShopItemForm({ item, onClose, onSaved }: {
         name: name.trim(),
         description: description.trim(),
         pointsCost,
-        featured,
-        lowStockThreshold,
       };
       if (item) {
         await update({ ...fields, itemId: item.itemId });
@@ -79,7 +69,6 @@ export function ShopItemForm({ item, onClose, onSaved }: {
       } else {
         const { itemId } = await create({
           ...fields,
-          stockQuantity: stockQuantity ?? 0,
           active: status === "active",
         });
         if (status === "archived") await setStatus({ sessionToken, itemId, status });
@@ -114,28 +103,11 @@ export function ShopItemForm({ item, onClose, onSaved }: {
         Description
         <textarea id={field("description")} className="admin-field__control min-h-20" value={description} maxLength={SHOP_DESCRIPTION_MAX_LENGTH} onChange={(event) => setDescription(event.target.value)} />
       </label>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="admin-field" htmlFor={field("price")}>
-          Price (points)
-          <input id={field("price")} className="admin-field__control" inputMode="numeric" value={price} aria-invalid={errors.price ? true : undefined} onChange={(event) => setPrice(event.target.value)} />
-        </label>
-        <label className="admin-field" htmlFor={field("stock")}>
-          {item ? "Current stock" : "Starting stock"}
-          <input id={field("stock")} className="admin-field__control" inputMode="numeric" value={stock} disabled={!!item} aria-invalid={errors.stock ? true : undefined} onChange={(event) => setStock(event.target.value)} />
-        </label>
-      </div>
+      <label className="admin-field" htmlFor={field("price")}>
+        Price (points)
+        <input id={field("price")} className="admin-field__control" inputMode="numeric" value={price} aria-invalid={errors.price ? true : undefined} onChange={(event) => setPrice(event.target.value)} />
+      </label>
       {errors.price ? <p className="shop-field-error">{errors.price}</p> : null}
-      {errors.stock ? <p className="shop-field-error">{errors.stock}</p> : null}
-      {item ? <p className="text-sm text-muted">Change stock with Adjust so every change is logged.</p> : null}
-      <label className="admin-field" htmlFor={field("low")}>
-        Low-stock warning at
-        <input id={field("low")} className="admin-field__control" inputMode="numeric" value={low} aria-invalid={errors.low ? true : undefined} onChange={(event) => setLow(event.target.value)} />
-      </label>
-      {errors.low ? <p className="shop-field-error">{errors.low}</p> : null}
-      <label className="shop-check" htmlFor={field("featured")}>
-        <input id={field("featured")} type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} />
-        Feature this item at the top of the shop
-      </label>
       <label className="admin-field" htmlFor={field("status")}>
         Status
         <select id={field("status")} className="admin-field__control" value={status} onChange={(event) => setStatusValue(event.target.value as Status)}>
