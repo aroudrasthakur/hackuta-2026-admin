@@ -58,7 +58,7 @@ describe("admin meals page", () => {
   }
   async function submit() { await act(async () => fireEvent.submit(container.querySelector("form")!)); }
 
-  it.each(["reviewer", "volunteer"])("does not query or show controls to %s", async (role) => {
+  it.each(["volunteer"])("does not query or show controls to %s", async (role) => {
     mocks.auth.staff.role = role; await render(); expect(container.textContent).toBe(""); expect(mocks.query).not.toHaveBeenCalled();
   });
   it("waits for a session before querying", async () => {

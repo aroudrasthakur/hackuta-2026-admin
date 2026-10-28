@@ -10,7 +10,7 @@ let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 
 const auth: AdminAuthContextValue = {
-  staff: { adminId: "1", email: "a@b.com", name: "Staff", role: "reviewer", expiresAt: Date.now() + 60_000 },
+  staff: { adminId: "1", email: "a@b.com", name: "Staff", role: "admin", expiresAt: Date.now() + 60_000 },
   sessionToken: "token",
   authError: null,
   isAuthenticated: true,

@@ -30,7 +30,7 @@ describe("admin sign-in rate limit key", () => {
 });
 
 describe("admin sign-in lockout window", () => {
-  it.each(["admin", "reviewer", "volunteer"] as const)(
+  it.each(["admin", "volunteer"] as const)(
     "blocks direct %s login attempts across caller-supplied IPs and email casing", async (role) => {
       const t = createConvexTest();
       const email = "rotating@hackuta.org";

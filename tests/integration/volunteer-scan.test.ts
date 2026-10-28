@@ -120,10 +120,9 @@ describe("listMyScanOptions", () => {
     expect(JSON.stringify(options)).not.toMatch(/email|points"|participant|Other/);
   });
 
-  it("returns all capabilities and all active events for admins and rejects reviewers and missing sessions", async () => {
+  it("returns all capabilities and all active events for admins and rejects missing sessions", async () => {
     const t = createConvexTest();
     const admin = await seedStaff(t, { role: "admin" });
-    const reviewer = await seedStaff(t, { role: "reviewer" });
     const early = await seedEvent(t, { name: "Early", startsAt: 10, endsAt: 20 });
     const late = await seedEvent(t, { name: "Late", startsAt: 50, endsAt: 60 });
     await seedEvent(t, { name: "Closed", active: false });
@@ -138,8 +137,26 @@ describe("listMyScanOptions", () => {
         { eventId: late, name: "Late", pointsAwarded: 10, startsAt: 50, endsAt: 60 },
       ],
     });
-    await expectAdminErrorCode(t.query(listMyScanOptionsRef, { sessionToken: reviewer.sessionToken }), "VOLUNTEER_ONLY");
     await expectAdminErrorCode(t.query(listMyScanOptionsRef, { sessionToken: "missing" }), "NOT_AUTHENTICATED");
+  });
+
+  it("returns every active event for a volunteer with canScanAllEvents, including ones added later", async () => {
+    const t = createConvexTest();
+    const volunteer = await seedVolunteer(t);
+    const early = await seedEvent(t, { name: "Early", startsAt: 10, endsAt: 20 });
+    await t.run((ctx) => ctx.db.patch(volunteer.adminId, { canScanAllEvents: true }));
+    const late = await seedEvent(t, { name: "Late", startsAt: 50, endsAt: 60 });
+    await seedEvent(t, { name: "Closed", active: false });
+
+    expect(await t.query(listMyScanOptionsRef, { sessionToken: volunteer.sessionToken })).toEqual({
+      canCheckIn: false,
+      canFoodCheckIn: false,
+      canRedeemShop: false,
+      events: [
+        { eventId: early, name: "Early", pointsAwarded: 10, startsAt: 10, endsAt: 20 },
+        { eventId: late, name: "Late", pointsAwarded: 10, startsAt: 50, endsAt: 60 },
+      ],
+    });
   });
 });
 
@@ -345,14 +362,8 @@ describe("resolveQrForScan", () => {
     await expectAdminErrorCode(scan("shop"), "NOT_AUTHENTICATED");
   });
 
-  it("allows admins across all purposes without capability or event grants and rejects reviewers", async () => {
+  it("allows admins across all purposes without capability or event grants", async () => {
     const t = createConvexTest();
-    const reviewer = await seedStaff(t, { role: "reviewer" });
-    await expectAdminErrorCode(t.mutation(resolveQrForScanRef, {
-      sessionToken: reviewer.sessionToken, qrCodeToken: QR_TOKEN, purpose: "shop",
-    }), "VOLUNTEER_ONLY");
-    expect(await scanRows(t)).toEqual([]);
-
     const admin = await seedStaff(t, { role: "admin" });
     await seedParticipant(t);
     const mealPeriodId = await seedMealPeriod(t, admin.adminId);

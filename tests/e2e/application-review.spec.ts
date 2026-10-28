@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import {
   E2E_ADMIN,
   E2E_APPLICATION_IDS,
-  E2E_REVIEWER,
   signInOrganizer,
 } from "./fixtures/auth";
 import { resetE2eMockBackend } from "./fixtures/resetMock";
@@ -13,7 +12,7 @@ test.describe("application review workflow", () => {
     await resetE2eMockBackend(page);
   });
   test("keeps keyboard focus in the native resume dialog and restores it on close", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInOrganizer(page, E2E_ADMIN);
     await page.getByRole("link", { name: "Review application for Taylor Unreviewed" }).click();
     const trigger = page.getByRole("button", { name: "Preview Resume" });
     await trigger.click();
@@ -31,7 +30,7 @@ test.describe("application review workflow", () => {
   });
 
   test("reviewer can start review on an unreviewed application", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInOrganizer(page, E2E_ADMIN);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.unreviewed}`);
     await expect(page.getByRole("region", { name: "Review claim" })).toBeVisible();
     await page.getByRole("button", { name: "Start review" }).click();
@@ -39,7 +38,7 @@ test.describe("application review workflow", () => {
   });
 
   test("puts identity and review evidence first and keeps secondary information expandable", async ({ page }, testInfo) => {
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInOrganizer(page, E2E_ADMIN);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
     await expect(page.getByRole("region", { name: "Review claim" }).locator("p").first()).toHaveCSS("color", "rgb(48, 88, 115)");
     for (const width of [1440, 375, 320]) {
@@ -62,7 +61,7 @@ test.describe("application review workflow", () => {
   });
 
   test("reviewer confirms waitlist decision with two-step flow", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInOrganizer(page, E2E_ADMIN);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
     await page.getByRole("button", { name: "Change Decision" }).click();
     await page.getByRole("button", { name: "Waitlist" }).click();
@@ -84,14 +83,14 @@ test.describe("application review workflow", () => {
   });
 
   test("finalized application hides decision controls", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInOrganizer(page, E2E_ADMIN);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.accepted}`);
     await expect(page.getByText(/final decision/i)).toBeVisible();
     await expect(page.getByRole("region", { name: "Application decision" })).toHaveCount(0);
   });
 
   test("supports keyboard confirmation and announces the saved decision", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
+    await signInOrganizer(page, E2E_ADMIN);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
     await page.getByRole("button", { name: "Change Decision" }).click();
     const accept = page.getByRole("button", { name: "Accept", exact: true });
@@ -132,16 +131,11 @@ test.describe("application review workflow", () => {
     ).toBeVisible();
   });
 
-  test("reviewer cannot see admin-only review history section", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
-    await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.accepted}`);
-    await expect(page.getByRole("region", { name: "Review history" })).toHaveCount(0);
-  });
-
   test("skips applications actively held by other reviewers", async ({ page }) => {
     await signInOrganizer(page, E2E_ADMIN);
     await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.unreviewed}`);
-    await expect(page.getByRole("navigation", { name: "Review navigation" })).toContainText("No more available applications in this queue.");
-    await expect(page.getByRole("link", { name: "Review next application", exact: true })).toHaveCount(0);
+    await page.getByRole("link", { name: "Review next application", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}$`));
+    await expect(page.getByRole("heading", { name: "Casey Decision" })).toBeVisible();
   });
 });

@@ -3,11 +3,10 @@ import { expect } from "@playwright/test";
 import {
   E2E_ADMIN,
   E2E_APPLICATION_IDS,
-  E2E_REVIEWER,
   E2E_VOLUNTEER,
 } from "../../../shared/admin/e2e/credentials";
 
-export { E2E_ADMIN, E2E_APPLICATION_IDS, E2E_REVIEWER };
+export { E2E_ADMIN, E2E_APPLICATION_IDS, E2E_VOLUNTEER };
 
 export async function signInVolunteer(page: Page) {
   await page.goto("/admin/login");

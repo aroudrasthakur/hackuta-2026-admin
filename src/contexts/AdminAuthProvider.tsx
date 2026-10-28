@@ -10,7 +10,25 @@ import {
 } from "../lib/adminSessionClient";
 import { logAdminError } from "../../shared/admin/logAdminError";
 import { UserFacingError } from "../lib/userFacingError";
-import { AdminAuthContext, type AdminAuthContextValue } from "./adminAuthContext";
+import { AdminAuthContext, type AdminAuthContextValue, type StaffProfile } from "./adminAuthContext";
+
+function toStaffProfile(
+  staff: {
+    adminId: string;
+    email: string;
+    name: string;
+    role: string;
+    canCheckIn?: boolean;
+    canFoodCheckIn?: boolean;
+    canRedeemShop?: boolean;
+    expiresAt: number;
+  },
+): StaffProfile {
+  return {
+    ...staff,
+    role: staff.role === "admin" ? "admin" : "volunteer",
+  };
+}
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [sessionToken, setSessionToken] = useState<string | null>(null);
@@ -122,7 +140,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     const isLoading = !sessionReady || (sessionToken !== null && staff === undefined);
     return {
       sessionToken,
-      staff: sessionToken ? staff ?? null : null,
+      staff: sessionToken ? (staff ? toStaffProfile(staff) : null) : null,
       authError,
       isLoading,
       isAuthenticated: !!sessionToken && !!staff,

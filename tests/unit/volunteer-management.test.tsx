@@ -67,6 +67,7 @@ function volunteer(overrides: Partial<VolunteerRow> = {}): VolunteerRow {
     canCheckIn: true,
     canFoodCheckIn: false,
     canRedeemShop: false,
+    canScanAllEvents: false,
     events: [{ eventId: workshopId, name: "Workshop", active: true }],
     createdAt: 1,
     updatedAt: 1,
@@ -319,7 +320,7 @@ describe("VolunteersPage", () => {
   });
 
   it("waits for administrator access before querying", async () => {
-    await render(<VolunteersPage />, "/", { ...adminAuth, staff: { ...adminAuth.staff!, role: "reviewer" } });
+    await render(<VolunteersPage />, "/", { ...adminAuth, staff: { ...adminAuth.staff!, role: "volunteer" } });
     expect(text()).toContain("Verifying administrator access…");
     expect(mocks.paginatedQuery).not.toHaveBeenCalled();
     expect(button("Add volunteer")).toBeUndefined();
@@ -375,12 +376,37 @@ describe("VolunteerDetailPage", () => {
     await flip("Assign Workshop");
     expect(text()).toContain("Unsaved changes");
     await submit(container.querySelector('form[aria-labelledby="volunteer-events-heading"]'));
-    expect(save).toHaveBeenCalledWith({ sessionToken: "session-token", volunteerAdminId: volunteerId, eventIds: [panelId] });
+    expect(save).toHaveBeenCalledWith({
+      sessionToken: "session-token", volunteerAdminId: volunteerId, eventIds: [panelId], canScanAllEvents: false,
+    });
     currentVolunteer = volunteer({ events: [{ eventId: panelId, name: "Panel", active: false }] });
     await renderDetail();
     expect(text()).toContain("Event assignments saved (1 added, 1 removed).");
     expect(switchFor("Assign Panel").getAttribute("aria-checked")).toBe("true");
     expect(button("Save event assignments")?.disabled).toBe(true);
+  });
+
+  it("assigns every current and future event with All events", async () => {
+    const save = mutation(setVolunteerEventAccessRef, async () => ({ ok: true, added: 1, removed: 0 }));
+    await renderDetail();
+    expect(switchFor("All events").getAttribute("aria-checked")).toBe("false");
+    await flip("All events");
+    expect(text()).toContain("All events assigned, including ones added later.");
+    expect(switchFor("Assign Workshop").getAttribute("aria-checked")).toBe("true");
+    expect(switchFor("Assign Panel").getAttribute("aria-checked")).toBe("true");
+    expect(switchFor("Assign Workshop").hasAttribute("disabled")).toBe(true);
+    await submit(container.querySelector('form[aria-labelledby="volunteer-events-heading"]'));
+    expect(save).toHaveBeenCalledWith({
+      sessionToken: "session-token",
+      volunteerAdminId: volunteerId,
+      eventIds: [workshopId, panelId],
+      canScanAllEvents: true,
+    });
+    currentVolunteer = volunteer({ canScanAllEvents: true, events: [{ eventId: workshopId, name: "Workshop", active: true }] });
+    await renderDetail();
+    expect(text()).toContain("This volunteer can award points for every event, including ones added later.");
+    expect(text()).toContain("Allowed for all events");
+    expect(text()).toContain("Points: all events");
   });
 
   it("reports assignment failures and links to Events when none exist", async () => {

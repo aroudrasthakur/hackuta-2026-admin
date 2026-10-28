@@ -203,11 +203,6 @@ describe("two-step badge check-in", () => {
 
     await s.t.run((ctx) => ctx.db.patch(s.volunteer.adminId, { canCheckIn: false }));
     expect(await s.checkIn()).toEqual({ status: "not_authorized" });
-    const reviewer = await seedStaff(s.t, { role: "reviewer" });
-    await expectAdminErrorCode(s.t.mutation(checkInWithBadgeRef, {
-      sessionToken: reviewer.sessionToken, registrationQrCodeToken: REGISTRATION, badgeQrCodeToken: BADGE,
-    }), "VOLUNTEER_ONLY");
-
     const freshId = await seedParticipant(s.t, s.admin.adminId, { qrCodeToken: "99".repeat(32) });
     expect(await s.t.mutation(checkInWithBadgeRef, {
       sessionToken: s.admin.sessionToken, registrationQrCodeToken: "99".repeat(32), badgeQrCodeToken: OTHER_BADGE,
@@ -275,7 +270,6 @@ describe("admin badge replacement", () => {
     await seedParticipant(s.t, s.admin.adminId, {
       qrCodeToken: "HACKUTA-BADGE-0003", badgeQrCodeToken: "HACKUTA-BADGE-0003", registrationQrCodeToken: OTHER_REGISTRATION, checkedInAt: 1,
     });
-    const reviewer = await seedStaff(s.t, { role: "reviewer" });
     const before = await s.snapshot();
     await expectAdminErrorCode(s.replace(s.admin.sessionToken, { expectedBadgeAssignedAt: NOW - 1 }), "BADGE_ASSIGNMENT_CHANGED");
     await expectAdminErrorCode(s.replace(s.admin.sessionToken, { badgeQrCodeToken: BADGE }), "BADGE_IN_USE");
@@ -284,7 +278,6 @@ describe("admin badge replacement", () => {
     await expectAdminErrorCode(s.replace(s.admin.sessionToken, { badgeQrCodeToken: "" }), "INVALID_BADGE");
     await expectAdminErrorCode(s.replace(s.admin.sessionToken, { reason: "  " }), "INVALID_BADGE_REASON");
     await expectAdminErrorCode(s.replace(s.volunteer.sessionToken), "NOT_AUTHORIZED");
-    await expectAdminErrorCode(s.replace(reviewer.sessionToken), "ADMIN_ONLY");
     expect(await s.snapshot()).toEqual(before);
   });
 

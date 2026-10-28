@@ -49,7 +49,7 @@ const staff = {
   adminId: "staff-1",
   email: "staff@hackuta.org",
   name: "Jordan Reviewer",
-  role: "reviewer" as const,
+  role: "admin" as const,
   expiresAt: Date.now() + 60_000,
 };
 
@@ -171,7 +171,7 @@ describe("app routes", () => {
     expect(context.signOut).toHaveBeenCalledOnce();
   });
 
-  it.each(["reviewer", "admin"] as const)("redirects a %s away from volunteer operations", async (role) => {
+  it.each(["admin"] as const)("redirects a %s away from volunteer operations", async (role) => {
     await renderApp("/volunteer", authContext({ staff: { ...staff, role } }));
     expect(currentPath()).toBe("/admin/applications");
   });
@@ -187,7 +187,7 @@ describe("app routes", () => {
     expect(container.textContent).toContain("Reviewer");
     expect(container.querySelector('nav[aria-label="Admin"]')?.textContent).toContain("Decision emails");
     expect(container.querySelector(".admin-topbar__identity-name")?.textContent).toBe("Jordan Reviewer");
-    expect(container.querySelector(".admin-topbar__identity-role")?.textContent).toBe("Reviewer");
+    expect(container.querySelector(".admin-topbar__identity-role")?.textContent).toBe("Admin");
   });
 
   it("sends signed-out visitors to sign-in", async () => {

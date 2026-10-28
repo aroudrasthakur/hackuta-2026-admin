@@ -256,7 +256,7 @@ describe("getVolunteer", () => {
 });
 
 describe("event management authorization", () => {
-  it.each(["reviewer", "volunteer"] as const)("denies every event API to a %s without writing", async (role) => {
+  it("denies every event API to a volunteer without writing", async () => {
     const { t, actor, sessionToken, create } = await fixture();
     const eventId = await create();
     const snapshot = () => t.run(async (ctx) => ({
@@ -264,8 +264,8 @@ describe("event management authorization", () => {
       logs: await ctx.db.query("staffConfigLogs").collect(),
     }));
     const before = await snapshot();
-    await t.run((ctx) => ctx.db.patch(actor.adminId, { role }));
-    const code = role === "reviewer" ? "ADMIN_ONLY" : "NOT_AUTHORIZED";
+    await t.run((ctx) => ctx.db.patch(actor.adminId, { role: "volunteer" }));
+    const code = "NOT_AUTHORIZED";
     await expectAdminErrorCode(t.query(events.listEvents, { sessionToken, paginationOpts: page }), code);
     await expectAdminErrorCode(t.query(events.getEvent, { sessionToken, eventId }), code);
     await expectAdminErrorCode(create(), code);

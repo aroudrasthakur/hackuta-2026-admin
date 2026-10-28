@@ -75,7 +75,6 @@ const deniedCallers: Record<string, (t: ConvexTestInstance) => Promise<string>> 
     await t.run((ctx) => ctx.db.delete(adminId));
     return sessionToken;
   },
-  "inactive reviewer": async (t) => (await seedStaff(t, { role: "reviewer", active: false })).sessionToken,
   "inactive admin": async (t) => (await seedStaff(t, { role: "admin", active: false })).sessionToken,
 };
 
@@ -96,41 +95,6 @@ describe("review access for callers without an active organizer session", () => 
       const sessionToken = await makeToken(t);
       expect(await t.query(getCurrentStaffRef, { sessionToken })).toBeNull();
     });
-  });
-});
-
-describe("reviewer permissions", () => {
-  it.each(["listApplications", "openApplication", "logViewed", "startReview"] as const)(
-    "allows %s",
-    async (callName) => {
-      const t = createConvexTest();
-      const { sessionToken } = await seedStaff(t, { role: "reviewer" });
-      const { applicationId } = await seedApplicant(t);
-      await expect(protectedCalls(t, sessionToken, applicationId)[callName]()).resolves.toBeDefined();
-    },
-  );
-
-  it.each([
-    ["accept", "accepted"],
-    ["reject", "rejected"],
-    ["waitlist", "waitlisted"],
-  ] as const)("allows %s", async (callName, status) => {
-    const t = createConvexTest();
-    const { sessionToken } = await seedStaff(t, { role: "reviewer" });
-    const { applicationId } = await seedApplicant(t);
-    await protectedCalls(t, sessionToken, applicationId)[callName]();
-    expect((await t.run((ctx) => ctx.db.query("applicationReviews").first()))?.status).not.toBe(status);
-    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
-      decision: status,
-      status: "queued",
-    });
-  });
-
-  it("blocks the full review history", async () => {
-    const t = createConvexTest();
-    const { sessionToken } = await seedStaff(t, { role: "reviewer" });
-    const { applicationId } = await seedApplicant(t);
-    await expectAdminErrorCode(protectedCalls(t, sessionToken, applicationId).viewHistory(), "ADMIN_ONLY");
   });
 });
 
@@ -177,9 +141,9 @@ describe("admin permissions", () => {
 });
 
 describe("account changes apply to live sessions", () => {
-  it("blocks a reviewer on the next request after the account is deactivated", async () => {
+  it("blocks an admin on the next request after the account is deactivated", async () => {
     const t = createConvexTest();
-    const { adminId, sessionToken } = await seedStaff(t, { role: "reviewer" });
+    const { adminId, sessionToken } = await seedStaff(t, { role: "admin" });
     const { applicationId } = await seedApplicant(t);
     const calls = protectedCalls(t, sessionToken, applicationId);
 
@@ -188,15 +152,15 @@ describe("account changes apply to live sessions", () => {
     await expectAdminErrorCode(calls.startReview(), "NOT_AUTHENTICATED");
   });
 
-  it("removes history access when an admin is demoted to reviewer", async () => {
+  it("removes history access when an admin is demoted to volunteer", async () => {
     const t = createConvexTest();
     const { adminId, sessionToken } = await seedStaff(t, { role: "admin" });
     const { applicationId } = await seedApplicant(t);
     const calls = protectedCalls(t, sessionToken, applicationId);
 
     await calls.viewHistory();
-    await t.run((ctx) => ctx.db.patch(adminId, { role: "reviewer" }));
-    await expectAdminErrorCode(calls.viewHistory(), "ADMIN_ONLY");
+    await t.run((ctx) => ctx.db.patch(adminId, { role: "volunteer" }));
+    await expectAdminErrorCode(calls.viewHistory(), "NOT_AUTHORIZED");
   });
 
   it("ignores applicant sign-in when no staff session is sent", async () => {
@@ -219,7 +183,7 @@ describe("participant QR credentials", () => {
 
   it("omits the QR token and participant id from the acceptance response and review reads", async () => {
     const t = createConvexTest();
-    const { sessionToken } = await seedStaff(t, { role: "reviewer" });
+    const { sessionToken } = await seedStaff(t, { role: "admin" });
     const { applicationId } = await seedApplicant(t);
     const calls = protectedCalls(t, sessionToken, applicationId);
 
@@ -235,7 +199,7 @@ describe("participant QR credentials", () => {
 
   it("keeps the same QR token when acceptance is retried", async () => {
     const t = createConvexTest();
-    const { sessionToken } = await seedStaff(t, { role: "reviewer" });
+    const { sessionToken } = await seedStaff(t, { role: "admin" });
     const { applicationId } = await seedApplicant(t);
     const calls = protectedCalls(t, sessionToken, applicationId);
 

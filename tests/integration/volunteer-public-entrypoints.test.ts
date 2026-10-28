@@ -24,13 +24,13 @@ const adminDir = join(process.cwd(), "convex", "admin");
 /** Each public organizer API must call its guard before sensitive reads/writes. Update when adding endpoints. */
 const PUBLIC_ENTRY_GUARDS = [
   ...["listMealPeriods", "listMealRedemptions", "createMealPeriod", "updateMealPeriod", "setMealPeriodActive", "removeMealPeriod"].map((exportName) => ({ file: "meals.ts", exportName, guard: "requireAdminRole" })),
-  { file: "applications.ts", exportName: "listSubmittedApplications", guard: "requireReviewerAccess" },
-  { file: "applications.ts", exportName: "getApplication", guard: "requireReviewerAccess" },
+  { file: "applications.ts", exportName: "listSubmittedApplications", guard: "requireAdminRole" },
+  { file: "applications.ts", exportName: "getApplication", guard: "requireAdminRole" },
   { file: "applications.ts", exportName: "createSampleApplication", guard: "requireAdminRole" },
-  { file: "applicationReviewLogs.ts", exportName: "logApplicationReviewAction", guard: "requireReviewerAccess" },
-  { file: "applicationReviewLogs.ts", exportName: "setApplicationDecision", guard: "requireReviewerAccess" },
+  { file: "applicationReviewLogs.ts", exportName: "logApplicationReviewAction", guard: "requireAdminRole" },
+  { file: "applicationReviewLogs.ts", exportName: "setApplicationDecision", guard: "requireAdminRole" },
   { file: "applicationReviewLogs.ts", exportName: "listApplicationReviewLogs", guard: "requireAdminRole" },
-  { file: "decisionEmailQueue.ts", exportName: "listDecisionEmailQueue", guard: "requireReviewerAccess" },
+  { file: "decisionEmailQueue.ts", exportName: "listDecisionEmailQueue", guard: "requireAdminRole" },
   { file: "decisionEmailQueue.ts", exportName: "setDecisionEmailHold", guard: "requireAdminRole" },
   { file: "decisionEmailQueue.ts", exportName: "retryFailedDecisionEmails", guard: "requireAdminRole" },
   { file: "auth.ts", exportName: "createAndProvisionAdmin", guard: "requireAdminRole" },

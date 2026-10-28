@@ -23,7 +23,7 @@ export function canAccessStaffRoute(
   }
   if (pathname === ADMIN_ROUTES.applications || pathname === ADMIN_ROUTES.decisionEmails ||
     /^\/admin\/applications\/[^/]+$/.test(pathname)) {
-    return staff.role === "admin" || staff.role === "reviewer";
+    return staff.role === "admin";
   }
   if (pathname === ADMIN_ROUTES.volunteer) {
     return staff.role === "volunteer";

@@ -74,7 +74,7 @@ function applicationDetail(): ApplicationDetail {
 
 function staffContext(overrides: Partial<AdminAuthContextValue> = {}): AdminAuthContextValue {
   return {
-    staff: { adminId: "staff", email: "staff@hackuta.org", name: "Staff", role: "reviewer", expiresAt: Date.now() + 60_000 },
+    staff: { adminId: "staff", email: "staff@hackuta.org", name: "Staff", role: "admin", expiresAt: Date.now() + 60_000 },
     sessionToken: "internal-session", isAuthenticated: true, isLoading: false, sessionReady: true,
     signIn: vi.fn(), signOut: vi.fn(), ...overrides,
   };
@@ -151,7 +151,7 @@ describe("read-only application review page", () => {
       .find((element) => element.textContent === "Back to Applications");
   }
 
-  it.each(["reviewer", "admin"] as const)("shows decision controls without finalizing until confirmation", async (role) => {
+  it.each(["admin"] as const)("shows decision controls without finalizing until confirmation", async (role) => {
     const context = staffContext();
     context.staff = { ...context.staff!, role };
     await renderPage({ context });
@@ -201,22 +201,15 @@ describe("read-only application review page", () => {
     });
   });
 
-  it.each(["reviewer", "admin"] as const)("shows review history only to admin accounts (%s)", async (role) => {
-    const context = staffContext();
-    context.staff = { ...context.staff!, role };
-    await renderPage({ context });
+  it("shows review history", async () => {
+    await renderPage({ context: staffContext() });
     const history = container.querySelector('section[aria-label="Review history"]');
-    if (role === "admin") {
-      expect(history).not.toBeNull();
-      expect(mocks.paginatedQuery).toHaveBeenCalledWith(
-        listApplicationReviewLogsRef,
-        { sessionToken: "internal-session", applicationId: "application-a" },
-        { initialNumItems: 50 },
-      );
-    } else {
-      expect(history).toBeNull();
-      expect(mocks.paginatedQuery).not.toHaveBeenCalled();
-    }
+    expect(history).not.toBeNull();
+    expect(mocks.paginatedQuery).toHaveBeenCalledWith(
+      listApplicationReviewLogsRef,
+      { sessionToken: "internal-session", applicationId: "application-a" },
+      { initialNumItems: 50 },
+    );
   });
 
   it("handles sparse and older applications without raw missing values", async () => {
@@ -369,7 +362,6 @@ describe("read-only application review page", () => {
             applicationId={applicationId}
             sessionToken="internal-session"
             staffAdminId="staff"
-            isAdmin={false}
           />
         </>
       );

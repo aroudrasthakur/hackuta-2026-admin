@@ -5,7 +5,7 @@ import { createConvexTest } from "../helpers/convexTestContext";
 
 const sessionToken = "a".repeat(64);
 
-async function createFixture(role: "reviewer" | "admin" = "reviewer") {
+async function createFixture(role: "admin" = "admin") {
   const t = createConvexTest();
   const sessionTokenHash = await hashSessionToken(sessionToken);
   const records = await t.run(async (ctx) => {
@@ -71,7 +71,7 @@ describe("submitted applications dashboard query", () => {
     fixture = await createFixture();
   });
 
-  it.each(["reviewer", "admin"] as const)("lists only submitted applications for %s", async (role) => {
+  it.each(["admin"] as const)("lists only submitted applications for %s", async (role) => {
     const { t, adminId, submittedId, reviewedId } = fixture;
     await t.run((ctx) => ctx.db.patch(adminId, { role }));
     const list = await t.query(listSubmittedApplicationsRef, { sessionToken });

@@ -33,14 +33,12 @@ const deliveryTones: Record<QueueRow["status"], StatusTone> = {
 
 function QueueTable({
   rows,
-  isAdmin,
   selected,
   onToggle,
   onHold,
   busy,
 }: {
   rows: QueueRow[];
-  isAdmin: boolean;
   selected: Set<string>;
   onToggle: (itemId: QueueRow["itemId"]) => void;
   onHold: (itemId: QueueRow["itemId"], held: boolean) => void;
@@ -56,31 +54,29 @@ function QueueTable({
         <caption className="sr-only">Decision email queue</caption>
         <thead>
           <tr>
-            {isAdmin ? <th scope="col" className="w-12">Send</th> : null}
+            <th scope="col" className="w-12">Send</th>
             <th scope="col">Applicant</th>
             <th scope="col">Decision</th>
             <th scope="col">Status</th>
             <th scope="col">Queued</th>
-            {isAdmin ? <th scope="col">Hold</th> : null}
+            <th scope="col">Hold</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.itemId}>
-              {isAdmin ? (
-                <td className="w-12">
-                  {row.status === "queued" || row.status === "held" ? (
-                    <input
-                      type="checkbox"
-                      className="block size-4 accent-ocean"
-                      aria-label={`Select ${row.applicantName}`}
-                      checked={selected.has(row.itemId)}
-                      disabled={row.status === "held"}
-                      onChange={() => onToggle(row.itemId)}
-                    />
-                  ) : null}
-                </td>
-              ) : null}
+              <td className="w-12">
+                {row.status === "queued" || row.status === "held" ? (
+                  <input
+                    type="checkbox"
+                    className="block size-4 accent-ocean"
+                    aria-label={`Select ${row.applicantName}`}
+                    checked={selected.has(row.itemId)}
+                    disabled={row.status === "held"}
+                    onChange={() => onToggle(row.itemId)}
+                  />
+                ) : null}
+              </td>
               <th scope="row" className="font-normal">
                 <Link className="font-semibold text-night underline" to={ADMIN_ROUTES.applicationReview(row.applicationId)}>
                   {row.applicantName}
@@ -91,22 +87,20 @@ function QueueTable({
               <td><ApplicationDecisionBadge status={row.decision} /></td>
               <td><AdminStatusBadge tone={deliveryTones[row.status]} label={`Delivery: ${row.status}`}>{row.status.charAt(0).toUpperCase() + row.status.slice(1)}</AdminStatusBadge></td>
               <td>{new Date(row.queuedAt).toLocaleString()}</td>
-              {isAdmin ? (
-                <td className="whitespace-nowrap">
-                  {row.status === "queued" || row.status === "held" ? (
-                    <button
-                      type="button"
-                      className={`${reviewSecondaryButtonClass} mx-auto min-w-[5.75rem]`}
-                      disabled={busy}
-                      onClick={() => onHold(row.itemId, row.status !== "held")}
-                    >
-                      {row.status === "held" ? "Unhold" : "Hold"}
-                    </button>
-                  ) : (
-                    <span className="mx-auto inline-block min-h-11 min-w-[5.75rem]" aria-hidden />
-                  )}
-                </td>
-              ) : null}
+              <td className="whitespace-nowrap">
+                {row.status === "queued" || row.status === "held" ? (
+                  <button
+                    type="button"
+                    className={`${reviewSecondaryButtonClass} mx-auto min-w-[5.75rem]`}
+                    disabled={busy}
+                    onClick={() => onHold(row.itemId, row.status !== "held")}
+                  >
+                    {row.status === "held" ? "Unhold" : "Hold"}
+                  </button>
+                ) : (
+                  <span className="mx-auto inline-block min-h-11 min-w-[5.75rem]" aria-hidden />
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -165,8 +159,7 @@ function RecentlySentSection({ rows, totalSent }: { rows: SentRow[]; totalSent: 
 }
 
 function DecisionEmailQueueContent() {
-  const { sessionToken, staff } = useAdminAuth();
-  const isAdmin = staff?.role === "admin";
+  const { sessionToken } = useAdminAuth();
   const queue = useQuery(listDecisionEmailQueueRef, sessionToken ? { sessionToken } : "skip");
   const release = useAction(releaseDecisionEmailsRef);
   const hold = useMutation(setDecisionEmailHoldRef);
@@ -258,38 +251,35 @@ function DecisionEmailQueueContent() {
       {error ? <p role="alert" className="admin-callout admin-callout--alert">{error}</p> : null}
       {notice ? <p role="status" className="admin-callout admin-callout--success">{notice}</p> : null}
 
-      {isAdmin ? (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={reviewPrimaryButtonClass}
-            disabled={busy || sending || selectedIds.length === 0}
-            onClick={() => void send(selectedIds)}
-          >
-            Send selected
-          </button>
-          <button
-            type="button"
-            className={reviewSecondaryButtonClass}
-            disabled={busy || sending || queue.counts.queued === 0}
-            onClick={() => void send()}
-          >
-            Send all queued
-          </button>
-          <button
-            type="button"
-            className={reviewSecondaryButtonClass}
-            disabled={busy || sending || queue.counts.failed === 0}
-            onClick={() => void retryFailed()}
-          >
-            Retry failed
-          </button>
-        </div>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={reviewPrimaryButtonClass}
+          disabled={busy || sending || selectedIds.length === 0}
+          onClick={() => void send(selectedIds)}
+        >
+          Send selected
+        </button>
+        <button
+          type="button"
+          className={reviewSecondaryButtonClass}
+          disabled={busy || sending || queue.counts.queued === 0}
+          onClick={() => void send()}
+        >
+          Send all queued
+        </button>
+        <button
+          type="button"
+          className={reviewSecondaryButtonClass}
+          disabled={busy || sending || queue.counts.failed === 0}
+          onClick={() => void retryFailed()}
+        >
+          Retry failed
+        </button>
+      </div>
 
       <QueueTable
         rows={queue.active}
-        isAdmin={isAdmin}
         selected={selected}
         onToggle={toggle}
         onHold={(itemId, held) => void setHold(itemId, held)}
@@ -302,12 +292,11 @@ function DecisionEmailQueueContent() {
 }
 
 export function DecisionEmailQueuePage() {
-  const { sessionToken, staff } = useAdminAuth();
+  const { sessionToken } = useAdminAuth();
   const [retry, setRetry] = useState(0);
   return (
     <section aria-labelledby="decision-emails-heading" className="space-y-5">
       <AdminPageHeader id="decision-emails-heading" title="Decision emails" description="Review queued decisions before they are emailed. Review status and participant records update only after the email server accepts each message." />
-      {staff?.role !== "admin" ? <p className="admin-callout">An admin releases these emails. You can review the queue, but you cannot send it.</p> : null}
       <ErrorBoundary key={`${sessionToken}:${retry}`} fallback={<QueryErrorState title="Unable to load decision emails" onRetry={() => setRetry((value) => value + 1)} />}>
         <DecisionEmailQueueContent />
       </ErrorBoundary>

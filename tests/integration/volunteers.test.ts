@@ -108,7 +108,7 @@ describe("createVolunteer", () => {
     await expect(t.mutation(volunteers.createVolunteer, { ...args, email: "third@hackuta.org", canFoodCheckIn: "yes" } as never)).rejects.toThrow();
   });
 
-  it.each(["admin", "reviewer", "volunteer"] as const)("rejects an email used by an existing %s without modifying it", async (role) => {
+  it.each(["admin", "volunteer"] as const)("rejects an email used by an existing %s without modifying it", async (role) => {
     const { t, args } = await fixture();
     const existing = await seedStaff(t);
     await t.run((ctx) => ctx.db.patch(existing.adminId, { role, email: args.email, active: role !== "volunteer" }));
@@ -135,7 +135,7 @@ describe("createVolunteer", () => {
     const { t, args } = await fixture();
     const { adminId } = await t.mutation(volunteers.createVolunteer, args);
     const { sessionToken, email, name, password } = args;
-    await expectAdminErrorCode(t.mutation(auth.createAndProvisionAdmin, { sessionToken, email, name, password, role: "admin" }), "STAFF_ACCOUNT_EXISTS");
+    await expectAdminErrorCode(t.mutation(auth.createAndProvisionAdmin, { sessionToken, email, name, password }), "STAFF_ACCOUNT_EXISTS");
     await expectAdminErrorCode(t.mutation(auth.provisionAdminAuthAccount, { adminId, password: ORGANIZER_TEST_PASSWORD }), "NOT_AUTHORIZED");
     expect((await t.run((ctx) => ctx.db.get(adminId)))?.role).toBe("volunteer");
   });
@@ -187,12 +187,12 @@ describe("promoteParticipantToVolunteer", () => {
       sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD, ...extra,
     });
 
-    const reviewer = await seedStaff(t, { role: "reviewer" });
-    await t.run((ctx) => ctx.db.patch(reviewer.adminId, { email: "taylor@example.com" }));
+    const otherAdmin = await seedStaff(t, { role: "admin" });
+    await t.run((ctx) => ctx.db.patch(otherAdmin.adminId, { email: "taylor@example.com" }));
     let before = await snapshot(t);
     await expectAdminErrorCode(promote(), "STAFF_ACCOUNT_EXISTS");
     expect(await snapshot(t)).toEqual(before);
-    expect((await t.run((ctx) => ctx.db.get(reviewer.adminId)))?.role).toBe("reviewer");
+    expect((await t.run((ctx) => ctx.db.get(otherAdmin.adminId)))?.role).toBe("admin");
 
     await promote({ email: "first@hackuta.org" });
     before = await snapshot(t);
@@ -228,12 +228,12 @@ describe("listVolunteers", () => {
       sessionToken: actor.sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD,
     });
     await t.mutation(volunteers.setVolunteerEventAccess, { ...target, eventIds: [eventId] });
-    await seedStaff(t, { role: "reviewer" });
+    await seedStaff(t, { role: "admin" });
 
     const first = await t.query(volunteers.listVolunteers, { sessionToken: actor.sessionToken, paginationOpts: { numItems: 1, cursor: null } });
     expect(first.page).toEqual([{
       adminId: target.volunteerAdminId, name: "Volunteer", email: "volunteer@hackuta.org", active: true,
-      participant: null, canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false,
+      participant: null, canCheckIn: false, canFoodCheckIn: false, canRedeemShop: false, canScanAllEvents: false,
       events: [{ eventId, name: "Workshop", active: true }],
       createdAt: expect.any(Number), updatedAt: expect.any(Number),
     }]);
@@ -404,6 +404,27 @@ describe("setVolunteerEventAccess", () => {
     expect(await snapshot(t)).toEqual(before);
     expect(await t.mutation(volunteers.setVolunteerEventAccess, { ...target, eventIds: [] })).toMatchObject({ removed: 1 });
   });
+
+  it("grants every current and future event when canScanAllEvents is set", async () => {
+    const { t, actor, target, session, eventId } = await managedFixture();
+    expect(await t.mutation(volunteers.setVolunteerEventAccess, {
+      ...target, eventIds: [eventId], canScanAllEvents: true,
+    })).toEqual({ ok: true, added: 1, removed: 0 });
+    expect(await t.run((ctx) => ctx.db.get(target.volunteerAdminId))).toMatchObject({ canScanAllEvents: true });
+    const later = await seedEvent(t, "Later");
+    expect((await t.run((ctx) => requireVolunteerEventAccess(ctx, session.sessionToken, later))).event._id).toBe(later);
+    expect((await configLogs(t)).at(-1)).toMatchObject({
+      action: "volunteer_event_access_updated", actorAdminId: actor.adminId, targetAdminId: target.volunteerAdminId,
+    });
+    expect(JSON.parse((await configLogs(t)).at(-1)!.details ?? "{}")).toEqual({
+      eventIds: [eventId], addedEventIds: [eventId], removedEventIds: [],
+      changedFields: ["canScanAllEvents"], before: { canScanAllEvents: false }, after: { canScanAllEvents: true },
+    });
+    expect(await t.mutation(volunteers.setVolunteerEventAccess, {
+      ...target, eventIds: [eventId], canScanAllEvents: false,
+    })).toEqual({ ok: true, added: 0, removed: 0 });
+    await expectAdminErrorCode(t.run((ctx) => requireVolunteerEventAccess(ctx, session.sessionToken, later)), "EVENT_ACCESS_DENIED");
+  });
 });
 
 describe("audit log queries", () => {
@@ -518,18 +539,18 @@ describe("privilege escalation", () => {
   }
   const t = (f: { t: ConvexTestInstance }) => f.t;
 
-  it.each(["reviewer", "volunteer", "expired", "inactive", "invalid"] as const)(
+  it.each(["volunteer", "expired", "inactive", "invalid"] as const)(
     "denies every management API to a caller who is %s", async (condition) => {
       const f = await managedFixture();
-      if (condition === "reviewer" || condition === "volunteer") {
-        await f.t.run((ctx) => ctx.db.patch(f.actor.adminId, { role: condition }));
+      if (condition === "volunteer") {
+        await f.t.run((ctx) => ctx.db.patch(f.actor.adminId, { role: "volunteer" }));
       } else if (condition === "inactive") {
         await f.t.run((ctx) => ctx.db.patch(f.actor.adminId, { active: false }));
       } else if (condition === "expired") {
         await f.t.run((ctx) => ctx.db.patch(f.actor.sessionId, { expiresAt: Date.now() - 1 }));
       }
       const sessionToken = condition === "invalid" ? "" : f.actor.sessionToken;
-      const code = condition === "reviewer" ? "ADMIN_ONLY" : condition === "volunteer" ? "NOT_AUTHORIZED" : "NOT_AUTHENTICATED";
+      const code = condition === "volunteer" ? "NOT_AUTHORIZED" : "NOT_AUTHENTICATED";
       const before = await snapshot(f.t);
       for (const call of managementCalls(f, sessionToken)) await expectAdminErrorCode(call(), code);
       expect(await snapshot(f.t)).toEqual(before);
@@ -543,7 +564,7 @@ describe("privilege escalation", () => {
     expect(await snapshot(f.t)).toEqual(before);
   });
 
-  it.each(["admin", "reviewer", "missing"] as const)("never manages a %s target as a volunteer", async (condition) => {
+  it.each(["admin", "missing"] as const)("never manages a %s target as a volunteer", async (condition) => {
     const f = await managedFixture();
     if (condition === "missing") await f.t.run((ctx) => ctx.db.delete(f.adminId));
     else await f.t.run((ctx) => ctx.db.patch(f.adminId, { role: condition }));
@@ -554,17 +575,13 @@ describe("privilege escalation", () => {
     expect(await snapshot(f.t)).toEqual(before);
   });
 
-  it("keeps existing admin and reviewer credentials working after volunteer management", async () => {
+  it("keeps existing admin credentials working after volunteer management", async () => {
     const f = await managedFixture();
-    for (const role of ["admin", "reviewer"] as const) {
-      await seedAdminAccount(f.t, { email: `${role}@hackuta.org`, role, active: true });
-    }
+    await seedAdminAccount(f.t, { email: "admin@hackuta.org", role: "admin", active: true });
     await f.t.mutation(volunteers.setVolunteerCapabilities, { ...f.target, canCheckIn: true, canFoodCheckIn: true });
     await f.t.mutation(volunteers.revokeVolunteer, f.target);
     await f.t.mutation(volunteers.restoreVolunteer, f.target);
-    for (const role of ["admin", "reviewer"] as const) {
-      const { sessionToken } = await signInOrganizer(f.t, `${role}@hackuta.org`);
-      expect(await f.t.query(auth.getCurrentStaff, { sessionToken })).toMatchObject({ role });
-    }
+    const { sessionToken } = await signInOrganizer(f.t, "admin@hackuta.org");
+    expect(await f.t.query(auth.getCurrentStaff, { sessionToken })).toMatchObject({ role: "admin" });
   });
 });

@@ -11,7 +11,7 @@ async function createFixture() {
   const sessionTokenHash = await hashSessionToken(sessionToken);
   const records = await t.run(async (ctx) => {
     const adminId = await ctx.db.insert("admins", {
-      email: "staff@hackuta.org", name: "Staff", role: "reviewer", active: true,
+      email: "staff@hackuta.org", name: "Staff", role: "admin", active: true,
       createdAt: 1, updatedAt: 1,
     });
     const sessionId = await ctx.db.insert("adminSessions", {
@@ -32,7 +32,7 @@ describe("read-only submitted application detail", () => {
   let fixture: Awaited<ReturnType<typeof createFixture>>;
   beforeEach(async () => { fixture = await createFixture(); });
 
-  it.each(["reviewer", "admin"] as const)("records repeated %s views without claiming or changing the application", async (role) => {
+  it.each(["admin"] as const)("records repeated %s views without claiming or changing the application", async (role) => {
     const { t, adminId, applicationId } = fixture;
     await t.run((ctx) => ctx.db.patch(adminId, { role }));
     const before = await t.run((ctx) => ctx.db.get(applicationId));
@@ -61,7 +61,7 @@ describe("read-only submitted application detail", () => {
     const sessionTokenHash = await hashSessionToken(otherToken);
     const { otherAdminId, reviewId } = await t.run(async (ctx) => {
       const otherAdminId = await ctx.db.insert("admins", {
-        email: "other@hackuta.org", name: "Other", role: "reviewer", active: true, createdAt: 1, updatedAt: 1,
+        email: "other@hackuta.org", name: "Other", role: "admin", active: true, createdAt: 1, updatedAt: 1,
       });
       await ctx.db.insert("adminSessions", {
         adminId: otherAdminId, sessionTokenHash, createdAt: 1, expiresAt: Date.now() + 60_000,
@@ -95,7 +95,7 @@ describe("read-only submitted application detail", () => {
     expect(await t.run((ctx) => ctx.db.query("applicationReviewLogs").collect())).toEqual([]);
   });
 
-  it.each(["reviewer", "admin"] as const)("allows active %s accounts without writes or history", async (role) => {
+  it.each(["admin"] as const)("allows active %s accounts without writes or history", async (role) => {
     const { t, adminId, applicationId } = fixture;
     await t.run(async (ctx) => {
       await ctx.db.patch(adminId, { role });

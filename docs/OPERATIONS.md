@@ -30,7 +30,7 @@ Deploy and configure the organizer admin app. Shared Convex backend pushes run f
 
 `npm run test:smoke` serves the current frontend at `http://127.0.0.1:5377` and
 connects to `standing-manatee-425` with mock mode and development auth bypass
-disabled. It does not deploy code. Provide a dedicated reviewer account in the
+disabled. It does not deploy code. Provide a dedicated admin account in the
 **local-only** `.env.smoke.local` file (ignored by `.gitignore` via `.env.*` — never commit it):
 
 ```dotenv

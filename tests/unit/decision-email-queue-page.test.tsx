@@ -38,7 +38,7 @@ vi.mock("../../src/convex/reactBindings", () => ({
   usePaginatedQuery: vi.fn(),
 }));
 
-function staffContext(role: "reviewer" | "admin"): AdminAuthContextValue {
+function staffContext(role: "admin"): AdminAuthContextValue {
   return {
     staff: {
       adminId: "staff-1",
@@ -137,7 +137,7 @@ describe("DecisionEmailQueuePage", () => {
     container.remove();
   });
 
-  async function renderPage(role: "reviewer" | "admin") {
+  async function renderPage(role: "admin") {
     await act(async () => {
       root.render(
         <MemoryRouter>
@@ -198,13 +198,6 @@ describe("DecisionEmailQueuePage", () => {
     expect(button("Send selected")).toBeDefined();
     expect(button("Send all queued")).toBeDefined();
     expect(button("Retry failed")).toBeDefined();
-  });
-
-  it("hides send controls for reviewers", async () => {
-    await renderPage("reviewer");
-    expect(container.textContent).toContain("An admin releases these emails");
-    expect(button("Send selected")).toBeUndefined();
-    expect(button("Hold")).toBeUndefined();
   });
 
   it("shows at most five recently sent rows with a total count", async () => {

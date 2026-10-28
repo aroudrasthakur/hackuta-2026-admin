@@ -60,12 +60,22 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
   const now = useNow();
   const assigned: string[] = volunteer.events.map((event) => event.eventId);
   const [selected, setSelected] = useState<string[]>(assigned);
+  const [allEvents, setAllEvents] = useState(volunteer.canScanAllEvents);
   const [saving, setSaving] = useState(false);
   const save = useMutation(setVolunteerEventAccessRef);
-  const changed = selected.length !== assigned.length || selected.some((eventId) => !assigned.includes(eventId));
+  const changed = allEvents !== volunteer.canScanAllEvents
+    || selected.length !== assigned.length
+    || selected.some((eventId) => !assigned.includes(eventId));
+
+  function setAll(checked: boolean) {
+    setFeedback(null);
+    setAllEvents(checked);
+    if (checked) setSelected(events.map((event) => event.eventId));
+  }
 
   function toggle(eventId: string, checked: boolean) {
     setFeedback(null);
+    setAllEvents(false);
     setSelected((current) => checked ? [...current, eventId] : current.filter((id) => id !== eventId));
   }
 
@@ -79,8 +89,14 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
         sessionToken,
         volunteerAdminId: volunteer.adminId,
         eventIds: selected as Array<VolunteerRow["events"][number]["eventId"]>,
+        canScanAllEvents: allEvents,
       });
-      setFeedback({ tone: "success", message: `Event assignments saved (${result.added} added, ${result.removed} removed).` });
+      setFeedback({
+        tone: "success",
+        message: allEvents
+          ? "This volunteer can award points for every event, including ones added later."
+          : `Event assignments saved (${result.added} added, ${result.removed} removed).`,
+      });
     } catch (caught) {
       setFeedback({ tone: "error", message: reportUserFacingError(
         "Unable to save event assignments", caught,
@@ -101,13 +117,44 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
         </p>
       </div>
       <FeedbackMessage feedback={feedback} />
+      <ul className="admin-access-list" aria-label="Event preferences">
+        <li className="admin-access-row">
+          <span className="admin-access-row__icon" aria-hidden="true"><SectionIcon name="events" /></span>
+          <div className="min-w-0">
+            <p className="admin-access-row__title">
+              All events
+              {allEvents
+                ? <AdminStatusBadge tone="positive">{volunteer.canScanAllEvents ? "Allowed" : "Allowed after saving"}</AdminStatusBadge>
+                : volunteer.canScanAllEvents
+                  ? <AdminStatusBadge tone="warning">Removed after saving</AdminStatusBadge>
+                  : <AdminStatusBadge tone="neutral">Specific events only</AdminStatusBadge>}
+            </p>
+            <p className="admin-access-row__description">
+              Award points for every current event and any event added later.
+            </p>
+          </div>
+          <div className="admin-access-row__control">
+            <AccessSwitch
+              label="All events"
+              checked={allEvents}
+              disabled={saving || !volunteer.active}
+              onChange={setAll}
+            />
+          </div>
+        </li>
+      </ul>
       {status === "LoadingFirstPage" ? <LoadingState message="Loading events…" /> : events.length === 0 ? (
         <p className="text-sm text-ocean">
           No events exist yet. <Link className="font-semibold text-night underline" to={ADMIN_ROUTES.events}>Create an event</Link> first.
+          {allEvents ? " All-events access will include them when they are created." : null}
         </p>
       ) : (
         <>
-          <p className="text-sm font-semibold text-night">{selected.length} of {events.length} events assigned</p>
+          <p className="text-sm font-semibold text-night">
+            {allEvents
+              ? "All events assigned, including ones added later."
+              : `${selected.length} of ${events.length} events assigned`}
+          </p>
           <ul className="admin-access-list" aria-label="Events">
             {events.map((event) => (
               <li key={event.eventId} className="admin-access-row">
@@ -122,8 +169,8 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
                 <div className="admin-access-row__control">
                   <AccessSwitch
                     label={`Assign ${event.name}`}
-                    checked={selected.includes(event.eventId)}
-                    disabled={saving}
+                    checked={allEvents || selected.includes(event.eventId)}
+                    disabled={saving || allEvents}
                     onChange={(checked) => toggle(event.eventId, checked)}
                   />
                 </div>
@@ -177,6 +224,7 @@ function VolunteerAccess({ sessionToken, volunteer, feedback, setFeedback }: Sec
   const changed = ACCESS_ROWS.some(({ key }) => access[key] !== saved[key]);
   const locked = saving || !volunteer.active;
   const eventCount = volunteer.events.length;
+  const allEventsAllowed = volunteer.canScanAllEvents;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -227,9 +275,11 @@ function VolunteerAccess({ sessionToken, volunteer, feedback, setFeedback }: Sec
           <div className="min-w-0">
             <p className="admin-access-row__title">
               Event points
-              {eventCount > 0
-                ? <AdminStatusBadge tone="positive">Allowed for {eventCount} {eventCount === 1 ? "event" : "events"}</AdminStatusBadge>
-                : <AdminStatusBadge tone="neutral">Not allowed</AdminStatusBadge>}
+              {allEventsAllowed
+                ? <AdminStatusBadge tone="positive">Allowed for all events</AdminStatusBadge>
+                : eventCount > 0
+                  ? <AdminStatusBadge tone="positive">Allowed for {eventCount} {eventCount === 1 ? "event" : "events"}</AdminStatusBadge>
+                  : <AdminStatusBadge tone="neutral">Not allowed</AdminStatusBadge>}
             </p>
             <p className="admin-access-row__description">
               Award points for assigned events. <a className="font-semibold text-night underline" href="#volunteer-events-heading">Manage event assignments</a>
@@ -307,6 +357,10 @@ function AccountAccess({ sessionToken, volunteer, feedback, setFeedback }: Secti
 function historyDetail(log: StaffConfigLogRow) {
   const details = log.details ?? {};
   if (log.action === "volunteer_event_access_updated") {
+    const after = details.after && typeof details.after === "object"
+      ? details.after as { canScanAllEvents?: boolean }
+      : undefined;
+    if (after?.canScanAllEvents) return "all events, including future ones";
     const added = Array.isArray(details.addedEventIds) ? details.addedEventIds.length : 0;
     const removed = Array.isArray(details.removedEventIds) ? details.removedEventIds.length : 0;
     return `${added} added, ${removed} removed`;
@@ -376,11 +430,13 @@ function VolunteerDetail({ sessionToken, volunteerAdminId }: { sessionToken: str
       />
     );
   }
-  const eventKey = volunteer.events.map((event) => event.eventId).sort().join(",");
+  const eventKey = `${volunteer.canScanAllEvents}:${volunteer.events.map((event) => event.eventId).sort().join(",")}`;
   const eventCount = volunteer.events.length;
   const allowed = [
     ...volunteerPermissionList(volunteer),
-    ...(eventCount ? [`Points: ${eventCount} ${eventCount === 1 ? "event" : "events"}`] : []),
+    ...(volunteer.canScanAllEvents
+      ? ["Points: all events"]
+      : eventCount ? [`Points: ${eventCount} ${eventCount === 1 ? "event" : "events"}`] : []),
   ];
   return (
     <>

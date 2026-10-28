@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer, signInVolunteer, signOutOrganizer } from "./fixtures/auth";
+import { E2E_ADMIN, signInOrganizer, signInVolunteer } from "./fixtures/auth";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
 test("admin manages a meal on mobile, checks history, and removes an unused meal", async ({ page }) => {
@@ -45,14 +45,9 @@ test("admin manages a meal on mobile, checks history, and removes an unused meal
   await expect(page.getByText("No meals scheduled")).toBeVisible();
 });
 
-test("reviewers and volunteers cannot open meal management", async ({ page }) => {
-  await signInOrganizer(page, E2E_REVIEWER);
-  await expect(page.getByRole("link", { name: "Meals", exact: true })).toHaveCount(0);
-  await page.evaluate(() => { window.history.pushState({}, "", "/admin/meals"); window.dispatchEvent(new PopStateEvent("popstate")); });
-  await expect(page).toHaveURL(/\/admin\/applications$/);
-  await signOutOrganizer(page);
+test("volunteers cannot open meal management", async ({ page }) => {
   await signInVolunteer(page);
+  await expect(page.getByRole("link", { name: "Meals", exact: true })).toHaveCount(0);
   await page.evaluate(() => { window.history.pushState({}, "", "/admin/meals"); window.dispatchEvent(new PopStateEvent("popstate")); });
   await expect(page).toHaveURL(/\/admin\/scan$/);
-  await expect(page.getByRole("link", { name: "Meals", exact: true })).toHaveCount(0);
 });

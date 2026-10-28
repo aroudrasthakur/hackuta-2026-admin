@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { E2E_ADMIN, E2E_REVIEWER, signInOrganizer } from "./fixtures/auth";
+import { E2E_ADMIN, signInOrganizer } from "./fixtures/auth";
 import { setDecisionQueue } from "./fixtures/decisionQueue";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
@@ -8,17 +8,6 @@ async function openQueue(page: import("@playwright/test").Page) {
 }
 
 test.describe("decision email queue", () => {
-  test("reviewers can read delivery states but cannot select, hold, or send", async ({ page }) => {
-    await signInOrganizer(page, E2E_REVIEWER);
-    await setDecisionQueue(page, "mixed");
-    await openQueue(page);
-    await expect(page.getByRole("table", { name: "Decision email queue" })).toBeVisible();
-    await expect(page.getByRole("checkbox")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Send|Hold|Retry failed/i })).toHaveCount(0);
-    await expect(page.getByLabel("Delivery: queued", { exact: true })).toHaveText("Queued");
-    await expect(page.getByLabel("Delivery: failed", { exact: true })).toHaveText("Failed");
-  });
-
   test("admins hold, unhold, send selected, retry failed, and send all queued", async ({ page }) => {
     await signInOrganizer(page, E2E_ADMIN);
     await setDecisionQueue(page, "mixed");

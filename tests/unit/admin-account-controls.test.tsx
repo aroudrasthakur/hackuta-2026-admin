@@ -13,7 +13,7 @@ const staff = {
   adminId: "a1",
   email: "staff@hackuta.org",
   name: "Jordan Reviewer",
-  role: "reviewer" as const,
+  role: "admin" as const,
   expiresAt: Date.now() + 60_000,
 };
 
@@ -95,7 +95,7 @@ describe("AdminAccountControls", () => {
     await act(async () => trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
     const item = container.querySelector<HTMLButtonElement>('[role="menuitem"]')!;
     expect(document.activeElement).toBe(item);
-    expect(container.textContent).toContain("Reviewer");
+    expect(container.textContent).toContain("Admin");
     for (const key of ["ArrowUp", "ArrowDown", "Home", "End"]) {
       await act(async () => item.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })));
       expect(document.activeElement).toBe(item);

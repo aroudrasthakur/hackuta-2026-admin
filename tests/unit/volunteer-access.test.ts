@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   newVolunteerFields,
   requireAdminRole,
-  requireReviewerAccess,
   requireVolunteerAccess,
   requireVolunteerEventAccess,
   requireVolunteerCapability,
@@ -26,6 +25,7 @@ describe("volunteer capabilities", () => {
       canCheckIn: false,
       canFoodCheckIn: false,
       canRedeemShop: false,
+      canScanAllEvents: false,
     });
     expect(volunteerCapabilities(newVolunteerFields())).toEqual({
       canCheckIn: false,
@@ -64,29 +64,20 @@ describe("volunteer capabilities", () => {
 });
 
 describe("volunteer session guards", () => {
-  it("rejects volunteers from reviewer and admin operations", async () => {
+  it("rejects volunteers from admin operations", async () => {
     const t = createConvexTest();
     const { sessionToken } = await seedStaff(t, { role: "volunteer" });
 
-    await expectAdminErrorCode(
-      t.run((ctx) => requireReviewerAccess(ctx, sessionToken)),
-      "NOT_AUTHORIZED",
-    );
     await expectAdminErrorCode(
       t.run((ctx) => requireAdminRole(ctx, sessionToken)),
       "NOT_AUTHORIZED",
     );
   });
 
-  it("rejects reviewers and signed-out callers from volunteer operations while allowing admins", async () => {
+  it("rejects signed-out callers from volunteer operations while allowing admins", async () => {
     const t = createConvexTest();
-    const reviewer = await seedStaff(t, { role: "reviewer" });
     const admin = await seedStaff(t, { role: "admin" });
 
-    await expectAdminErrorCode(
-      t.run((ctx) => requireVolunteerAccess(ctx, reviewer.sessionToken)),
-      "VOLUNTEER_ONLY",
-    );
     const resolvedAdmin = await t.run((ctx) => requireVolunteerAccess(ctx, admin.sessionToken));
     expect(resolvedAdmin._id).toBe(admin.adminId);
     for (const capability of ["canCheckIn", "canFoodCheckIn", "canRedeemShop"] as const) {
@@ -197,17 +188,20 @@ describe("volunteer event authorization", () => {
     await expectAdminErrorCode(check(), "EVENT_NOT_FOUND");
   });
 
-  it("allows an admin without an assignment and rejects a reviewer even with an assignment", async () => {
-    const { t, adminId, eventId, check } = await fixture();
+  it("allows an admin without an assignment", async () => {
+    const { t, adminId, check } = await fixture();
     await t.run((ctx) => ctx.db.patch(adminId, { role: "admin" }));
     expect((await check()).volunteer._id).toBe(adminId);
+  });
 
-    await t.run(async (ctx) => {
-      await ctx.db.patch(adminId, { role: "reviewer" });
-      await ctx.db.insert("volunteerEventAccess", {
-        volunteerAdminId: adminId, eventId, grantedBy: adminId, createdAt: 1,
-      });
-    });
-    await expectAdminErrorCode(check(), "VOLUNTEER_ONLY");
+  it("allows a volunteer with canScanAllEvents to award a new event without an assignment row", async () => {
+    const { t, adminId, sessionToken, eventId, check } = await fixture();
+    await expectAdminErrorCode(check(), "EVENT_ACCESS_DENIED");
+    await t.run((ctx) => ctx.db.patch(adminId, { canScanAllEvents: true }));
+    expect((await check()).event._id).toBe(eventId);
+    const laterEvent = await t.run((ctx) => ctx.db.insert("events", {
+      name: "Added later", pointsAwarded: 5, startsAt: 1, endsAt: 2, active: true, createdAt: 1, updatedAt: 1,
+    }));
+    expect((await t.run((ctx) => requireVolunteerEventAccess(ctx, sessionToken, laterEvent))).event._id).toBe(laterEvent);
   });
 });

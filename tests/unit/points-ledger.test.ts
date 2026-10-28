@@ -20,7 +20,7 @@ const SENSITIVE_KEYS = ["qrCodeToken", "foodRestriction", "password", "sessionTo
 
 async function insertAdmin(
   t: ConvexTestInstance,
-  role: "admin" | "reviewer" = "admin",
+  role: "admin" | "volunteer" = "admin",
   active = true,
 ) {
   return t.run((ctx) =>
@@ -267,7 +267,7 @@ describe("admin point adjustments", () => {
   it("rejects a negative balance, a bad delta, and a non-admin actor", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
-    const reviewerId = await insertAdmin(t, "reviewer");
+    const volunteerId = await insertAdmin(t, "volunteer");
     const inactiveId = await insertAdmin(t, "admin", false);
     const removedAdminId = await insertAdmin(t);
     await t.run((ctx) => ctx.db.delete(removedAdminId));
@@ -291,7 +291,7 @@ describe("admin point adjustments", () => {
     );
     await expectAdminErrorCode(
       t.run((ctx) =>
-        adjustPoints(ctx, { actorAdminId: reviewerId, participantId, delta: -1, reason: "reviewer" }),
+        adjustPoints(ctx, { actorAdminId: volunteerId, participantId, delta: -1, reason: "volunteer" }),
       ),
       "ADMIN_ONLY",
     );

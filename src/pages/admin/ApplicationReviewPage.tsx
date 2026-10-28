@@ -20,13 +20,11 @@ export function ApplicationReviewContent({
   applicationId,
   sessionToken,
   staffAdminId,
-  isAdmin,
   applicationsSearch = "",
 }: {
   applicationId: string;
   sessionToken: string;
   staffAdminId: string;
-  isAdmin: boolean;
   applicationsSearch?: string;
 }) {
   const loadedDetail = useQuery(getApplicationRef, { sessionToken, applicationId });
@@ -102,9 +100,7 @@ export function ApplicationReviewContent({
           <NextApplicationLink applicationId={applicationId} sessionToken={sessionToken} staffAdminId={staffAdminId} applicationsSearch={applicationsSearch} />
         </ErrorBoundary>
       </ApplicationDetail>
-      {isAdmin && (
-        <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />
-      )}
+      <ApplicationReviewHistory applicationId={detail.application._id} sessionToken={sessionToken} />
     </>
   );
 }
@@ -133,7 +129,6 @@ export function ApplicationReviewPage() {
             applicationId={applicationId}
             sessionToken={sessionToken}
             staffAdminId={staff.adminId}
-            isAdmin={staff.role === "admin"}
             applicationsSearch={applicationsSearch}
           />
         </ErrorBoundary>

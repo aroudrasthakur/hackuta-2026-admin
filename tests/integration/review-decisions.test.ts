@@ -38,7 +38,7 @@ async function flushScheduled(t: ConvexTestInstance) {
   await t.finishAllScheduledFunctions(vi.runAllTimers);
 }
 
-async function setup(role: "reviewer" | "admin" = "reviewer") {
+async function setup(role: "admin" = "admin") {
   const t = createConvexTest();
   const staff = await seedStaff(t, { role, name: "Jordan Reviewer" });
   const applicant = await seedApplicant(t, { email: "taylor@example.com" });
@@ -71,7 +71,7 @@ describe.each(decisions)("$decision decision", (decision) => {
     expect(email.fetchMock).not.toHaveBeenCalled();
   });
 
-  it.each(["reviewer", "admin"] as const)(
+  it.each(["admin"] as const)(
     "queues the decision without changing review status, audit logs, participants, or email after %s confirms",
     async (role) => {
       const { t, staff, applicant, decide } = await setup(role);
