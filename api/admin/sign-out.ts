@@ -1,3 +1,3 @@
-import { handleAdminSignOut } from "../../server/adminAuthHandlers";
+import { handleAdminSignOut } from "../../server/adminAuthHandlers.ts";
 
 export default handleAdminSignOut;

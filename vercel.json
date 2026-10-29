@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/admin/*.ts": {
+      "includeFiles": "{server,shared/admin}/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }

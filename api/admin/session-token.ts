@@ -1,3 +1,3 @@
-import { handleAdminSessionToken } from "../../server/adminAuthHandlers";
+import { handleAdminSessionToken } from "../../server/adminAuthHandlers.ts";
 
 export default handleAdminSessionToken;

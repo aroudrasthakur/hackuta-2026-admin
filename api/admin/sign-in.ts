@@ -1,3 +1,3 @@
-import { handleAdminSignIn } from "../../server/adminAuthHandlers";
+import { handleAdminSignIn } from "../../server/adminAuthHandlers.ts";
 
 export default handleAdminSignIn;
