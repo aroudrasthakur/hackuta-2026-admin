@@ -1,3 +1,4 @@
 import { handleAdminSessionToken } from "../../server/adminAuthHandlers.ts";
+import { vercelAdminAuthHandler } from "../../server/nodeAdminAuthHttp.ts";
 
-export default handleAdminSessionToken;
+export default vercelAdminAuthHandler(handleAdminSessionToken);

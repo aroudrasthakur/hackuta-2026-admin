@@ -228,6 +228,68 @@ describe("session-token API", () => {
   });
 });
 
+describe("Vercel Node adapter", () => {
+  function nodeRequest(url: string, method: string, body = "", headers: Record<string, string> = {}) {
+    const chunks = body ? [body] : [];
+    return {
+      url,
+      method,
+      headers: { host: "admin.hackuta.org", ...headers },
+      async *[Symbol.asyncIterator]() {
+        yield* chunks;
+      },
+    };
+  }
+
+  function nodeResponse() {
+    const headers: Record<string, string> = {};
+    let resolveEnd!: (body: string) => void;
+    const ended = new Promise<string>((resolve) => (resolveEnd = resolve));
+    return {
+      headers,
+      ended,
+      statusCode: 0,
+      headersSent: false,
+      setHeader: (key: string, value: string) => {
+        headers[key.toLowerCase()] = value;
+      },
+      end: (body: Buffer | string) => resolveEnd(Buffer.isBuffer(body) ? body.toString() : body),
+    };
+  }
+
+  it("converts a Node IncomingMessage so sign-in can read headers", async () => {
+    convex.mutation.mockResolvedValue({ ok: true, sessionToken: token, expiresAt: 123 });
+    const res = nodeResponse();
+    await signInRoute(
+      nodeRequest("/api/admin/sign-in", "POST", JSON.stringify({ email: "a@hackuta.org", password: "pw" }), {
+        "content-type": "application/json",
+        "x-forwarded-proto": "https",
+        "x-forwarded-for": "203.0.113.9",
+      }) as never,
+      res as never,
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(await res.ended)).toEqual({ ok: true, expiresAt: 123 });
+    expect(res.headers["set-cookie"]).toContain("HttpOnly");
+    expect(res.headers["set-cookie"]).toContain("Secure");
+    expect(convex.mutation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ email: "a@hackuta.org", password: "pw", clientIp: "203.0.113.9" }),
+    );
+  });
+
+  it("reads the session cookie from IncomingMessage headers", async () => {
+    const res = nodeResponse();
+    await sessionTokenRoute(
+      nodeRequest("/api/admin/session-token", "GET", "", { cookie: cookieHeader }) as never,
+      res as never,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(await res.ended).toBe(token);
+  });
+});
+
 describe("API routing", () => {
   it.each([
     ["GET", "/api/admin/sign-in"],
