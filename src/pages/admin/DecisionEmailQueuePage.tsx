@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAction, useMutation, useQuery } from "../../convex/reactBindings";
 import {
   listDecisionEmailQueueRef,
@@ -20,6 +20,8 @@ import { AdminStatusBadge, type StatusTone } from "../../components/AdminStatusB
 import { EmptyState } from "../../components/states/EmptyState";
 import { QueryErrorState } from "../../components/states/QueryErrorState";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { ApplicationsQueuePagination } from "../../components/ApplicationsQueuePagination";
+import { paginateQueue, queuePage, queuePageRange } from "../../lib/applicationQueue";
 
 type QueueRow = DecisionEmailQueue["active"][number];
 type SentRow = DecisionEmailQueue["sent"][number];
@@ -164,10 +166,34 @@ function DecisionEmailQueueContent() {
   const release = useAction(releaseDecisionEmailsRef);
   const hold = useMutation(setDecisionEmailHoldRef);
   const retry = useMutation(retryFailedDecisionEmailsRef);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const activeCount = queue?.active.length ?? 0;
+  const page = queuePage(searchParams, activeCount);
+  const { start: rangeStart, end: rangeEnd, totalPages } = queuePageRange(page, activeCount);
+  const pagedActive = queue ? paginateQueue(queue.active, page) : [];
+
+  const goToPage = useCallback((nextPage: number) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (nextPage <= 1) next.delete("page");
+      else next.set("page", String(nextPage));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    const requestedRaw = searchParams.get("page");
+    if (!requestedRaw) return;
+    const requested = Number.parseInt(requestedRaw, 10);
+    if (!Number.isFinite(requested) || requested < 1) return;
+    if (requested === page) return;
+    goToPage(page);
+  }, [goToPage, page, searchParams]);
 
   function toggle(itemId: QueueRow["itemId"]) {
     setSelected((current) => {
@@ -278,8 +304,23 @@ function DecisionEmailQueueContent() {
         </button>
       </div>
 
+      {queue.active.length > 0 ? (
+        <div className="flex min-h-11 flex-wrap items-center justify-between gap-3">
+          <p role="status" className="text-sm text-ocean">
+            Showing {rangeStart}–{rangeEnd} of {activeCount} queued
+            <span className="sr-only">. Page {page} of {totalPages}.</span>
+          </p>
+          <ApplicationsQueuePagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+            ariaLabel="Queued decision emails pages"
+          />
+        </div>
+      ) : null}
+
       <QueueTable
-        rows={queue.active}
+        rows={pagedActive}
         selected={selected}
         onToggle={toggle}
         onHold={(itemId, held) => void setHold(itemId, held)}

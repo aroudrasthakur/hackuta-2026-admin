@@ -4,16 +4,18 @@ export function ApplicationsQueuePagination({
   page,
   totalPages,
   onPageChange,
+  ariaLabel = "Applications pages",
 }: {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  ariaLabel?: string;
 }) {
   if (totalPages <= 1) return null;
 
   return (
     <nav
-      aria-label="Applications pages"
+      aria-label={ariaLabel}
       className="flex flex-wrap items-center justify-center gap-2 sm:justify-end"
     >
       <button

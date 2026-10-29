@@ -186,6 +186,38 @@ describe("DecisionEmailQueuePage", () => {
     }
   });
 
+  it("shows ten queued rows per page with navigation", async () => {
+    const active = Array.from({ length: 11 }, (_, index) => ({
+      itemId: `item-${index}` as DecisionEmailQueue["active"][number]["itemId"],
+      applicationId: `app-${index}` as DecisionEmailQueue["active"][number]["applicationId"],
+      decision: "accepted" as const,
+      recipientEmail: `person-${index}@example.com`,
+      applicantName: `Applicant ${String(index + 1).padStart(2, "0")}`,
+      status: "queued" as const,
+      queuedAt: 1_700_000_000_000 + index,
+      sentAt: null,
+      errorMessage: null,
+    }));
+    mocks.query.mockReturnValue(
+      sampleQueue({
+        active,
+        sent: [],
+        counts: { queued: 11, held: 0, sending: 0, failed: 0, sent: 0 },
+      }),
+    );
+    await renderPage("admin");
+
+    expect(container.querySelectorAll('tbody th[scope="row"]')).toHaveLength(10);
+    expect(container.textContent).toContain("Showing 1–10 of 11 queued");
+    expect(container.querySelector('nav[aria-label="Queued decision emails pages"]')).not.toBeNull();
+
+    const next = button("Next")!;
+    await act(async () => next.click());
+    expect(container.querySelectorAll('tbody th[scope="row"]')).toHaveLength(1);
+    expect(container.textContent).toContain("Showing 11–11 of 11 queued");
+    expect(container.textContent).toContain("Applicant 11");
+  });
+
   it("renders queue rows and recently sent for an admin", async () => {
     await renderPage("admin");
     expect(container.textContent).toContain("Taylor Student");

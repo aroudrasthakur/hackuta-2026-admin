@@ -26,9 +26,11 @@ describe("decision email templates", () => {
     expect(subject).toBe("You're accepted to HackUTA 2026");
     expect(text).toContain("November 14–15, 2026");
     expect(text).toContain("University of Texas at Arlington");
-    expect(text).toContain("https://hackuta.com");
+    expect(text).toContain("UTA ID for check-in");
+    expect(text).toContain("team-formation channel on our discord");
     expect(text).toContain("https://discord.gg/2bVsYS3SgS");
     expect(text).toContain("offer your spot to someone on the waitlist");
+    expect(text).toContain("Stay tuned for next steps");
   });
 
   it("explains a rejection as limited space and invites a future application", () => {
