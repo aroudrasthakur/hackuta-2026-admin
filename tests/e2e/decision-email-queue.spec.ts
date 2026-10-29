@@ -19,13 +19,13 @@ test.describe("decision email queue", () => {
     await queuedRow.getByRole("button", { name: "Unhold", exact: true }).click();
     await queuedRow.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Send selected", exact: true }).click();
-    await expect(page.getByRole("status")).toContainText("Sent 1 of 1. 0 failed.");
+    await expect(page.getByRole("status").filter({ hasText: "Sent 1 of 1. 0 failed." })).toBeVisible();
     await expect(page.getByRole("region", { name: "Recently sent decision emails" })).toContainText("Casey Decision");
     await expect(page.getByRole("button", { name: "Send selected", exact: true })).toBeDisabled();
     await page.getByRole("button", { name: "Retry failed", exact: true }).click();
-    await expect(page.getByRole("status")).toContainText("1 failed email returned to the queue.");
+    await expect(page.getByRole("status").filter({ hasText: "1 failed email returned to the queue." })).toBeVisible();
     await page.getByRole("button", { name: "Send all queued", exact: true }).click();
-    await expect(page.getByRole("status")).toContainText("Sent 1 of 1. 0 failed.");
+    await expect(page.getByRole("status").filter({ hasText: "Sent 1 of 1. 0 failed." })).toBeVisible();
     await expect(page.getByLabel("Delivery: held")).toHaveCount(1);
   });
 
@@ -68,7 +68,7 @@ test.describe("decision email queue", () => {
     await signInOrganizer(page, E2E_ADMIN);
     await setDecisionQueue(page, "loading");
     await openQueue(page);
-    await expect(page.getByRole("status")).toHaveText("Loading decision emails…");
+    await expect(page.getByRole("status").filter({ hasText: "Loading decision emails…" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Decision emails", exact: true })).toBeVisible();
     await setDecisionQueue(page, "empty");
     await expect(page.getByRole("heading", { name: "No decision emails are waiting" })).toBeVisible();

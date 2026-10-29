@@ -93,7 +93,7 @@ test("supports mobile account keyboard interaction and reduced-motion loading", 
   await expect(page.getByRole("navigation", { name: "Admin", exact: true }).getByRole("link", { name: "Applications", exact: true })).toBeFocused();
   await setDecisionQueue(page, "loading");
   await page.getByRole("navigation", { name: "Admin", exact: true }).getByRole("link", { name: "Decision emails" }).click();
-  await expect(page.getByRole("status")).toHaveText("Loading decision emails…");
+  await expect(page.getByRole("status").filter({ hasText: "Loading decision emails…" })).toBeVisible();
   await expect(page.locator(".admin-skeleton").first()).toHaveCSS("animation-name", "none");
   await expect(page.locator('[aria-current="page"]')).toHaveCSS("transition-duration", "0s");
   await expect(page.locator(".sign-in-storm")).toHaveAttribute("data-motion", "false");
