@@ -1,23 +1,27 @@
-import { makeFunctionReference } from "convex/server";
+import { anyApi, makeFunctionReference, type ApiFromModules } from "convex/server";
+import type * as notifications from "../../convex/admin/notifications";
 import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cancelFlashSaleRef,
-  cancelNotificationRef,
   createFlashSaleRef,
   createShopItemRef,
-  getNotificationAdminRef,
-  listNotificationsAdminRef,
-  publishNotificationNowRef,
-  saveNotificationDraftRef,
-  scheduleNotificationRef,
   updateFlashSaleRef,
-  updateNotificationRef,
 } from "../../src/convex/adminApi";
 import { publishScheduledNotificationRef } from "../../convex/admin/notifications";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest } from "../helpers/convexTestContext";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
+
+const {
+  cancelNotification: cancelNotificationRef,
+  getNotificationAdmin: getNotificationAdminRef,
+  listNotificationsAdmin: listNotificationsAdminRef,
+  publishNotificationNow: publishNotificationNowRef,
+  saveNotificationDraft: saveNotificationDraftRef,
+  scheduleNotification: scheduleNotificationRef,
+  updateNotification: updateNotificationRef,
+} = (anyApi as ApiFromModules<{ "admin/notifications": typeof notifications }>).admin.notifications;
 
 const NOW = Date.UTC(2026, 10, 14, 15, 0, 0);
 const MINUTE = 60_000;

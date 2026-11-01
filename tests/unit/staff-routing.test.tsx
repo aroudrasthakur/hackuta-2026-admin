@@ -19,7 +19,6 @@ vi.mock("../../src/pages/admin/VolunteersPage", () => ({ VolunteersPage: () => <
 vi.mock("../../src/pages/admin/VolunteerDetailPage", () => ({ VolunteerDetailPage: () => <h1>Volunteer detail</h1> }));
 vi.mock("../../src/pages/admin/EventsPage", () => ({ EventsPage: () => <h1>Events</h1> }));
 vi.mock("../../src/pages/admin/ShopPage", () => ({ ShopPage: () => <h1>Shop</h1> }));
-vi.mock("../../src/pages/admin/NotificationsPage", () => ({ NotificationsPage: () => <h1>Send notifications</h1> }));
 vi.mock("../../src/pages/admin/VolunteerShopPage", () => ({ VolunteerShopPage: () => <h1>Shop redemption</h1> }));
 const query = vi.hoisted(() => vi.fn());
 vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query, useMutation: () => vi.fn() }));
@@ -79,7 +78,7 @@ describe("staff route policy", () => {
     for (const route of [ADMIN_ROUTES.applications, ADMIN_ROUTES.decisionEmails, ADMIN_ROUTES.applicationReview("abc")]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role !== "volunteer");
     }
-    for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.events, ADMIN_ROUTES.shop, ADMIN_ROUTES.notifications]) {
+    for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.events, ADMIN_ROUTES.shop]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role === "admin");
     }
     expect(canAccessStaffRoute(ADMIN_ROUTES.volunteer, profile, allOptions)).toBe(role === "volunteer");
@@ -146,7 +145,6 @@ describe("protected staff screens", () => {
       "Events",
       "Meals",
       "Shop",
-      "Send notifications",
       "Scan",
     ]);
     expect(query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
@@ -184,11 +182,20 @@ describe("protected staff screens", () => {
     [ADMIN_ROUTES.volunteerDetail("volunteer-1"), "Volunteer detail"],
     [ADMIN_ROUTES.events, "Events"],
     [ADMIN_ROUTES.meals, "Meals"],
-    [ADMIN_ROUTES.notifications, "Send notifications"],
   ])("opens %s for administrators", async (route, heading) => {
     await render(route, auth({ staff: { ...staff, role: "admin" } }));
     expect(path()).toBe(route);
     expect(container.querySelector("h1")?.textContent).toBe(heading);
+  });
+
+  it.each(["admin", "volunteer"] as const)("redirects removed notification links to the %s home", async (role) => {
+    const profile = { ...staff, role };
+    const removedRoute = "/admin/notifications";
+    expect(canAccessStaffRoute(removedRoute, profile, allOptions)).toBe(false);
+    expect(intendedStaffDestination({ from: { pathname: removedRoute } }, profile, allOptions)).toBe(staffHome(profile));
+    await render(removedRoute, auth({ staff: profile }));
+    expect(path()).toBe(staffHome(profile));
+    expect(links()).not.toContain("Send notifications");
   });
 
   it("keeps the Volunteers tab current on a volunteer's page", async () => {
@@ -197,7 +204,7 @@ describe("protected staff screens", () => {
     expect(current?.textContent).toBe("Volunteers");
   });
 
-  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop, ADMIN_ROUTES.meals, ADMIN_ROUTES.notifications])("sends volunteers away from %s", async (route) => {
+  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop, ADMIN_ROUTES.meals])("sends volunteers away from %s", async (route) => {
     await render(route, auth({ staff: { ...staff, role: "volunteer" } }));
     expect(path()).toBe(ADMIN_ROUTES.scan);
   });
