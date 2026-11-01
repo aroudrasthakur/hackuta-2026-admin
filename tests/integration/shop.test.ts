@@ -36,7 +36,6 @@ const MINUTE = 60_000;
 
 const listShopRef = makeFunctionReference<"query">("admin/participantShop:listShop");
 const getMyShopHistoryRef = makeFunctionReference<"query">("admin/participantShop:getMyShopHistory");
-const listPublishedNotificationsRef = makeFunctionReference<"query">("admin/participantShop:listPublishedNotifications");
 
 let keyCounter = 0;
 function newKey() {
@@ -521,6 +520,31 @@ describe("flash sales", () => {
     expect(sales).toMatchObject([{ flashSaleId, status: "ended", items: [{ itemId, salePointsCost: 10, pointsCost: 20 }] }]);
   });
 
+  it("creates, edits, and cancels a scheduled sale without notifications or scheduled jobs", async () => {
+    const shop = await seedShop();
+    const itemId = await createItem(shop);
+    const snapshot = () => shop.t.run(async (ctx) => ({
+      notifications: await ctx.db.query("participantNotifications").collect(),
+      jobs: await ctx.db.system.query("_scheduled_functions").collect(),
+      actions: (await ctx.db.query("staffConfigLogs").collect()).map((row) => row.action),
+    }));
+    const { flashSaleId } = await createSale(shop, itemId, { startsAt: NOW + 10 * MINUTE });
+    expect(await snapshot()).toEqual({ notifications: [], jobs: [], actions: ["shop_item_created", "flash_sale_created"] });
+    expect(await shop.t.run((ctx) => ctx.db.get(flashSaleId))).not.toHaveProperty("notificationId");
+    await shop.t.mutation(updateFlashSaleRef, {
+      sessionToken: shop.admin.sessionToken, flashSaleId, title: "Updated sale", message: "Discounted stickers",
+      startsAt: NOW + 15 * MINUTE, endsAt: NOW + 25 * MINUTE, items: [{ itemId, salePointsCost: 12 }],
+    });
+    expect(await snapshot()).toEqual({ notifications: [], jobs: [], actions: ["shop_item_created", "flash_sale_created", "flash_sale_updated"] });
+    await shop.t.mutation(cancelFlashSaleRef, { sessionToken: shop.admin.sessionToken, flashSaleId });
+    expect(await snapshot()).toEqual({ notifications: [], jobs: [], actions: ["shop_item_created", "flash_sale_created", "flash_sale_updated", "flash_sale_cancelled"] });
+    vi.setSystemTime(NOW + 20 * MINUTE);
+    const participant = shop.t.withIdentity({ subject: shop.userId, email: "taylor@example.com" });
+    expect(await participant.query(listShopRef, {})).toMatchObject({ items: [{ pointsCost: 20, onSale: false }], activeSales: [] });
+    expect(await shop.t.run((ctx) => ctx.db.get(shop.participantId))).toMatchObject({ points: 100 });
+    expect(await shop.t.run((ctx) => ctx.db.query("shopFlashSaleItems").collect())).toMatchObject([{ flashSaleId, cancelled: true }]);
+  });
+
   it("rejects overlaps, empty sales, and prices that are not discounts", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop, { pointsCost: 20 });
@@ -541,15 +565,14 @@ describe("flash sales", () => {
     );
   });
 
-  it("cancels a live sale, restoring prices and withdrawing the notification", async () => {
+  it("cancels a live sale and immediately restores participant prices", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop, { pointsCost: 20 });
     const { flashSaleId } = await createSale(shop, itemId);
     const asParticipant = shop.t.withIdentity({ subject: shop.userId, email: "taylor@example.com" });
 
-    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toMatchObject([
-      { type: "flash_sale", title: "Lunch rush", message: "Stickers half off", publishedAt: NOW, linkUrl: "/dashboard" },
-    ]);
+    expect(await shop.t.run((ctx) => ctx.db.query("participantNotifications").collect())).toEqual([]);
+    expect(await shop.t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).toEqual([]);
     const live = await asParticipant.query(listShopRef, {});
     expect(live).toMatchObject({
       items: [{ itemId, pointsCost: 10, basePointsCost: 20, onSale: true }],
@@ -558,7 +581,6 @@ describe("flash sales", () => {
     });
 
     await shop.t.mutation(cancelFlashSaleRef, { sessionToken: shop.admin.sessionToken, flashSaleId });
-    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
     expect(await asParticipant.query(listShopRef, {})).toMatchObject({ items: [{ pointsCost: 20, onSale: false }], activeSales: [] });
     await expectAdminErrorCode(
       shop.t.mutation(cancelFlashSaleRef, { sessionToken: shop.admin.sessionToken, flashSaleId }),
@@ -567,7 +589,7 @@ describe("flash sales", () => {
     expect(await createSale(shop, itemId)).toEqual({ flashSaleId: expect.any(String) });
   });
 
-  it("edits only scheduled sales and publishes the notification at the start", async () => {
+  it("edits only scheduled sales and applies the revised window and prices", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop, { pointsCost: 20 });
     const { flashSaleId } = await createSale(shop, itemId, { startsAt: NOW + 10 * MINUTE, endsAt: NOW + 20 * MINUTE });
@@ -577,14 +599,14 @@ describe("flash sales", () => {
       startsAt: NOW + 15 * MINUTE, endsAt: NOW + 25 * MINUTE, items: [{ itemId, salePointsCost: 15 }],
     };
 
-    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
     expect(await shop.t.mutation(updateFlashSaleRef, edit)).toEqual({ ok: true });
-    await shop.t.finishAllScheduledFunctions(vi.runAllTimers);
-    expect(Date.now()).toBe(NOW + 15 * MINUTE);
-    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toMatchObject([
-      { type: "flash_sale", title: "Dinner rush", message: "Cheaper stickers", publishedAt: NOW + 15 * MINUTE, expiresAt: NOW + 25 * MINUTE },
-    ]);
-    expect((await asParticipant.query(listShopRef, {}))?.items[0]).toMatchObject({ pointsCost: 15 });
+    vi.setSystemTime(NOW + 10 * MINUTE);
+    expect((await asParticipant.query(listShopRef, {}))?.items[0]).toMatchObject({ pointsCost: 20, onSale: false });
+    vi.setSystemTime(NOW + 15 * MINUTE);
+    expect(await asParticipant.query(listShopRef, {})).toMatchObject({
+      items: [{ pointsCost: 15, onSale: true }],
+      activeSales: [{ flashSaleId, title: "Dinner rush", message: "Cheaper stickers" }],
+    });
     await expectAdminErrorCode(shop.t.mutation(updateFlashSaleRef, edit), "FLASH_SALE_NOT_EDITABLE");
   });
 });
@@ -597,7 +619,6 @@ describe("participant shop API", () => {
     const asParticipant = shop.t.withIdentity({ subject: shop.userId, email: "taylor@example.com" });
 
     expect(await shop.t.query(listShopRef, {})).toBeNull();
-    expect(await shop.t.query(listPublishedNotificationsRef, {})).toBeNull();
     expect(await shop.t.query(getMyShopHistoryRef, {})).toEqual([]);
     const history = await asParticipant.query(getMyShopHistoryRef, {});
     expect(history).toMatchObject([{ itemName: "Sticker pack", quantity: 1, totalPointsSpent: 20, onSale: false, refunded: false }]);

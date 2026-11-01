@@ -325,7 +325,7 @@ describe("Flash sales tab", () => {
     expect(alert).toContain("Add at least one item to the sale.");
 
     await type("Title", "Late-night drop");
-    await type("Notification message", "Tees are cheap");
+    await type("Sale description", "Tees are cheap");
     await type("Starts", "");
     await submit(form);
     expect(text()).toContain("Choose a start and end date and time.");
@@ -357,6 +357,7 @@ describe("Flash sales tab", () => {
       items: [{ itemId: "tee", salePointsCost: 320 }],
     });
     expect(text()).toContain("Sale scheduled.");
+    expect(text()).not.toMatch(/notification/i);
   });
 
   it("edits a scheduled sale and can stop editing", async () => {

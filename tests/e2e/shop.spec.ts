@@ -57,6 +57,7 @@ test.describe("admin shop", () => {
     await openSection(page, "Flash sales");
     await expect(page.getByText("Midnight tee sale")).toBeVisible();
     await page.getByLabel("Title").fill("Late-night drop");
+    await page.getByLabel("Sale description").fill("Discounted stickers for the late shift.");
     await page.getByRole("button", { name: "Add an item" }).click();
     await page.getByLabel("Item 1").selectOption({ label: "HackUTA 2026 T-shirt" });
     await page.getByLabel("Sale price for HackUTA 2026 T-shirt").fill("250");
@@ -69,6 +70,17 @@ test.describe("admin shop", () => {
     await expect(page.locator(".admin-callout--success")).toContainText("Sale scheduled.");
     await expect(page.locator(".shop-sale", { hasText: "Late-night drop" })).toContainText("Scheduled");
     await reviewScreenshot(page, "test-results/shop-admin-sales.png");
+    const sale = page.locator(".shop-sale", { hasText: "Late-night drop" });
+    await sale.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByLabel("Sale description")).toHaveValue("Discounted stickers for the late shift.");
+    await page.getByLabel("Sale price for Sticker pack").fill("25");
+    await page.getByRole("button", { name: "Save sale", exact: true }).click();
+    await expect(sale).toContainText("Sticker pack: 25");
+    await sale.getByRole("button", { name: "Cancel sale", exact: true }).click();
+    await sale.getByRole("button", { name: "Confirm cancel", exact: true }).click();
+    await expect(sale).toContainText("Cancelled");
+    await expect(page.locator(".admin-callout--success")).toHaveText("Late-night drop cancelled. Normal prices are back.");
+    await expect(page.getByRole("main")).not.toContainText(/notification/i);
   });
 
   test("hides shop redemption from volunteers without shop access", async ({ page }) => {

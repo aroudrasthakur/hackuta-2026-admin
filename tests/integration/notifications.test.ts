@@ -1,13 +1,6 @@
 import { anyApi, makeFunctionReference, type ApiFromModules } from "convex/server";
 import type * as notifications from "../../convex/admin/notifications";
-import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  cancelFlashSaleRef,
-  createFlashSaleRef,
-  createShopItemRef,
-  updateFlashSaleRef,
-} from "../../src/convex/adminApi";
 import { publishScheduledNotificationRef } from "../../convex/admin/notifications";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest } from "../helpers/convexTestContext";
@@ -311,75 +304,6 @@ describe("admin notifications management & participant notifications", () => {
       paginationOpts: { numItems: 10, cursor: null },
     });
     expect(searched.page.map((row) => row.title)).toEqual(["Temporary Sticker Drop"]);
-  });
-
-  it("integrates flash sales with participantNotifications without duplicates on edit or cancellation", async () => {
-    const { t, admin, asParticipant } = await seedNotificationsContext();
-    const { itemId } = await t.mutation(createShopItemRef, {
-      sessionToken: admin.sessionToken,
-      name: "HackUTA Hoodie",
-      description: "Warm hoodie",
-      pointsCost: 500,
-    });
-
-    // Schedule a flash sale in the future
-    const { flashSaleId } = await t.mutation(createFlashSaleRef, {
-      sessionToken: admin.sessionToken,
-      title: "Hoodie Happy Hour",
-      message: "Hoodies for 350 points",
-      startsAt: NOW + 20 * MINUTE,
-      endsAt: NOW + 50 * MINUTE,
-      items: [{ itemId: itemId as GenericId<"shopItems">, salePointsCost: 350 }],
-    });
-
-    // Not visible to participants before startsAt
-    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
-
-    // Edit the scheduled flash sale — must update the existing notification, not create a duplicate
-    await t.mutation(updateFlashSaleRef, {
-      sessionToken: admin.sessionToken,
-      flashSaleId,
-      title: "Late Night Hoodie Sale",
-      message: "Hoodies down to 300 points!",
-      startsAt: NOW + 25 * MINUTE,
-      endsAt: NOW + 55 * MINUTE,
-      items: [{ itemId: itemId as GenericId<"shopItems">, salePointsCost: 300 }],
-    });
-
-    const adminListBeforeStart = await t.query(listNotificationsAdminRef, {
-      sessionToken: admin.sessionToken,
-      type: "flash_sale",
-      paginationOpts: { numItems: 10, cursor: null },
-    });
-    expect(adminListBeforeStart.page).toHaveLength(1);
-    expect(adminListBeforeStart.page[0]).toMatchObject({
-      title: "Late Night Hoodie Sale",
-      message: "Hoodies down to 300 points!",
-      type: "flash_sale",
-      status: "scheduled",
-      scheduledAt: NOW + 25 * MINUTE,
-      relatedFlashSale: { flashSaleId, title: "Late Night Hoodie Sale" },
-    });
-
-    // At NOW + 25 min, scheduled function publishes the flash sale notification
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-
-    const liveFeed = await asParticipant.query(listPublishedNotificationsRef, {});
-    expect(liveFeed).toHaveLength(1);
-    expect(liveFeed?.[0]).toMatchObject({
-      title: "Late Night Hoodie Sale",
-      message: "Hoodies down to 300 points!",
-      type: "flash_sale",
-      publishedAt: NOW + 25 * MINUTE,
-      expiresAt: NOW + 55 * MINUTE,
-    });
-
-    // Cancelling the live sale withdraws the notification from the participant portal
-    await t.mutation(cancelFlashSaleRef, {
-      sessionToken: admin.sessionToken,
-      flashSaleId,
-    });
-    expect(await asParticipant.query(listPublishedNotificationsRef, {})).toEqual([]);
   });
 
   it("covers relatedEvent validation, scheduleNotification on existing rows, and updateNotification on drafts", async () => {
