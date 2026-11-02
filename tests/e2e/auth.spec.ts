@@ -46,7 +46,6 @@ test.describe("organizer authentication", () => {
       "Events",
       "Meals",
       "Shop",
-      "Send notifications",
       "Scan",
     ]);
     await page.getByRole("link", { name: "Participants", exact: true }).click();
@@ -55,6 +54,19 @@ test.describe("organizer authentication", () => {
     await expect(page.getByRole("heading", { name: "Volunteers", exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Events", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
+  });
+
+  test("redirects the retired notifications URL to the signed-in staff home", async ({ page }) => {
+    await signInOrganizer(page, E2E_ADMIN);
+    await page.goto("/admin/notifications");
+    await expect(page).toHaveURL(/\/admin\/applications$/);
+    await expect(page.getByRole("heading", { name: "Applications", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Send notifications", exact: true })).toHaveCount(0);
+    await signOutOrganizer(page);
+    await signInVolunteer(page);
+    await page.goto("/admin/notifications");
+    await expect(page).toHaveURL(/\/admin\/scan$/);
+    await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
   });
 
   test("supports volunteer scan navigation, refresh, and history on mobile", async ({ page }) => {

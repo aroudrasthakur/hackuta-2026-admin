@@ -12,7 +12,6 @@ const adminPages = [
   { link: "Events", heading: "Events" },
   { link: "Meals", heading: "Meals" },
   { link: "Shop", heading: "Shop" },
-  { link: "Send notifications", heading: "Send notifications" },
   { link: "Scan", heading: "Scan" },
 ] as const;
 
