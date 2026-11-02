@@ -28,7 +28,7 @@ const PAGES: Record<ScanWorkflowName, { purpose: ScanPurpose | null; title: stri
   "check-in": {
     purpose: null,
     title: "Participant check-in",
-    lead: "Scan the participant's registration QR, then the badge you hand them, then confirm.",
+    lead: "Scan the participant's registration QR, then the badge you hand them, check their government ID, then confirm.",
   },
   food: {
     purpose: "food_check_in",

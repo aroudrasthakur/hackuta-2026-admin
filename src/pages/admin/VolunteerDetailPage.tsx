@@ -198,7 +198,7 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
 type Capabilities = { canCheckIn: boolean; canFoodCheckIn: boolean; canRedeemShop: boolean };
 
 const ACCESS_ROWS: Array<{ key: keyof Capabilities; title: string; description: string; icon: SectionIconName }> = [
-  { key: "canCheckIn", title: "Participant check-in", icon: "checkIn", description: "Scan a registration QR, hand over a badge, and check the participant in." },
+  { key: "canCheckIn", title: "Participant check-in", icon: "checkIn", description: "Scan a registration QR, hand over a badge, check government ID, and check the participant in." },
   { key: "canFoodCheckIn", title: "Food distribution", icon: "food", description: "Scan badges and record meals." },
   { key: "canRedeemShop", title: "Shop redemption", icon: "shop", description: "Scan badges and sell shop items for points." },
 ];

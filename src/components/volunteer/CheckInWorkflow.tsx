@@ -8,7 +8,7 @@ import { ScanResult } from "./ScanResult";
 import { ScanSteps } from "./ScanSteps";
 import { SuccessIcon } from "./VolunteerIcons";
 
-const STEPS = ["Registration QR", "Badge QR", "Confirm"] as const;
+const STEPS = ["Registration QR", "Badge QR", "Verify ID", "Confirm"] as const;
 
 function stepIndex(state: CheckInWorkflowState) {
   switch (state.step) {
@@ -18,8 +18,10 @@ function stepIndex(state: CheckInWorkflowState) {
     case "badge":
     case "checking_badge":
       return 1;
-    case "confirm":
+    case "identity":
       return 2;
+    case "confirm":
+      return 3;
     case "result":
       return state.outcome.tone === "success" ? STEPS.length : -1;
   }
@@ -75,13 +77,32 @@ function ParticipantCard({ name, children }: { name: string; children?: ReactNod
   );
 }
 
+function DietaryFacts({ name, foodRestriction }: { name: string; foodRestriction: string | null }) {
+  return (
+    <dl className="volunteer-confirm__facts">
+      <div>
+        <dt>Name</dt>
+        <dd>{name}</dd>
+      </div>
+      <div className={foodRestriction ? "volunteer-confirm__dietary" : undefined}>
+        <dt>Dietary restrictions</dt>
+        <dd>{foodRestriction ?? "None listed"}</dd>
+      </div>
+      <div className={foodRestriction ? "volunteer-confirm__dietary" : undefined}>
+        <dt>Food restrictions</dt>
+        <dd>{foodRestriction ?? "None listed"}</dd>
+      </div>
+    </dl>
+  );
+}
+
 /**
- * Door check-in in three steps: the registration QR identifies the
- * participant, the badge QR picks their physical badge, and Confirm checks
- * them in. Nothing is saved before Confirm. Scanned values are never shown.
+ * Door check-in: registration QR, badge QR, government-ID check, then
+ * Confirm. The ID step writes nothing. Nothing is saved before Confirm.
+ * Scanned values are never shown.
  */
 export function CheckInWorkflow() {
-  const { state, scanRegistration, scanBadge, confirm, back, restart } = useCheckInWorkflow();
+  const { state, scanRegistration, scanBadge, proceed, confirm, back, restart } = useCheckInWorkflow();
   const [cameraPreferred, setCameraPreferred] = useState(false);
   const onScan = (scan: (rawValue: string) => Promise<void>) => (rawValue: string, source: ScanSource) => {
     setCameraPreferred(source === "camera");
@@ -130,6 +151,29 @@ export function CheckInWorkflow() {
         </div>
       ) : null}
 
+      {state.step === "identity" ? (
+        <>
+          <div className="rounded-2xl border-2 border-ocean bg-ocean/10 p-4 text-night">
+            <p className="text-2xl font-bold">Check government ID</p>
+            <p className="text-base">Compare the name on their government-issued ID with this participant. This step does not check them in.</p>
+          </div>
+          <ParticipantCard name={state.participant.name}>
+            <DietaryFacts name={state.participant.name} foodRestriction={state.participant.foodRestriction} />
+          </ParticipantCard>
+          <div className="volunteer-confirm__actions">
+            <button type="button" className={scanConfirmButtonClass} onClick={proceed}>
+              Proceed
+            </button>
+            <button type="button" className={scanSecondaryButtonClass} onClick={back}>
+              Back: Scan a different badge
+            </button>
+            <button type="button" className={scanSecondaryButtonClass} onClick={restart}>
+              Start over
+            </button>
+          </div>
+        </>
+      ) : null}
+
       {state.step === "confirm" ? (
         <>
           <ParticipantCard name={state.participant.name}>
@@ -156,7 +200,7 @@ export function CheckInWorkflow() {
               {state.submitting ? "Checking in…" : state.error ? "Try again: Confirm check-in" : "Confirm check-in"}
             </button>
             <button type="button" className={scanSecondaryButtonClass} onClick={back} disabled={state.submitting}>
-              Back: Scan a different badge
+              Back: Check ID again
             </button>
             <button type="button" className={scanSecondaryButtonClass} onClick={restart} disabled={state.submitting}>
               Start over

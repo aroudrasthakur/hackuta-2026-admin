@@ -18,13 +18,18 @@ import {
 } from "../lib/scanResults";
 import { useAdminAuth } from "./useAdminAuth";
 
-type Participant = { name: string };
+type Participant = { name: string; foodRestriction: string | null };
+
+function participantOf(value: { name: string; foodRestriction?: string | null }): Participant {
+  return { name: value.name, foodRestriction: value.foodRestriction ?? null };
+}
 
 export type CheckInWorkflowState =
   | { step: "registration"; error: ScanOutcome | null }
   | { step: "checking_registration" }
   | { step: "badge"; participant: Participant; error: ScanOutcome | null }
   | { step: "checking_badge"; participant: Participant }
+  | { step: "identity"; participant: Participant }
   | { step: "confirm"; participant: Participant; submitting: boolean; error: ScanOutcome | null }
   | { step: "result"; outcome: ScanOutcome };
 
@@ -47,9 +52,10 @@ const SAME_AS_REGISTRATION: ScanOutcome = {
 };
 
 /**
- * Registration QR → badge QR → confirm → result for door check-in. Each scan
- * is checked on the server, and the confirmation re-runs every check before
- * assigning the badge and checking the participant in together.
+ * Registration QR → badge QR → government-ID check → confirm → result for
+ * door check-in. Each scan is checked on the server. The ID step writes
+ * nothing. Confirmation re-runs every check before assigning the badge and
+ * checking the participant in together.
  *
  * Both scanned values live only in refs and are never shown. Back drops the
  * current step's value; Start over, Scan next, and unmount drop both. A
@@ -113,7 +119,7 @@ export function useCheckInWorkflow() {
       return finish(checkInStepOutcome(result));
     }
     registrationRef.current = registration;
-    setState({ step: "badge", participant: result.participant, error: null });
+    setState({ step: "badge", participant: participantOf(result.participant), error: null });
   }, [finish, resolveRegistration, run, sessionToken, state.step]);
 
   /** A badge problem keeps the participant and asks for another badge; anything else ends the flow. */
@@ -145,8 +151,14 @@ export function useCheckInWorkflow() {
     if (!result) return;
     if (result.status !== "ok") return failAtBadge(participant, result);
     badgeRef.current = badge;
-    setState({ step: "confirm", participant, submitting: false, error: null });
+    setState({ step: "identity", participant: participantOf(result.participant) });
   }, [failAtBadge, finish, resolveBadge, run, sessionToken, state]);
+
+  /** Desk-only government-ID check. Writes nothing. */
+  const proceed = useCallback(() => {
+    if (state.step !== "identity") return;
+    setState({ step: "confirm", participant: state.participant, submitting: false, error: null });
+  }, [state]);
 
   const confirm = useCallback(async () => {
     const registration = registrationRef.current;
@@ -167,11 +179,15 @@ export function useCheckInWorkflow() {
     failAtBadge(participant, result);
   }, [checkIn, failAtBadge, finish, run, sessionToken, state]);
 
-  /** One step back: confirm → badge, badge → registration. Ignores any response in flight. */
+  /** One step back: confirm → identity, identity/badge check → badge, else registration. Ignores any response in flight. */
   const back = useCallback(() => {
     requestRef.current += 1;
     busyRef.current = false;
-    if (state.step === "confirm" || state.step === "checking_badge") {
+    if (state.step === "confirm") {
+      setState({ step: "identity", participant: state.participant });
+      return;
+    }
+    if (state.step === "identity" || state.step === "checking_badge") {
       badgeRef.current = null;
       setState({ step: "badge", participant: state.participant, error: null });
       return;
@@ -186,5 +202,5 @@ export function useCheckInWorkflow() {
     setState({ step: "registration", error: null });
   }, [clear]);
 
-  return { state, scanRegistration, scanBadge, confirm, back, restart };
+  return { state, scanRegistration, scanBadge, proceed, confirm, back, restart };
 }

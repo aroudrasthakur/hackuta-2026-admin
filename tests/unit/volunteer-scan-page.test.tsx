@@ -154,10 +154,18 @@ async function reachBadgeStep() {
   await scan(registration);
 }
 
-async function reachConfirmStep() {
+async function reachIdentityStep(foodRestriction: string | null = null) {
   await reachBadgeStep();
-  mocks.resolveBadge.mockResolvedValueOnce(registrationOk);
+  mocks.resolveBadge.mockResolvedValueOnce({
+    status: "ok",
+    participant: { name: "Sam Lee", foodRestriction },
+  });
   await scan(badge);
+}
+
+async function reachConfirmStep(foodRestriction: string | null = null) {
+  await reachIdentityStep(foodRestriction);
+  await click("Proceed");
 }
 
 describe("check-in workflow", () => {
@@ -180,13 +188,20 @@ describe("check-in workflow", () => {
     expect(document.activeElement?.textContent).toBe("Sam Lee");
     expect(text()).toContain("Registration verified · not checked in yet");
 
-    mocks.resolveBadge.mockResolvedValueOnce(registrationOk);
+    mocks.resolveBadge.mockResolvedValueOnce({ status: "ok", participant: { name: "Sam Lee", foodRestriction: "Vegan" } });
     await scan(`${badge}\n`);
     expect(mocks.resolveBadge).toHaveBeenCalledWith({ sessionToken: "session", registrationQrCodeToken: registration, badgeQrCodeToken: badge });
-    expect(currentStep()).toBe("3. Confirm");
+    expect(currentStep()).toBe("3. Verify ID");
+    expect(text()).toContain("Check government ID");
+    expect(text()).toContain("Sam Lee");
+    expect(text()).toContain("Vegan");
     expect(mocks.checkIn).not.toHaveBeenCalled();
     expect(text()).not.toContain(badge);
     expect(text()).not.toContain(registration);
+
+    await click("Proceed");
+    expect(currentStep()).toBe("4. Confirm");
+    expect(mocks.checkIn).not.toHaveBeenCalled();
 
     await click("Confirm check-in");
     expect(mocks.checkIn).toHaveBeenCalledWith({ sessionToken: "session", registrationQrCodeToken: registration, badgeQrCodeToken: badge });
@@ -271,6 +286,9 @@ describe("check-in workflow", () => {
   it("goes back one step at a time and starts over without keeping values", async () => {
     await render("check-in");
     await reachConfirmStep();
+    await click("Back: Check ID again");
+    expect(currentStep()).toBe("3. Verify ID");
+    expect(text()).toContain("Sam Lee");
     await click("Back: Scan a different badge");
     expect(currentStep()).toBe("2. Badge QR");
     expect(text()).toContain("Sam Lee");
@@ -322,7 +340,7 @@ describe("check-in workflow", () => {
     expect(saving.disabled).toBe(true);
     expect(saving.getAttribute("aria-busy")).toBe("true");
     expect(button("Start over")!.disabled).toBe(true);
-    expect(button("Back: Scan a different badge")!.disabled).toBe(true);
+    expect(button("Back: Check ID again")!.disabled).toBe(true);
     await act(async () => saving.click());
     await act(async () => saving.click());
     expect(mocks.checkIn).toHaveBeenCalledTimes(1);
@@ -365,6 +383,23 @@ describe("check-in workflow", () => {
     await reachConfirmStep();
     await click("Confirm check-in");
     expect(result()?.textContent).toContain("Permission required");
+  });
+
+  it("shows dietary restrictions on the ID step and none listed when missing", async () => {
+    await render("check-in");
+    await reachIdentityStep("Vegetarian; Allergies: nuts");
+    expect(currentStep()).toBe("3. Verify ID");
+    expect(text()).toContain("Dietary restrictions");
+    expect(text()).toContain("Food restrictions");
+    expect(text()).toContain("Vegetarian; Allergies: nuts");
+    await click("Proceed");
+    expect(currentStep()).toBe("4. Confirm");
+    expect(text()).not.toContain("Vegetarian; Allergies: nuts");
+    expect(mocks.checkIn).not.toHaveBeenCalled();
+
+    await click("Start over");
+    await reachIdentityStep(null);
+    expect(text()).toContain("None listed");
   });
 
   it("shows a loading state until scan access loads", async () => {
