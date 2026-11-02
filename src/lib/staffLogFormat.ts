@@ -31,6 +31,12 @@ export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = 
   flash_sale_created: "Flash sale created",
   flash_sale_updated: "Flash sale updated",
   flash_sale_cancelled: "Flash sale cancelled",
+  // Historical rows from the removed notification admin. New writes never use these.
+  notification_created: "Notification created",
+  notification_updated: "Notification updated",
+  notification_published: "Notification published",
+  notification_scheduled: "Notification scheduled",
+  notification_cancelled: "Notification cancelled",
 };
 
 /** Short names of the scan permissions a volunteer has, in a fixed order. */
