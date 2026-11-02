@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
+import { ApplicationsQueuePagination } from "../../components/ApplicationsQueuePagination";
 import { ParticipantBadgeSection } from "../../components/admin/ParticipantBadgeSection";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
@@ -22,11 +23,12 @@ import {
   reviewPrimaryButtonClass,
   reviewSecondaryButtonClass,
 } from "../../lib/reviewButtonClasses";
+import { paginateQueue, queuePage, queuePageRange } from "../../lib/applicationQueue";
 import { ADJUSTMENT_REASON_MAX_LENGTH } from "../../../shared/admin/volunteerRules";
 import { PASSWORD_MIN_LENGTH, PASSWORD_REQUIREMENTS_MESSAGE } from "../../../shared/auth/password";
 import { ADMIN_ROUTES } from "../../types/routes";
 
-const PAGE_SIZE = 25;
+const SERVER_PAGE_SIZE = 100;
 const controlClass = "admin-field__control";
 const participantIdText = (participant: ParticipantRow) => participant.participantId;
 
@@ -92,6 +94,7 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
   sessionToken: string;
   onOpen: (participant: ParticipantRow, trigger: HTMLButtonElement) => void;
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [checkInFilter, setCheckInFilter] = useState("all");
   const [foodFilter, setFoodFilter] = useState("all");
@@ -111,18 +114,48 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
   const { results, status, loadMore } = usePaginatedQuery(
     listParticipantsRef,
     args,
-    { initialNumItems: PAGE_SIZE },
+    { initialNumItems: SERVER_PAGE_SIZE },
   );
-  const isLoading = status === "LoadingFirstPage" || status === "LoadingMore";
+  const finished = status === "Exhausted";
   const hasFilters = search.trim() !== "" || checkInFilter !== "all" ||
     foodFilter !== "all" || volunteerFilter !== "all";
-  const finished = status === "Exhausted";
+  const filteredCount = finished ? results.length : 0;
+  const page = queuePage(searchParams, filteredCount);
+  const { start: rangeStart, end: rangeEnd, totalPages } = queuePageRange(page, filteredCount);
+  const pagedParticipants = finished ? paginateQueue(results, page) : [];
+
+  useEffect(() => {
+    if (status === "CanLoadMore") loadMore(SERVER_PAGE_SIZE);
+  }, [loadMore, status]);
+
+  const goToPage = useCallback((nextPage: number) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (nextPage <= 1) next.delete("page");
+      else next.set("page", String(nextPage));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    const requestedRaw = searchParams.get("page");
+    if (!requestedRaw) return;
+    const requested = Number.parseInt(requestedRaw, 10);
+    if (!Number.isFinite(requested) || requested < 1) return;
+    if (requested === page) return;
+    goToPage(page);
+  }, [goToPage, page, searchParams]);
+
+  function resetPage() {
+    goToPage(1);
+  }
 
   function clearFilters() {
     setSearch("");
     setCheckInFilter("all");
     setFoodFilter("all");
     setVolunteerFilter("all");
+    resetPage();
   }
 
   return (
@@ -134,14 +167,14 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
             type="search"
             value={search}
             maxLength={100}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => { setSearch(event.target.value); resetPage(); }}
             placeholder="Search participants"
             className={controlClass}
           />
         </label>
         <label className="admin-field">
           Check-in status
-          <select className={controlClass} value={checkInFilter} onChange={(event) => setCheckInFilter(event.target.value)}>
+          <select className={controlClass} value={checkInFilter} onChange={(event) => { setCheckInFilter(event.target.value); resetPage(); }}>
             <option value="all">All check-in statuses</option>
             <option value="checked">Checked in</option>
             <option value="not">Not checked in</option>
@@ -149,7 +182,7 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
         </label>
         <label className="admin-field">
           Food redemption
-          <select className={controlClass} value={foodFilter} onChange={(event) => setFoodFilter(event.target.value)}>
+          <select className={controlClass} value={foodFilter} onChange={(event) => { setFoodFilter(event.target.value); resetPage(); }}>
             <option value="all">All food statuses</option>
             <option value="redeemed">Redeemed</option>
             <option value="not">Not redeemed</option>
@@ -157,7 +190,7 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
         </label>
         <label className="admin-field">
           Volunteer status
-          <select className={controlClass} value={volunteerFilter} onChange={(event) => setVolunteerFilter(event.target.value)}>
+          <select className={controlClass} value={volunteerFilter} onChange={(event) => { setVolunteerFilter(event.target.value); resetPage(); }}>
             <option value="all">All volunteer statuses</option>
             <option value="none">Not a volunteer</option>
             <option value="linked">Linked volunteer</option>
@@ -172,15 +205,26 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
         </div>
       </div>
 
-      {isLoading && results.length === 0 ? <RosterSkeleton /> : null}
-      {results.length > 0 ? (
+      {!finished ? <RosterSkeleton /> : null}
+      {finished && results.length > 0 ? (
         <>
-          <p role="status" aria-live="polite" className="text-sm text-ocean">
-            Showing {results.length} participant{results.length === 1 ? "" : "s"} from the roster pages loaded.
-          </p>
+          <div className="flex min-h-11 flex-wrap items-center justify-between gap-3">
+            <p role="status" aria-live="polite" className="text-sm text-ocean">
+              {hasFilters
+                ? `Showing ${rangeStart}–${rangeEnd} of ${filteredCount} matching participants`
+                : `Showing ${rangeStart}–${rangeEnd} of ${filteredCount} participants`}
+              <span className="sr-only">. Page {page} of {totalPages}.</span>
+            </p>
+            <ApplicationsQueuePagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={goToPage}
+              ariaLabel="Participants pages"
+            />
+          </div>
           <div className="admin-card overflow-hidden">
             <ul className="space-y-3 p-3 md:hidden">
-              {results.map((participant) => (
+              {pagedParticipants.map((participant) => (
                 <li key={participantIdText(participant)} className="space-y-3 rounded-xl border border-sand/80 bg-white/70 p-4">
                   <div className="min-w-0">
                     <button
@@ -223,7 +267,7 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
                 </tr>
               </thead>
               <tbody>
-                {results.map((participant) => (
+                {pagedParticipants.map((participant) => (
                   <tr key={participantIdText(participant)} className="border-b border-sand/70 last:border-0">
                     <td className="max-w-[18rem] px-4 py-3">
                       <button
@@ -271,33 +315,13 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
         </>
       ) : null}
 
-      {results.length === 0 && finished ? (
+      {finished && results.length === 0 ? (
         <EmptyState
           title={hasFilters ? (search.trim() ? "No search results" : "No participants match these filters") : "No participants yet"}
           description={hasFilters
             ? "Try another search or clear some filters to see more accepted participants."
             : "Accepted participants will appear here when their participant records are ready."}
         />
-      ) : null}
-
-      {results.length === 0 && !finished && !isLoading ? (
-        <div className="admin-card admin-card__body space-y-3 text-center">
-          <h2 className="admin-card__title">No matches in the roster pages loaded</h2>
-          <p className="admin-page-lead">The roster is searched a page at a time. Continue to scan the next page for matching participants.</p>
-        </div>
-      ) : null}
-
-      {status === "CanLoadMore" || status === "LoadingMore" ? (
-        <div className="flex justify-center">
-          <button
-            type="button"
-            disabled={status === "LoadingMore"}
-            onClick={() => loadMore(PAGE_SIZE)}
-            className={reviewPrimaryButtonClass}
-          >
-            {status === "LoadingMore" ? "Loading participants…" : "Load more participants"}
-          </button>
-        </div>
       ) : null}
     </section>
   );

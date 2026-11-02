@@ -205,7 +205,7 @@ async function openDetails() {
 }
 
 describe("ParticipantsPage", () => {
-  it("shows loading, empty, filtered-empty, and next-page roster states", async () => {
+  it("shows loading, empty, and filtered-empty roster states", async () => {
     paginationStatus = "LoadingFirstPage";
     currentRows = [];
     await render();
@@ -218,12 +218,28 @@ describe("ParticipantsPage", () => {
     await fill("Search name or email", "nobody");
     await render();
     expect(container.textContent).toContain("No search results");
+  });
 
-    paginationStatus = "CanLoadMore";
+  it("shows ten participants per page with navigation", async () => {
+    currentRows = Array.from({ length: 11 }, (_, index) => ({
+      ...row,
+      participantId: `participant-${index}` as ParticipantRow["participantId"],
+      name: `Participant ${String(index + 1).padStart(2, "0")}`,
+      email: `participant-${index}@example.com`,
+    }));
     await render();
-    expect(container.textContent).toContain("No matches in the roster pages loaded");
-    await click("Load more participants");
-    expect(mocks.loadMore).toHaveBeenCalledWith(25);
+    expect(container.querySelectorAll("table tbody tr")).toHaveLength(10);
+    expect(container.textContent).toContain("Showing 1–10 of 11 participants");
+    expect(container.querySelector('nav[aria-label="Participants pages"]')).not.toBeNull();
+
+    await click("Next");
+    expect(container.querySelectorAll("table tbody tr")).toHaveLength(1);
+    expect(container.textContent).toContain("Participant 11");
+    expect(container.textContent).toContain("Showing 11–11 of 11 participants");
+
+    await click("Previous");
+    expect(container.querySelectorAll("table tbody tr")).toHaveLength(10);
+    expect(container.textContent).toContain("Showing 1–10 of 11 participants");
   });
 
   it("passes search and each status filter to the backend paginator and clears them", async () => {
@@ -231,7 +247,7 @@ describe("ParticipantsPage", () => {
     expect(mocks.paginatedQuery).toHaveBeenLastCalledWith(
       listParticipantsRef,
       { sessionToken: "session-token", search: "" },
-      { initialNumItems: 25 },
+      { initialNumItems: 100 },
     );
     await fill("Search name or email", "alex");
     const selects = container.querySelectorAll("select");
@@ -254,7 +270,7 @@ describe("ParticipantsPage", () => {
         foodRedeemed: true,
         volunteerStatus: "active",
       },
-      { initialNumItems: 25 },
+      { initialNumItems: 100 },
     );
     await click("Clear filters");
     expect((field("Search name or email") as HTMLInputElement).value).toBe("");
