@@ -10,7 +10,9 @@ import { awardEventPoints, computeLedgerPoints } from "../../convex/admin/points
 import { ADJUSTMENT_REASON_MAX_LENGTH } from "../../shared/admin/volunteerRules";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
+import { seedMealPeriod } from "../helpers/mealTestKit";
 import { ORGANIZER_TEST_PASSWORD, signInOrganizer } from "../helpers/staffTestFixtures";
 
 const { participantsAdmin: api } = (anyApi as ApiFromModules<{
@@ -35,13 +37,13 @@ async function seedParticipant(t: ConvexTestInstance, acceptedBy: GenericId<"adm
     fields: { firstName: seed.firstName ?? "Taylor", lastName: seed.lastName ?? "Student" },
     review: { status: seed.status ?? "accepted" },
   });
-  const participantId = await t.run((ctx) => ctx.db.insert("participants", {
+  const { participantId, checkedInId } = await t.run((ctx) => insertParticipantWithOptionalCheckIn(ctx, {
     applicationId, authUserId: userId, acceptedBy, acceptedAt: 1,
     qrCodeToken: tokenCounter.toString(16).padStart(64, "a"),
-    points: 0, foodRestriction: "Vegan", createdAt: 1, updatedAt: 1,
-    ...seed.fields,
+    foodRestriction: "Vegan", createdAt: 1, updatedAt: 1,
+    ...(seed.fields as object),
   }));
-  return { participantId, applicationId, userId };
+  return { participantId, applicationId, userId, checkedInId };
 }
 
 function seedEvent(t: ConvexTestInstance, name: string, pointsAwarded: number) {
@@ -60,12 +62,32 @@ function getParticipant(t: ConvexTestInstance, participantId: GenericId<"partici
   return t.run((ctx) => ctx.db.get(participantId));
 }
 
+function getAttendee(t: ConvexTestInstance, participantId: GenericId<"participants">) {
+  return t.run((ctx) => getCheckedIn(ctx, participantId));
+}
+
+async function seedMealRedemption(
+  t: ConvexTestInstance,
+  adminId: GenericId<"admins">,
+  participantId: GenericId<"participants">,
+  redeemedAt: number,
+) {
+  const mealPeriodId = await seedMealPeriod(t, adminId);
+  await t.run(async (ctx) => {
+    const attendee = await getCheckedIn(ctx, participantId);
+    await ctx.db.insert("mealRedemptions", {
+      checkedInId: attendee!._id, mealPeriodId, scannedBy: adminId, redeemedAt,
+    });
+  });
+}
+
 describe("listParticipants", () => {
   it("returns only accepted participants with identity, balance, check-in, and volunteer link", async () => {
     const { t, admin, sessionToken } = await fixture();
     const accepted = await seedParticipant(t, admin.adminId, {
-      email: "taylor@example.com", fields: { points: 30, checkedInAt: 100, foodCheckedInAt: 200 },
+      email: "taylor@example.com", fields: { points: 30, checkedInAt: 100 },
     });
+    await seedMealRedemption(t, admin.adminId, accepted.participantId, 200);
     await seedParticipant(t, admin.adminId, { firstName: "Rejected", status: "rejected" });
     await seedParticipant(t, admin.adminId, { firstName: "Withdrawn", status: "withdrawn" });
     const volunteerId = await t.mutation(api.promoteParticipantToVolunteer, {
@@ -102,7 +124,8 @@ describe("listParticipants", () => {
     const { t, admin, sessionToken } = await fixture();
     const none = await seedParticipant(t, admin.adminId, { firstName: "None" });
     const checked = await seedParticipant(t, admin.adminId, { firstName: "Checked", fields: { checkedInAt: 5 } });
-    const fed = await seedParticipant(t, admin.adminId, { firstName: "Fed", fields: { checkedInAt: 5, foodCheckedInAt: 6 } });
+    const fed = await seedParticipant(t, admin.adminId, { firstName: "Fed", fields: { checkedInAt: 5 } });
+    await seedMealRedemption(t, admin.adminId, fed.participantId, 6);
     const active = await t.mutation(api.promoteParticipantToVolunteer, {
       sessionToken, participantId: checked.participantId, password: ORGANIZER_TEST_PASSWORD,
     });
@@ -160,7 +183,9 @@ describe("listParticipants", () => {
 describe("getParticipantDetails", () => {
   it("returns awards, the ledger cross-check, and volunteer details without the QR token", async () => {
     const { t, admin, sessionToken } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId, { email: "taylor@example.com" });
+    const { participantId } = await seedParticipant(t, admin.adminId, {
+      email: "taylor@example.com", fields: { checkedInAt: 1 },
+    });
     const eventId = await seedEvent(t, "Workshop", 15);
     await t.run((ctx) => awardEventPoints(ctx, { actorAdminId: admin.adminId, participantId, eventId, now: 50 }));
     await t.mutation(api.setParticipantPoints, { sessionToken, participantId, points: 10, reason: "Duplicate scan" });
@@ -168,7 +193,7 @@ describe("getParticipantDetails", () => {
     const details = await t.query(api.getParticipantDetails, { sessionToken, participantId });
     expect(details).toMatchObject({
       participantId, name: "Taylor Student", email: "taylor@example.com", points: 10, ledgerPoints: 10,
-      pointsConsistent: true, checkedInAt: null, foodCheckedInAt: null, volunteer: null,
+      pointsConsistent: true, checkedInAt: 1, foodCheckedInAt: null, volunteer: null,
       awards: [{ eventId, eventName: "Workshop", pointsAwarded: 15, awardedAt: 50, awardedBy: { adminId: admin.adminId, name: "Admin Ada" } }],
     });
     expect(JSON.stringify(details)).not.toMatch(/qrCodeToken/);
@@ -177,7 +202,7 @@ describe("getParticipantDetails", () => {
 
   it("flags a cached balance that disagrees with the ledger", async () => {
     const { t, admin, sessionToken } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 7 } });
+    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 7, checkedInAt: 1 } });
     expect(await t.query(api.getParticipantDetails, { sessionToken, participantId }))
       .toMatchObject({ points: 7, ledgerPoints: 0, pointsConsistent: false });
   });
@@ -195,20 +220,20 @@ describe("getParticipantDetails", () => {
 describe("setParticipantPoints", () => {
   it("computes the delta server-side and writes balance and an immutable log together", async () => {
     const { t, admin, sessionToken } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 25 } });
+    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 25, checkedInAt: 1 } });
     const result = await t.mutation(api.setParticipantPoints, { sessionToken, participantId, points: 18, reason: "  Duplicate scan  " });
     expect(result).toEqual({ ok: true, changed: true, previousPoints: 25, newPoints: 18, pointsDelta: -7 });
-    expect((await getParticipant(t, participantId))?.points).toBe(18);
+    expect((await getAttendee(t, participantId))?.points).toBe(18);
     expect(await t.run((ctx) => ctx.db.query("volunteerActionLogs").collect())).toMatchObject([{
-      actorAdminId: admin.adminId, participantId, action: "admin_adjust",
+      actorAdminId: admin.adminId, checkedInId: (await getAttendee(t, participantId))?._id, action: "admin_adjust",
       previousPoints: 25, newPoints: 18, pointsDelta: -7, reason: "Duplicate scan", createdAt: expect.any(Number),
     }]);
   });
 
   it("keeps event awards, award uniqueness, and other participants unchanged", async () => {
     const { t, admin, sessionToken } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId);
-    const other = await seedParticipant(t, admin.adminId, { firstName: "Other", fields: { points: 9 } });
+    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { checkedInAt: 1 } });
+    const other = await seedParticipant(t, admin.adminId, { firstName: "Other", fields: { points: 9, checkedInAt: 1 } });
     const eventId = await seedEvent(t, "Workshop", 20);
     await t.run((ctx) => awardEventPoints(ctx, { actorAdminId: admin.adminId, participantId, eventId, now: 1 }));
     const awardsBefore = await t.run((ctx) => ctx.db.query("participantEventAwards").collect());
@@ -222,22 +247,30 @@ describe("setParticipantPoints", () => {
     expect(await getParticipant(t, other.participantId)).toEqual(otherBefore);
     const after = await getParticipant(t, participantId);
     expect(after).toMatchObject({
-      points: 0, qrCodeToken: before?.qrCodeToken, applicationId: before?.applicationId,
+      qrCodeToken: before?.qrCodeToken, applicationId: before?.applicationId,
       authUserId: before?.authUserId, foodRestriction: "Vegan",
     });
+    expect(after).not.toHaveProperty("points");
+    expect((await getAttendee(t, participantId))?.points).toBe(0);
     await expectAdminErrorCode(
       t.run((ctx) => awardEventPoints(ctx, { actorAdminId: admin.adminId, participantId, eventId, now: 2 })),
       "POINTS_ALREADY_AWARDED",
     );
-    expect(await t.run((ctx) => computeLedgerPoints(ctx, participantId))).toBe(0);
+    expect(await t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, participantId);
+      return computeLedgerPoints(ctx, attendee!._id, participantId);
+    })).toBe(0);
   });
 
   it("keeps the balance equal to event awards plus adjustments", async () => {
     const { t, admin, sessionToken } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId);
+    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { checkedInAt: 1 } });
     const [a, b] = [await seedEvent(t, "A", 10), await seedEvent(t, "B", 25)];
-    const ledger = () => t.run((ctx) => computeLedgerPoints(ctx, participantId));
-    const balance = async () => (await getParticipant(t, participantId))?.points;
+    const ledger = () => t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, participantId);
+      return computeLedgerPoints(ctx, attendee!._id, participantId);
+    });
+    const balance = async () => (await getAttendee(t, participantId))?.points;
     await t.run((ctx) => awardEventPoints(ctx, { actorAdminId: admin.adminId, participantId, eventId: a, now: 1 }));
     await t.mutation(api.setParticipantPoints, { sessionToken, participantId, points: 40, reason: "Bonus" });
     await t.run((ctx) => awardEventPoints(ctx, { actorAdminId: admin.adminId, participantId, eventId: b, now: 2 }));
@@ -249,7 +282,7 @@ describe("setParticipantPoints", () => {
   it("serializes concurrent adjustments so each log chains from the last committed balance", async () => {
     const { t, admin, sessionToken } = await fixture();
     const second = await seedStaff(t, { role: "admin", name: "Admin Bo" });
-    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 0 } });
+    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 0, checkedInAt: 1 } });
     const targets = [10, 3, 27, 3, 0, 14];
     const results = await Promise.all(targets.map((points, index) => t.mutation(api.setParticipantPoints, {
       sessionToken: index % 2 ? second.sessionToken : sessionToken, participantId, points, reason: `Concurrent ${index}`,
@@ -264,15 +297,18 @@ describe("setParticipantPoints", () => {
       expect(log.newPoints).toBe(running + (log.pointsDelta ?? 0));
       running = log.newPoints!;
     }
-    const finalPoints = (await getParticipant(t, participantId))?.points;
+    const finalPoints = (await getAttendee(t, participantId))?.points;
     expect(finalPoints).toBe(running);
-    expect(await t.run((ctx) => computeLedgerPoints(ctx, participantId))).toBe(finalPoints);
+    expect(await t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, participantId);
+      return computeLedgerPoints(ctx, attendee!._id, participantId);
+    })).toBe(finalPoints);
     expect(logs.length).toBe(results.filter((result) => result.changed).length);
   });
 
   it("is a no-op without a log when the target equals the current balance", async () => {
     const { t, admin, sessionToken } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 12 } });
+    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 12, checkedInAt: 1 } });
     expect(await t.mutation(api.setParticipantPoints, { sessionToken, participantId, points: 12, reason: "Check" }))
       .toEqual({ ok: true, changed: false, previousPoints: 12, newPoints: 12, pointsDelta: 0 });
     expect(await t.run((ctx) => ctx.db.query("volunteerActionLogs").collect())).toEqual([]);
@@ -280,7 +316,7 @@ describe("setParticipantPoints", () => {
 
   it("rejects invalid targets, reasons, client-supplied deltas, and ineligible participants without writes", async () => {
     const { t, admin, sessionToken } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 5 } });
+    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 5, checkedInAt: 1 } });
     const rejected = await seedParticipant(t, admin.adminId, { status: "rejected" });
     const set = (extra: Record<string, unknown>) =>
       t.mutation(api.setParticipantPoints, { sessionToken, participantId, points: 10, reason: "Fix", ...extra } as never);
@@ -313,21 +349,21 @@ describe("listPointAdjustments", () => {
     const base = await fixture();
     const { t, admin, sessionToken } = base;
     const second = await seedStaff(t, { role: "admin", name: "Admin Bo" });
-    const p1 = await seedParticipant(t, admin.adminId, { firstName: "One" });
-    const p2 = await seedParticipant(t, admin.adminId, { firstName: "Two" });
+    const p1 = await seedParticipant(t, admin.adminId, { firstName: "One", fields: { checkedInAt: 1 } });
+    const p2 = await seedParticipant(t, admin.adminId, { firstName: "Two", fields: { checkedInAt: 1 } });
     await t.run((ctx) => ctx.db.insert("volunteerActionLogs", {
-      actorAdminId: admin.adminId, participantId: p1.participantId, action: "point_scan",
+      actorAdminId: admin.adminId, checkedInId: p1.checkedInId!, action: "point_scan",
       pointsDelta: 10, previousPoints: 0, newPoints: 10, createdAt: 50,
     }));
     const rows = [
-      { actor: admin.adminId, participantId: p1.participantId, previousPoints: 10, newPoints: 4, createdAt: 100 },
-      { actor: second.adminId, participantId: p2.participantId, previousPoints: 0, newPoints: 8, createdAt: 200 },
-      { actor: admin.adminId, participantId: p2.participantId, previousPoints: 8, newPoints: 3, createdAt: 300 },
+      { actor: admin.adminId, checkedInId: p1.checkedInId!, previousPoints: 10, newPoints: 4, createdAt: 100 },
+      { actor: second.adminId, checkedInId: p2.checkedInId!, previousPoints: 0, newPoints: 8, createdAt: 200 },
+      { actor: admin.adminId, checkedInId: p2.checkedInId!, previousPoints: 8, newPoints: 3, createdAt: 300 },
     ];
     await t.run(async (ctx) => {
       for (const row of rows) {
         await ctx.db.insert("volunteerActionLogs", {
-          actorAdminId: row.actor, participantId: row.participantId, action: "admin_adjust",
+          actorAdminId: row.actor, checkedInId: row.checkedInId, action: "admin_adjust",
           previousPoints: row.previousPoints, newPoints: row.newPoints, pointsDelta: row.newPoints - row.previousPoints,
           reason: `Reason ${row.createdAt}`, createdAt: row.createdAt,
         });
@@ -373,7 +409,9 @@ describe("listPointAdjustments", () => {
 describe("promoteParticipantToVolunteer", () => {
   it("creates a linked volunteer through the shared provisioning helper and rejects duplicates", async () => {
     const { t, admin, sessionToken } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId, { email: "taylor@example.com", fields: { points: 12 } });
+    const { participantId } = await seedParticipant(t, admin.adminId, {
+      email: "taylor@example.com", fields: { points: 12, checkedInAt: 1 },
+    });
     const before = await getParticipant(t, participantId);
     const created = await t.mutation(api.promoteParticipantToVolunteer, { sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD });
     expect(await t.run((ctx) => ctx.db.get(created.adminId))).toMatchObject({
@@ -397,7 +435,7 @@ describe("promoteParticipantToVolunteer", () => {
 describe("participant admin access", () => {
   it.each(["volunteer", "invalid"] as const)("denies every participant admin API to a %s caller without writes", async (condition) => {
     const { t, admin } = await fixture();
-    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 5 } });
+    const { participantId } = await seedParticipant(t, admin.adminId, { fields: { points: 5, checkedInAt: 1 } });
     const sessionToken = condition === "invalid" ? "" : (await seedStaff(t, { role: "volunteer" })).sessionToken;
     const code = condition === "volunteer" ? "NOT_AUTHORIZED" : "NOT_AUTHENTICATED";
     const snapshot = () => t.run(async (ctx) => ({

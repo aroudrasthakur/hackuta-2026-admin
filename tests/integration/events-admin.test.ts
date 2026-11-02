@@ -7,6 +7,7 @@ import { awardEventPointsRef } from "../../src/convex/adminApi";
 import { EVENT_DESCRIPTION_MAX_LENGTH, EVENT_NAME_MAX_LENGTH, EVENT_POINTS_MAX } from "../../shared/admin/volunteerRules";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { ORGANIZER_TEST_PASSWORD } from "../helpers/staffTestFixtures";
 
@@ -54,10 +55,11 @@ async function scanSetup(t: ConvexTestInstance, actorAdminId: GenericId<"admins"
   const volunteer = await seedStaff(t, { role: "volunteer" });
   const participantId = await t.run(async (ctx) => {
     await ctx.db.insert("volunteerEventAccess", { volunteerAdminId: volunteer.adminId, eventId, grantedBy: actorAdminId, createdAt: 1 });
-    return ctx.db.insert("participants", {
+    const { participantId } = await insertParticipantWithOptionalCheckIn(ctx, {
       applicationId, authUserId: userId, acceptedBy: actorAdminId, acceptedAt: 1,
-      qrCodeToken: QR_TOKEN, badgeQrCodeToken: QR_TOKEN, points: 0, checkedInAt: 1, createdAt: 1, updatedAt: 1,
+      qrCodeToken: "ef".repeat(32), registrationQrCodeToken: "ef".repeat(32), badgeQrCodeToken: QR_TOKEN, points: 0, checkedInAt: 1, createdAt: 1, updatedAt: 1,
     });
+    return participantId;
   });
   const award = () => t.mutation(awardEventPointsRef, { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, eventId });
   return { participantId, award };
@@ -159,11 +161,11 @@ describe("updateEvent", () => {
     const eventId = await create();
     const { participantId, award } = await scanSetup(t, actor.adminId, eventId);
     expect(await award()).toEqual({ status: "success", pointsAwarded: 25 });
-    const before = { awards: await awards(t), participant: await t.run((ctx) => ctx.db.get(participantId)) };
+    const before = { awards: await awards(t), attendee: await t.run((ctx) => getCheckedIn(ctx, participantId)) };
 
     await t.mutation(events.updateEvent, { sessionToken, eventId, ...schedule, name: "Renamed", startsAt: NOW - 2 * HOUR });
     expect(await awards(t)).toEqual(before.awards);
-    expect((await t.run((ctx) => ctx.db.get(participantId)))?.points).toBe(before.participant?.points);
+    expect((await t.run((ctx) => getCheckedIn(ctx, participantId)))?.points).toBe(before.attendee?.points);
   });
 
   it("rejects an invalid window and missing events", async () => {
@@ -189,7 +191,9 @@ describe("setEventPoints", () => {
     expect(await award()).toEqual({ status: "success", pointsAwarded: 15 });
     await expectAdminErrorCode(t.mutation(events.setEventPoints, { sessionToken, eventId, pointsAwarded: 20 }), "EVENT_POINTS_LOCKED");
     expect(await t.mutation(events.setEventPoints, { sessionToken, eventId, pointsAwarded: 15 })).toEqual({ ok: true, changed: false });
-    expect(await awards(t)).toEqual([expect.objectContaining({ participantId, eventId, pointsAwarded: 15 })]);
+    expect(await awards(t)).toEqual([expect.objectContaining({
+      checkedInId: (await t.run((ctx) => getCheckedIn(ctx, participantId)))?._id, eventId, pointsAwarded: 15,
+    })]);
     expect((await t.run((ctx) => ctx.db.get(eventId)))?.pointsAwarded).toBe(15);
   });
 

@@ -9,6 +9,7 @@ import {
 } from "../../convex/admin/pointsLedger";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 
 const START = 1_000;
 const END = 2_000;
@@ -64,13 +65,14 @@ async function insertParticipant(
     );
   }
   return t.run((ctx) =>
-    ctx.db.insert("participants", {
+    insertParticipantWithOptionalCheckIn(ctx, {
       applicationId,
       authUserId: userId,
       acceptedAt: 3,
       acceptedBy: adminId,
       qrCodeToken: QR,
       foodRestriction: FOOD,
+      ...(status === "accepted" || points !== undefined ? { checkedInAt: 3 } : {}),
       ...(points !== undefined ? { points } : {}),
       createdAt: 3,
       updatedAt: 3,
@@ -96,12 +98,26 @@ async function insertEvent(
 }
 
 async function logsFor(t: ConvexTestInstance, participantId: GenericId<"participants">) {
-  return t.run((ctx) =>
-    ctx.db
+  return t.run(async (ctx) => {
+    const attendee = await getCheckedIn(ctx, participantId);
+    if (!attendee) return [];
+    return ctx.db
       .query("volunteerActionLogs")
-      .withIndex("by_participant", (q) => q.eq("participantId", participantId))
-      .collect(),
-  );
+      .withIndex("by_checkedIn", (q) => q.eq("checkedInId", attendee._id))
+      .collect();
+  });
+}
+
+function pointsOf(t: ConvexTestInstance, participantId: GenericId<"participants">) {
+  return t.run(async (ctx) => (await getCheckedIn(ctx, participantId))?.points);
+}
+
+function ledgerOf(
+  t: ConvexTestInstance,
+  checkedInId: GenericId<"checkedIn">,
+  participantId: GenericId<"participants">,
+) {
+  return t.run((ctx) => computeLedgerPoints(ctx, checkedInId, participantId));
 }
 
 function expectNoSensitiveLogFields(rows: Array<Record<string, unknown>>) {
@@ -119,7 +135,7 @@ describe("event point awards", () => {
   it("awards the event amount once and matches the ledger", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
-    const participantId = await insertParticipant(t, adminId, "accepted");
+    const { participantId, checkedInId } = await insertParticipant(t, adminId, "accepted");
     const eventId = await insertEvent(t);
     const otherEventId = await insertEvent(t, { pointsAwarded: 5 });
 
@@ -142,12 +158,13 @@ describe("event point awards", () => {
     expect(adjusted).toMatchObject({ previousPoints: 15, newPoints: 12, pointsDelta: -3 });
 
     const stored = await t.run(async (ctx) => {
-      const participant = await ctx.db.get(participantId);
-      const ledger = await computeLedgerPoints(ctx, participantId);
-      return { points: participant?.points, ledger };
+      const attendee = await getCheckedIn(ctx, participantId);
+      const ledger = await computeLedgerPoints(ctx, checkedInId!, participantId);
+      return { points: attendee?.points, ledger };
     });
     expect(stored.points).toBe(12);
     expect(stored.ledger).toBe(stored.points);
+    expect(await t.run(async (ctx) => ctx.db.get(participantId))).not.toHaveProperty("points");
 
     const logs = await logsFor(t, participantId);
     expect(logs.map((log) => log.action)).toEqual(["point_scan", "point_scan", "admin_adjust"]);
@@ -158,8 +175,7 @@ describe("event point awards", () => {
       t.run((ctx) => awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now: NOW })),
       "POINTS_ALREADY_AWARDED",
     );
-    const afterDuplicate = await t.run(async (ctx) => (await ctx.db.get(participantId))?.points);
-    expect(afterDuplicate).toBe(12);
+    expect(await pointsOf(t, participantId)).toBe(12);
     expect(await logsFor(t, participantId)).toHaveLength(3);
   });
 
@@ -169,7 +185,7 @@ describe("event point awards", () => {
     const eventId = await insertEvent(t, { pointsAwarded: 3 });
 
     for (const now of [START - 1, END, END + 1]) {
-      const participantId = await insertParticipant(t, adminId, "accepted", 0);
+      const { participantId } = await insertParticipant(t, adminId, "accepted", 0);
       const result = await t.run((ctx) =>
         awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now }),
       );
@@ -180,7 +196,7 @@ describe("event point awards", () => {
   it("rejects an inactive, missing, or invalid event", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
-    const participantId = await insertParticipant(t, adminId, "accepted", 4);
+    const { participantId } = await insertParticipant(t, adminId, "accepted", 4);
     const inactiveId = await insertEvent(t, { active: false });
 
     await expectAdminErrorCode(
@@ -219,7 +235,7 @@ describe("event point awards", () => {
       "INVALID_EVENT",
     );
 
-    expect(await t.run(async (ctx) => (await ctx.db.get(participantId))?.points)).toBe(4);
+    expect(await pointsOf(t, participantId)).toBe(4);
     expect(await logsFor(t, participantId)).toHaveLength(0);
   });
 
@@ -227,9 +243,9 @@ describe("event point awards", () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
     const eventId = await insertEvent(t);
-    const pendingId = await insertParticipant(t, adminId, "under_review");
-    const unreviewedId = await insertParticipant(t, adminId, "none");
-    const removedId = await insertParticipant(t, adminId, "accepted");
+    const { participantId: pendingId } = await insertParticipant(t, adminId, "under_review");
+    const { participantId: unreviewedId } = await insertParticipant(t, adminId, "none");
+    const { participantId: removedId } = await insertParticipant(t, adminId, "accepted");
     await t.run((ctx) => ctx.db.delete(removedId));
 
     await expectAdminErrorCode(
@@ -251,14 +267,14 @@ describe("event point awards", () => {
   it("rejects an award that would leave the safe integer range", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
-    const participantId = await insertParticipant(t, adminId, "accepted", Number.MAX_SAFE_INTEGER);
+    const { participantId } = await insertParticipant(t, adminId, "accepted", Number.MAX_SAFE_INTEGER);
     const eventId = await insertEvent(t, { pointsAwarded: 1 });
 
     await expectAdminErrorCode(
       t.run((ctx) => awardEventPoints(ctx, { actorAdminId: adminId, participantId, eventId, now: NOW })),
       "INVALID_POINTS",
     );
-    expect(await t.run(async (ctx) => (await ctx.db.get(participantId))?.points)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(await pointsOf(t, participantId)).toBe(Number.MAX_SAFE_INTEGER);
     expect(await logsFor(t, participantId)).toHaveLength(0);
   });
 });
@@ -271,8 +287,8 @@ describe("admin point adjustments", () => {
     const inactiveId = await insertAdmin(t, "admin", false);
     const removedAdminId = await insertAdmin(t);
     await t.run((ctx) => ctx.db.delete(removedAdminId));
-    const participantId = await insertParticipant(t, adminId, "accepted", 10);
-    const removedParticipantId = await insertParticipant(t, adminId, "accepted", 10);
+    const { participantId } = await insertParticipant(t, adminId, "accepted", 10);
+    const { participantId: removedParticipantId } = await insertParticipant(t, adminId, "accepted", 10);
     await t.run((ctx) => ctx.db.delete(removedParticipantId));
 
     await expectAdminErrorCode(
@@ -319,7 +335,7 @@ describe("admin point adjustments", () => {
       "PARTICIPANT_NOT_FOUND",
     );
 
-    expect(await t.run(async (ctx) => (await ctx.db.get(participantId))?.points)).toBe(10);
+    expect(await pointsOf(t, participantId)).toBe(10);
     expect(await logsFor(t, participantId)).toHaveLength(0);
 
     const cleared = await t.run((ctx) =>
@@ -333,7 +349,7 @@ describe("ledger totals", () => {
   it("ignores scan logs and rejects a corrupt award or adjustment", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
-    const participantId = await insertParticipant(t, adminId, "accepted");
+    const { participantId, checkedInId } = await insertParticipant(t, adminId, "accepted");
     const eventId = await insertEvent(t, { pointsAwarded: 8 });
 
     await t.run((ctx) =>
@@ -342,7 +358,7 @@ describe("ledger totals", () => {
     await t.run((ctx) =>
       ctx.db.insert("volunteerActionLogs", {
         actorAdminId: adminId,
-        participantId,
+        checkedInId: checkedInId!,
         action: "check_in",
         createdAt: NOW,
       }),
@@ -350,20 +366,19 @@ describe("ledger totals", () => {
     await t.run((ctx) =>
       ctx.db.insert("volunteerActionLogs", {
         actorAdminId: adminId,
-        participantId,
+        checkedInId: checkedInId!,
         action: "admin_adjust",
         reason: "blank delta",
         createdAt: NOW,
       }),
     );
 
-    const total = await t.run((ctx) => computeLedgerPoints(ctx, participantId));
-    expect(total).toBe(8);
+    expect(await ledgerOf(t, checkedInId!, participantId)).toBe(8);
 
-    const corruptId = await insertParticipant(t, adminId, "accepted");
+    const corrupt = await insertParticipant(t, adminId, "accepted");
     await t.run((ctx) =>
       ctx.db.insert("participantEventAwards", {
-        participantId: corruptId,
+        checkedInId: corrupt.checkedInId!,
         eventId,
         pointsAwarded: 1.5,
         awardedBy: adminId,
@@ -371,14 +386,14 @@ describe("ledger totals", () => {
       }),
     );
     await expectAdminErrorCode(
-      t.run((ctx) => computeLedgerPoints(ctx, corruptId)),
+      t.run((ctx) => computeLedgerPoints(ctx, corrupt.checkedInId!, corrupt.participantId)),
       "INVALID_POINTS",
     );
 
-    const negativeId = await insertParticipant(t, adminId, "accepted");
+    const negative = await insertParticipant(t, adminId, "accepted");
     await t.run(async (ctx) => {
       await ctx.db.insert("participantEventAwards", {
-        participantId: negativeId,
+        checkedInId: negative.checkedInId!,
         eventId,
         pointsAwarded: 5,
         awardedBy: adminId,
@@ -386,29 +401,29 @@ describe("ledger totals", () => {
       });
       await ctx.db.insert("volunteerActionLogs", {
         actorAdminId: adminId,
-        participantId: negativeId,
+        checkedInId: negative.checkedInId!,
         action: "admin_adjust",
         pointsDelta: -10,
         createdAt: NOW,
       });
     });
     await expectAdminErrorCode(
-      t.run((ctx) => computeLedgerPoints(ctx, negativeId)),
+      t.run((ctx) => computeLedgerPoints(ctx, negative.checkedInId!, negative.participantId)),
       "INVALID_POINTS",
     );
 
-    const fractionalAdjustId = await insertParticipant(t, adminId, "accepted");
+    const fractionalAdjust = await insertParticipant(t, adminId, "accepted");
     await t.run((ctx) =>
       ctx.db.insert("volunteerActionLogs", {
         actorAdminId: adminId,
-        participantId: fractionalAdjustId,
+        checkedInId: fractionalAdjust.checkedInId!,
         action: "admin_adjust",
         pointsDelta: 1.5,
         createdAt: NOW,
       }),
     );
     await expectAdminErrorCode(
-      t.run((ctx) => computeLedgerPoints(ctx, fractionalAdjustId)),
+      t.run((ctx) => computeLedgerPoints(ctx, fractionalAdjust.checkedInId!, fractionalAdjust.participantId)),
       "INVALID_POINTS",
     );
   });
@@ -418,7 +433,7 @@ describe("event awards lookup", () => {
   it("reports awards only after the first one is recorded", async () => {
     const t = createConvexTest();
     const adminId = await insertAdmin(t);
-    const participantId = await insertParticipant(t, adminId, "accepted", 0);
+    const { participantId } = await insertParticipant(t, adminId, "accepted", 0);
     const eventId = await insertEvent(t, { pointsAwarded: 10 });
     const hasAwards = () => t.run((ctx) => eventHasAwards(ctx, eventId));
 

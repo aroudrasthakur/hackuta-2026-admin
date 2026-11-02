@@ -85,8 +85,8 @@ describe("confirmed acceptance participant creation (#17)", () => {
       acceptedBy: adminId,
       acceptedAt: review?.completedAt,
       foodRestriction: "Vegetarian",
-      points: 0,
     });
+    expect(participant).not.toHaveProperty("points");
     expect(participant?.createdAt).toBeGreaterThanOrEqual(review?.completedAt ?? 0);
     expect(participant?.updatedAt).toBe(participant?.createdAt);
     expect(participant?.qrCodeToken).toMatch(/^[a-f0-9]{64}$/);

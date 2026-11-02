@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../../convex/schema";
 import { createMealPeriodRef, listMealPeriodsRef } from "../../src/convex/mealsApi";
 import { convexTestModules, createConvexTest } from "../helpers/convexTestContext";
+import { insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { redeemMealRef, foodCheckInParticipantRef, listActiveMealPeriodsRef } from "../../src/convex/adminApi";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
@@ -29,15 +30,16 @@ async function legacyMeal(historySize: number) {
     await ctx.db.patch(volunteer.adminId, { canFoodCheckIn: true });
     await ctx.db.patch(mealPeriodId, { servedCount: undefined });
     for (let index = 0; index < historySize; index++) {
-      const participantId = await ctx.db.insert("participants", {
+      const { checkedInId } = await insertParticipantWithOptionalCheckIn(ctx, {
         applicationId: applicant.applicationId, authUserId: applicant.userId,
-        acceptedBy: admin.adminId, acceptedAt: 1, qrCodeToken: index.toString(16).padStart(64, "0"), createdAt: 1, updatedAt: 1,
+        acceptedBy: admin.adminId, acceptedAt: 1, qrCodeToken: index.toString(16).padStart(64, "0"),
+        checkedInAt: 1, createdAt: 1, updatedAt: 1,
       });
-      await ctx.db.insert("mealRedemptions", { mealPeriodId, participantId, scannedBy: volunteer.adminId, redeemedAt: now + index });
+      await ctx.db.insert("mealRedemptions", { mealPeriodId, checkedInId: checkedInId!, scannedBy: volunteer.adminId, redeemedAt: now + index });
     }
-    await ctx.db.insert("participants", {
+    await insertParticipantWithOptionalCheckIn(ctx, {
       applicationId: applicant.applicationId, authUserId: applicant.userId, acceptedBy: admin.adminId,
-      acceptedAt: 1, qrCodeToken: "ab".repeat(32), badgeQrCodeToken: "ab".repeat(32), checkedInAt: 1, createdAt: 1, updatedAt: 1,
+      acceptedAt: 1, qrCodeToken: "ef".repeat(32), registrationQrCodeToken: "ef".repeat(32), badgeQrCodeToken: "ab".repeat(32), checkedInAt: 1, createdAt: 1, updatedAt: 1,
     });
   });
   const meals = () => t.query(listMealPeriodsRef, { sessionToken: admin.sessionToken });
@@ -59,14 +61,15 @@ describe("meal served counts", () => {
       mealIds.push(mealPeriodId);
     }
     await t.run(async (ctx) => {
-      const participantId = await ctx.db.insert("participants", {
+      const { checkedInId } = await insertParticipantWithOptionalCheckIn(ctx, {
         applicationId: applicant.applicationId, authUserId: applicant.userId,
-        acceptedBy: admin.adminId, acceptedAt: 1, qrCodeToken: "ab".repeat(32), createdAt: 1, updatedAt: 1,
+        acceptedBy: admin.adminId, acceptedAt: 1, qrCodeToken: "ab".repeat(32),
+        checkedInAt: 1, createdAt: 1, updatedAt: 1,
       });
       for (const mealPeriodId of mealIds) {
         for (let index = 0; index < 80; index++) {
           await ctx.db.insert("mealRedemptions", {
-            mealPeriodId, participantId, scannedBy: admin.adminId, redeemedAt: index, countedInServedCount: true,
+            mealPeriodId, checkedInId: checkedInId!, scannedBy: admin.adminId, redeemedAt: index, countedInServedCount: true,
           });
         }
         await ctx.db.patch(mealPeriodId, { servedCount: 80 });
@@ -130,9 +133,11 @@ describe("meal served counts", () => {
     await s.backfill();
     const tokens = Array.from({ length: 8 }, (_, index) => (index + 1).toString(16).padStart(64, "0"));
     await s.t.run(async (ctx) => {
-      for (const qrCodeToken of tokens) await ctx.db.insert("participants", {
+      for (const qrCodeToken of tokens) await insertParticipantWithOptionalCheckIn(ctx, {
         applicationId: s.applicant.applicationId, authUserId: s.applicant.userId,
-        acceptedBy: s.admin.adminId, acceptedAt: 1, qrCodeToken, badgeQrCodeToken: qrCodeToken, checkedInAt: 1, createdAt: 1, updatedAt: 1,
+        acceptedBy: s.admin.adminId, acceptedAt: 1,
+        qrCodeToken: `9${qrCodeToken.slice(1)}`, registrationQrCodeToken: `9${qrCodeToken.slice(1)}`,
+        badgeQrCodeToken: qrCodeToken, checkedInAt: 1, createdAt: 1, updatedAt: 1,
       });
     });
     const results = await Promise.all(tokens.map((qrCodeToken) =>

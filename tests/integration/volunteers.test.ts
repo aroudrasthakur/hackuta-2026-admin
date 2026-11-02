@@ -8,6 +8,7 @@ import { verifyPassword } from "../../convex/admin/passwordHash";
 import { MAX_VOLUNTEER_EVENTS } from "../../convex/admin/volunteers";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import {
   insertStaffSession, mutateOrganizerSignIn, ORGANIZER_TEST_PASSWORD, seedAdminAccount, signInOrganizer,
@@ -36,9 +37,9 @@ async function fixture() {
 
 async function seedParticipant(t: ConvexTestInstance, acceptedBy: GenericId<"admins">, status = "accepted") {
   const { applicationId, userId } = await seedApplicant(t, { email: "taylor@example.com", review: { status } });
-  const participantId = await t.run((ctx) => ctx.db.insert("participants", {
+  const { participantId } = await t.run((ctx) => insertParticipantWithOptionalCheckIn(ctx, {
     applicationId, authUserId: userId, acceptedBy, acceptedAt: 1,
-    qrCodeToken: "ab".repeat(32), points: 40, createdAt: 1, updatedAt: 1,
+    qrCodeToken: "ab".repeat(32), checkedInAt: 1, createdAt: 1, updatedAt: 1,
   }));
   return { participantId, applicationId, userId };
 }
@@ -434,13 +435,14 @@ describe("audit log queries", () => {
     const { participantId } = await seedParticipant(t, actor.adminId);
     const otherEvent = await seedEvent(t, "Hacking");
     await t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, participantId);
       const rows = [
         { actorAdminId: adminId, action: "check_in" as const, createdAt: 100 },
         { actorAdminId: adminId, action: "point_scan" as const, eventId, pointsDelta: 10, reason: "ignored", createdAt: 200 },
         { actorAdminId: actor.adminId, action: "admin_adjust" as const, pointsDelta: -5, reason: "Duplicate scan", createdAt: 300 },
         { actorAdminId: adminId, action: "point_scan" as const, eventId: otherEvent, pointsDelta: 10, createdAt: 400 },
       ];
-      for (const row of rows) await ctx.db.insert("volunteerActionLogs", { participantId, ...row });
+      for (const row of rows) await ctx.db.insert("volunteerActionLogs", { checkedInId: attendee?._id, ...row });
     });
     return { ...base, participantId, otherEvent };
   }
