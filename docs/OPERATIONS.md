@@ -19,6 +19,20 @@ Deploy and configure the organizer admin app. Shared Convex backend pushes run f
 
 `.env.example` still points local Convex CLI config at `standing-manatee-425`. Keep personal deployment values in `.env.local`. Use `npm run convex:codegen` here when you only need generated types. Do not upload functions from this repo.
 
+## Releasing issue #103
+
+The admin changes remove the participant notification APIs and schema. Complete the
+companion profile UI changes and refresh its admin schema lock before any backend
+upload; these admin PRs do not deploy Convex. Confirm the owner’s empty-data
+assumption still holds for `participantNotifications`, legacy
+`shopFlashSales.notificationId`, and notification-specific `staffConfigLogs` rows.
+Confirm there are no pending or running jobs targeting
+`admin/notifications:publishScheduledNotification`; cancel pending jobs and let
+running jobs finish before removing that handler. If legacy rows exist, resolve
+their incompatible fields before deploying the final schema. Preserve sale,
+purchase, participant, and unrelated audit records. Authentication and application
+decision emails continue using their existing modules.
+
 ## Production frontend checklist
 
 1. **Quality gate:** `npm run check:whitespace && npm run verify:register-schema-lock && npm run lint && npm run typecheck && npm run build`

@@ -20,6 +20,7 @@ import {
   updateFlashSaleRef,
   updateShopItemRef,
 } from "../../src/convex/adminApi";
+import schema from "../../convex/schema";
 import { computeLedgerPoints } from "../../convex/admin/pointsLedger";
 import { SHOP_MAX_QUANTITY } from "../../shared/admin/shopRules";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
@@ -523,21 +524,21 @@ describe("flash sales", () => {
   it("creates, edits, and cancels a scheduled sale without notifications or scheduled jobs", async () => {
     const shop = await seedShop();
     const itemId = await createItem(shop);
+    expect(schema.tables).not.toHaveProperty("participantNotifications");
     const snapshot = () => shop.t.run(async (ctx) => ({
-      notifications: await ctx.db.query("participantNotifications").collect(),
       jobs: await ctx.db.system.query("_scheduled_functions").collect(),
       actions: (await ctx.db.query("staffConfigLogs").collect()).map((row) => row.action),
     }));
     const { flashSaleId } = await createSale(shop, itemId, { startsAt: NOW + 10 * MINUTE });
-    expect(await snapshot()).toEqual({ notifications: [], jobs: [], actions: ["shop_item_created", "flash_sale_created"] });
+    expect(await snapshot()).toEqual({ jobs: [], actions: ["shop_item_created", "flash_sale_created"] });
     expect(await shop.t.run((ctx) => ctx.db.get(flashSaleId))).not.toHaveProperty("notificationId");
     await shop.t.mutation(updateFlashSaleRef, {
       sessionToken: shop.admin.sessionToken, flashSaleId, title: "Updated sale", message: "Discounted stickers",
       startsAt: NOW + 15 * MINUTE, endsAt: NOW + 25 * MINUTE, items: [{ itemId, salePointsCost: 12 }],
     });
-    expect(await snapshot()).toEqual({ notifications: [], jobs: [], actions: ["shop_item_created", "flash_sale_created", "flash_sale_updated"] });
+    expect(await snapshot()).toEqual({ jobs: [], actions: ["shop_item_created", "flash_sale_created", "flash_sale_updated"] });
     await shop.t.mutation(cancelFlashSaleRef, { sessionToken: shop.admin.sessionToken, flashSaleId });
-    expect(await snapshot()).toEqual({ notifications: [], jobs: [], actions: ["shop_item_created", "flash_sale_created", "flash_sale_updated", "flash_sale_cancelled"] });
+    expect(await snapshot()).toEqual({ jobs: [], actions: ["shop_item_created", "flash_sale_created", "flash_sale_updated", "flash_sale_cancelled"] });
     vi.setSystemTime(NOW + 20 * MINUTE);
     const participant = shop.t.withIdentity({ subject: shop.userId, email: "taylor@example.com" });
     expect(await participant.query(listShopRef, {})).toMatchObject({ items: [{ pointsCost: 20, onSale: false }], activeSales: [] });
@@ -571,7 +572,6 @@ describe("flash sales", () => {
     const { flashSaleId } = await createSale(shop, itemId);
     const asParticipant = shop.t.withIdentity({ subject: shop.userId, email: "taylor@example.com" });
 
-    expect(await shop.t.run((ctx) => ctx.db.query("participantNotifications").collect())).toEqual([]);
     expect(await shop.t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect())).toEqual([]);
     const live = await asParticipant.query(listShopRef, {});
     expect(live).toMatchObject({
