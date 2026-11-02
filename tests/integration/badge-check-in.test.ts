@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assignParticipantBadgeRef,
   checkInWithBadgeRef,
+  getParticipantDetailsRef,
+  listParticipantsRef,
   resolveBadgeForCheckInRef,
   resolveQrForScanRef,
   resolveRegistrationForCheckInRef,
@@ -115,10 +117,14 @@ describe("two-step badge check-in", () => {
     });
     expect(await s.participant()).not.toHaveProperty("points");
     expect(await s.attendee()).toMatchObject({
+      participantId: s.participantId,
+      applicationId: (await s.participant())!.applicationId,
+      authUserId: (await s.participant())!.authUserId,
       qrCodeToken: BADGE,
       registrationQrCodeToken: REGISTRATION,
       badgeQrCodeToken: BADGE,
       checkedInAt: NOW + 1000,
+      checkedInBy: s.volunteer.adminId,
       badgeAssignedAt: NOW + 1000,
       badgeAssignedBy: s.volunteer.adminId,
       updatedAt: NOW + 1000,
@@ -129,6 +135,35 @@ describe("two-step badge check-in", () => {
       actorAdminId: s.volunteer.adminId, checkedInId: (await s.attendee())!._id, action: "check_in", createdAt: NOW + 1000,
     })]);
     expectNoQrValues(logs);
+  });
+
+  it("updates admin list and details from the new checkedIn row", async () => {
+    const s = await scene();
+    const page = { numItems: 20, cursor: null };
+    expect(await s.t.query(listParticipantsRef, {
+      sessionToken: s.admin.sessionToken, paginationOpts: page,
+    })).toMatchObject({
+      page: [{ participantId: s.participantId, checkedInAt: null, badgeAssigned: false, points: 0 }],
+    });
+    expect(await s.t.query(getParticipantDetailsRef, {
+      sessionToken: s.admin.sessionToken, participantId: s.participantId,
+    })).toMatchObject({ checkedInAt: null, badge: null, points: 0, ledgerPoints: 0 });
+
+    expect(await s.checkIn()).toEqual({ status: "success", checkedInAt: NOW });
+
+    expect(await s.t.query(listParticipantsRef, {
+      sessionToken: s.admin.sessionToken, paginationOpts: page,
+    })).toMatchObject({
+      page: [{ participantId: s.participantId, checkedInAt: NOW, badgeAssigned: true, points: 0 }],
+    });
+    expect(await s.t.query(getParticipantDetailsRef, {
+      sessionToken: s.admin.sessionToken, participantId: s.participantId,
+    })).toMatchObject({
+      checkedInAt: NOW,
+      points: 0,
+      ledgerPoints: 0,
+      badge: { assignedAt: NOW, assignedBy: { adminId: s.volunteer.adminId } },
+    });
   });
 
   it("inserts checkedIn, keeps the registration token, and awards points only on checkedIn", async () => {
