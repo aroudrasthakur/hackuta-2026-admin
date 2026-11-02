@@ -258,7 +258,7 @@ describe("setParticipantPoints", () => {
     );
     expect(await t.run(async (ctx) => {
       const attendee = await getCheckedIn(ctx, participantId);
-      return computeLedgerPoints(ctx, attendee!._id, participantId);
+      return computeLedgerPoints(ctx, attendee!._id);
     })).toBe(0);
   });
 
@@ -268,7 +268,7 @@ describe("setParticipantPoints", () => {
     const [a, b] = [await seedEvent(t, "A", 10), await seedEvent(t, "B", 25)];
     const ledger = () => t.run(async (ctx) => {
       const attendee = await getCheckedIn(ctx, participantId);
-      return computeLedgerPoints(ctx, attendee!._id, participantId);
+      return computeLedgerPoints(ctx, attendee!._id);
     });
     const balance = async () => (await getAttendee(t, participantId))?.points;
     await t.run((ctx) => awardEventPoints(ctx, { actorAdminId: admin.adminId, participantId, eventId: a, now: 1 }));
@@ -301,7 +301,7 @@ describe("setParticipantPoints", () => {
     expect(finalPoints).toBe(running);
     expect(await t.run(async (ctx) => {
       const attendee = await getCheckedIn(ctx, participantId);
-      return computeLedgerPoints(ctx, attendee!._id, participantId);
+      return computeLedgerPoints(ctx, attendee!._id);
     })).toBe(finalPoints);
     expect(logs.length).toBe(results.filter((result) => result.changed).length);
   });

@@ -454,7 +454,7 @@ describe("refunds", () => {
     ]);
     expect(await shop.t.run(async (ctx) => {
       const attendee = await getCheckedIn(ctx, shop.participantId);
-      return computeLedgerPoints(ctx, attendee!._id, shop.participantId);
+      return computeLedgerPoints(ctx, attendee!._id);
     })).toBe(0);
     const history = await shop.t.query(listShopRedemptionsRef, {
       sessionToken: shop.admin.sessionToken, paginationOpts: { numItems: 10, cursor: null },

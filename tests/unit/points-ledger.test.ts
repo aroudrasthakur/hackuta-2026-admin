@@ -115,9 +115,8 @@ function pointsOf(t: ConvexTestInstance, participantId: GenericId<"participants"
 function ledgerOf(
   t: ConvexTestInstance,
   checkedInId: GenericId<"checkedIn">,
-  participantId: GenericId<"participants">,
 ) {
-  return t.run((ctx) => computeLedgerPoints(ctx, checkedInId, participantId));
+  return t.run((ctx) => computeLedgerPoints(ctx, checkedInId));
 }
 
 function expectNoSensitiveLogFields(rows: Array<Record<string, unknown>>) {
@@ -159,7 +158,7 @@ describe("event point awards", () => {
 
     const stored = await t.run(async (ctx) => {
       const attendee = await getCheckedIn(ctx, participantId);
-      const ledger = await computeLedgerPoints(ctx, checkedInId!, participantId);
+      const ledger = await computeLedgerPoints(ctx, checkedInId!);
       return { points: attendee?.points, ledger };
     });
     expect(stored.points).toBe(12);
@@ -373,7 +372,7 @@ describe("ledger totals", () => {
       }),
     );
 
-    expect(await ledgerOf(t, checkedInId!, participantId)).toBe(8);
+    expect(await ledgerOf(t, checkedInId!)).toBe(8);
 
     const corrupt = await insertParticipant(t, adminId, "accepted");
     await t.run((ctx) =>
@@ -386,7 +385,7 @@ describe("ledger totals", () => {
       }),
     );
     await expectAdminErrorCode(
-      t.run((ctx) => computeLedgerPoints(ctx, corrupt.checkedInId!, corrupt.participantId)),
+      t.run((ctx) => computeLedgerPoints(ctx, corrupt.checkedInId!)),
       "INVALID_POINTS",
     );
 
@@ -408,7 +407,7 @@ describe("ledger totals", () => {
       });
     });
     await expectAdminErrorCode(
-      t.run((ctx) => computeLedgerPoints(ctx, negative.checkedInId!, negative.participantId)),
+      t.run((ctx) => computeLedgerPoints(ctx, negative.checkedInId!)),
       "INVALID_POINTS",
     );
 
@@ -423,7 +422,7 @@ describe("ledger totals", () => {
       }),
     );
     await expectAdminErrorCode(
-      t.run((ctx) => computeLedgerPoints(ctx, fractionalAdjust.checkedInId!, fractionalAdjust.participantId)),
+      t.run((ctx) => computeLedgerPoints(ctx, fractionalAdjust.checkedInId!)),
       "INVALID_POINTS",
     );
   });
