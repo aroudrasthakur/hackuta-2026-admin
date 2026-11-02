@@ -541,7 +541,7 @@ describe("flash sales", () => {
     vi.setSystemTime(NOW + 20 * MINUTE);
     const participant = shop.t.withIdentity({ subject: shop.userId, email: "taylor@example.com" });
     expect(await participant.query(listShopRef, {})).toMatchObject({ items: [{ pointsCost: 20, onSale: false }], activeSales: [] });
-    expect(await shop.t.run((ctx) => ctx.db.get(shop.participantId))).toMatchObject({ points: 100 });
+    expect(await shop.t.run((ctx) => getCheckedIn(ctx, shop.participantId))).toMatchObject({ points: 100 });
     expect(await shop.t.run((ctx) => ctx.db.query("shopFlashSaleItems").collect())).toMatchObject([{ flashSaleId, cancelled: true }]);
   });
 
