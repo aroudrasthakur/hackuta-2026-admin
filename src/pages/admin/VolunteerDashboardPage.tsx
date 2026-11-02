@@ -22,7 +22,7 @@ const ACTIONS = [
     to: ADMIN_ROUTES.scanCheckIn,
     title: "Participant check-in",
     icon: "checkIn",
-    description: "Scan their registration QR, hand over a badge, and confirm.",
+    description: "Scan their registration QR, hand over a badge, check government ID, and confirm.",
   },
   {
     to: ADMIN_ROUTES.scanFood,

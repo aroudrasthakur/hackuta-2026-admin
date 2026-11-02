@@ -101,11 +101,28 @@ describe("two-step badge check-in", () => {
     expect(await s.participant(participantId)).toEqual(before);
   });
 
+  it("returns the dietary snapshot on preview without writing", async () => {
+    const s = await scene();
+    await s.t.run((ctx) => ctx.db.patch(s.participantId, { foodRestriction: "Vegan; peanut allergy" }));
+    const before = await s.snapshot();
+    expect(await s.registration()).toEqual({
+      status: "ok", participant: { name: "Taylor Student", foodRestriction: "Vegan; peanut allergy" },
+    });
+    expect(await s.badge()).toEqual({
+      status: "ok", participant: { name: "Taylor Student", foodRestriction: "Vegan; peanut allergy" },
+    });
+    expect(await s.snapshot()).toEqual(before);
+  });
+
   it("identifies, then checks in and assigns the badge in one write", async () => {
     const s = await scene();
     const before = await s.snapshot();
-    expect(await s.registration(` ${REGISTRATION.toUpperCase()} `)).toEqual({ status: "ok", participant: { name: "Taylor Student" } });
-    expect(await s.badge()).toEqual({ status: "ok", participant: { name: "Taylor Student" } });
+    expect(await s.registration(` ${REGISTRATION.toUpperCase()} `)).toEqual({
+      status: "ok", participant: { name: "Taylor Student", foodRestriction: null },
+    });
+    expect(await s.badge()).toEqual({
+      status: "ok", participant: { name: "Taylor Student", foodRestriction: null },
+    });
     expect(await s.snapshot()).toEqual(before);
 
     vi.setSystemTime(NOW + 1000);

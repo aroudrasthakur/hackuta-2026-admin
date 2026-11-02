@@ -64,7 +64,19 @@ test.describe("volunteer badge check-in", () => {
     await expect(page.getByRole("alert")).toContainText("Badge deactivated");
 
     await enterBadge(page, E2E_BADGES.unused);
-    await expect(currentStep(page)).toHaveText("3. Confirm");
+    await expect(currentStep(page)).toHaveText("3. Verify ID");
+    await expect(page.getByText("Check government ID")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Avery Arrival" })).toBeVisible();
+    await expect(page.getByText("Dietary restrictions")).toBeVisible();
+    await expect(page.getByText("Food restrictions")).toBeVisible();
+    await expect(page.getByText("Vegetarian; Allergies: dairy")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "Confirm check-in" })).toHaveCount(0);
+    await expect(page.getByText(E2E_BADGES.unused)).toHaveCount(0);
+    await expectNoHorizontalScroll(page);
+    await reviewScreenshot(page, "test-results/scanner-check-in-identity-mobile.png");
+
+    await page.getByRole("button", { name: "Proceed" }).click();
+    await expect(currentStep(page)).toHaveText("4. Confirm");
     await expect(page.getByText("Scanned and unused, ready to assign")).toBeVisible();
     await expect(page.getByText(E2E_BADGES.unused)).toHaveCount(0);
     await expectNoHorizontalScroll(page);
@@ -97,6 +109,10 @@ test.describe("volunteer badge check-in", () => {
     await openTab(page, "Check-in");
     await enterRegistration(page, E2E_QR_TOKENS.arrival);
     await enterBadge(page, E2E_BADGES.unused);
+    await expect(currentStep(page)).toHaveText("3. Verify ID");
+    await page.getByRole("button", { name: "Proceed" }).click();
+    await page.getByRole("button", { name: "Back: Check ID again" }).click();
+    await expect(currentStep(page)).toHaveText("3. Verify ID");
     await page.getByRole("button", { name: "Back: Scan a different badge" }).click();
     await expect(currentStep(page)).toHaveText("2. Badge QR");
     await page.getByRole("button", { name: "Back: Scan a different registration" }).click();
@@ -117,6 +133,7 @@ test.describe("volunteer badge check-in", () => {
     await openTab(page, "Check-in");
     await enterRegistration(page, E2E_QR_TOKENS.arrival);
     await enterBadge(page, E2E_BADGES.unusedSecond);
+    await page.getByRole("button", { name: "Proceed" }).click();
     await context.setOffline(true);
     await page.getByRole("button", { name: "Confirm check-in" }).click();
     await expect(page.getByRole("alert")).toContainText("Connection problem");
@@ -291,6 +308,7 @@ test.describe("admin QR scanner", () => {
     await page.getByRole("link", { name: /Participant check-in/ }).click();
     await enterRegistration(page, E2E_QR_TOKENS.arrival);
     await enterBadge(page, E2E_BADGES.unused);
+    await page.getByRole("button", { name: "Proceed" }).click();
     await page.getByRole("button", { name: "Confirm check-in" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Checked in" })).toBeVisible();
   });

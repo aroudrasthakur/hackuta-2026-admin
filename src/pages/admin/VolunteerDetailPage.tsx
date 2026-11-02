@@ -28,7 +28,7 @@ import {
   reviewPrimaryButtonClass,
   reviewSecondaryButtonClass,
 } from "../../lib/reviewButtonClasses";
-import { formatLogTime, STAFF_CONFIG_LABELS, volunteerPermissionList } from "../../lib/staffLogFormat";
+import { formatLogTime, staffConfigLabel, volunteerPermissionList } from "../../lib/staffLogFormat";
 import { reportUserFacingError } from "../../lib/userFacingError";
 import { ADMIN_ROUTES } from "../../types/routes";
 
@@ -198,7 +198,7 @@ function EventAssignments({ sessionToken, volunteer, feedback, setFeedback }: Se
 type Capabilities = { canCheckIn: boolean; canFoodCheckIn: boolean; canRedeemShop: boolean };
 
 const ACCESS_ROWS: Array<{ key: keyof Capabilities; title: string; description: string; icon: SectionIconName }> = [
-  { key: "canCheckIn", title: "Participant check-in", icon: "checkIn", description: "Scan a registration QR, hand over a badge, and check the participant in." },
+  { key: "canCheckIn", title: "Participant check-in", icon: "checkIn", description: "Scan a registration QR, hand over a badge, check government ID, and check the participant in." },
   { key: "canFoodCheckIn", title: "Food distribution", icon: "food", description: "Scan badges and record meals." },
   { key: "canRedeemShop", title: "Shop redemption", icon: "shop", description: "Scan badges and sell shop items for points." },
 ];
@@ -394,7 +394,7 @@ function AccountHistory({ sessionToken, volunteerAdminId }: { sessionToken: stri
             return (
               <li key={log.logId} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-sm">
                 <span>
-                  <span className="font-semibold text-night">{STAFF_CONFIG_LABELS[log.action]}</span>
+                  <span className="font-semibold text-night">{staffConfigLabel(log.action)}</span>
                   <span className="text-ocean"> by {log.actor.name}{detail ? ` · ${detail}` : ""}</span>
                 </span>
                 <time className="text-ocean" dateTime={new Date(log.createdAt).toISOString()}>{formatLogTime(log.createdAt)}</time>
