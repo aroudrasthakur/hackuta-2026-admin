@@ -33,7 +33,7 @@ Organizer-only queries, mutations, and internal actions. **Admin-owned** — saf
 | [shopFlashSales.ts](shopFlashSales.ts) | Admin-only timed flash sales |
 | [shopRedemption.ts](shopRedemption.ts) | Volunteer shop catalog, purchase preview, and the purchase mutation (`canRedeemShop`) |
 | [shopLedger.ts](shopLedger.ts), [shopPricing.ts](shopPricing.ts) | Internal points, refund, and pricing helpers (not auth boundaries) |
-| [participantShop.ts](participantShop.ts) | Participant shop, own purchase history, and published notifications for the profile portal |
+| [participantShop.ts](participantShop.ts) | Participant shop and own purchase history for the profile portal |
 
 ## Meal management
 
