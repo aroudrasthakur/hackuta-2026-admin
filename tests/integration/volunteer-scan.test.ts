@@ -12,6 +12,7 @@ import {
 } from "../../convex/admin/volunteerScanRateLimit";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { seedMealPeriod } from "../helpers/mealTestKit";
 
@@ -41,13 +42,13 @@ async function seedParticipant(
     review: { status: options.status ?? "accepted" },
   });
   const admin = await seedStaff(t, { role: "admin" });
-  const participantId = await t.run((ctx) =>
-    ctx.db.insert("participants", {
+  const { participantId } = await t.run((ctx) =>
+    insertParticipantWithOptionalCheckIn(ctx, {
       applicationId,
       authUserId: userId,
       acceptedAt: 1,
       acceptedBy: admin.adminId,
-      qrCodeToken: options.qrCodeToken ?? QR_TOKEN,
+      qrCodeToken: options.qrCodeToken ?? REGISTRATION_TOKEN,
       registrationQrCodeToken: REGISTRATION_TOKEN,
       badgeQrCodeToken: options.qrCodeToken ?? QR_TOKEN,
       badgeAssignedAt: 2,
@@ -56,7 +57,7 @@ async function seedParticipant(
       foodRestriction: "Vegetarian; peanut allergy",
       createdAt: 1,
       updatedAt: 1,
-      ...options.fields,
+      ...(options.fields as object),
     }),
   );
   return { participantId, applicationId, adminId: admin.adminId };
@@ -191,9 +192,12 @@ describe("resolveQrForScan", () => {
       qrCodeToken: "12".repeat(32),
       fields: { registrationQrCodeToken: undefined, badgeQrCodeToken: undefined, badgeAssignedAt: undefined },
     });
-    await t.run(async (ctx) => ctx.db.insert("retiredBadgeTokens", {
-      tokenHash: await hashBadgeToken("BADGE-LOST"), participantId, retiredBy: adminId, retiredAt: 1,
-    }));
+    await t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, participantId);
+      await ctx.db.insert("retiredBadgeTokens", {
+        tokenHash: await hashBadgeToken("BADGE-LOST"), checkedInId: attendee!._id, retiredBy: adminId, retiredAt: 1,
+      });
+    });
     const scan = (qrCodeToken: string) =>
       t.mutation(resolveQrForScanRef, { sessionToken: volunteer.sessionToken, qrCodeToken, purpose: "shop" });
 
@@ -243,9 +247,12 @@ describe("resolveQrForScan", () => {
     });
     expect(JSON.stringify(first)).not.toMatch(/Vegetarian|"points"/);
 
-    await t.run((ctx) => ctx.db.insert("participantEventAwards", {
-      participantId, eventId, pointsAwarded: 10, awardedBy: volunteer.adminId, awardedAt: 3,
-    }));
+    await t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, participantId);
+      await ctx.db.insert("participantEventAwards", {
+        checkedInId: attendee!._id, eventId, pointsAwarded: 10, awardedBy: volunteer.adminId, awardedAt: 3,
+      });
+    });
     expect(await t.mutation(resolveQrForScanRef, args)).toMatchObject({ status: "ok", alreadyAwarded: true });
   });
 

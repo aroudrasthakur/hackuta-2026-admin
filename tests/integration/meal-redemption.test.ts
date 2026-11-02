@@ -5,12 +5,14 @@ import {
 import { listMealPeriodsRef, listMealRedemptionsRef, removeMealPeriodRef, updateMealPeriodRef } from "../../src/convex/mealsApi";
 import { QR_SCAN_ATTEMPT_LIMIT, QR_SCAN_FAILURE_LIMIT, QR_SCAN_FAILURE_WINDOW_MS } from "../../convex/admin/volunteerScanRateLimit";
 import { createConvexTest } from "../helpers/convexTestContext";
+import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedStaff, seedApplicant } from "../helpers/reviewTestKit";
 import { seedMealPeriod } from "../helpers/mealTestKit";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 
 const NOW = Date.UTC(2026, 10, 14, 15);
 const QR = "ab".repeat(32);
+const REGISTRATION = "ef".repeat(32);
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
 afterEach(() => { vi.useRealTimers(); });
 
@@ -20,9 +22,9 @@ async function scene() {
   const volunteer = await seedStaff(t, { role: "volunteer" });
   await t.run((ctx) => ctx.db.patch(volunteer.adminId, { canFoodCheckIn: true }));
   const applicant = await seedApplicant(t, { review: { status: "accepted" } });
-  const participantId = await t.run((ctx) => ctx.db.insert("participants", {
+  const { participantId, checkedInId } = await t.run((ctx) => insertParticipantWithOptionalCheckIn(ctx, {
     applicationId: applicant.applicationId, authUserId: applicant.userId, acceptedBy: admin.adminId,
-    acceptedAt: 1, qrCodeToken: QR, badgeQrCodeToken: QR, checkedInAt: 7, foodRestriction: "Vegan; peanut allergy", foodCheckedInAt: 42,
+    acceptedAt: 1, qrCodeToken: REGISTRATION, registrationQrCodeToken: REGISTRATION, badgeQrCodeToken: QR, checkedInAt: 7, foodRestriction: "Vegan; peanut allergy",
     points: 30, createdAt: 1, updatedAt: 1,
   }));
   const mealPeriodId = await seedMealPeriod(t, admin.adminId);
@@ -34,7 +36,7 @@ async function scene() {
     redemptions: await ctx.db.query("mealRedemptions").collect(), logs: await ctx.db.query("volunteerActionLogs").collect(),
   }));
   const rates = () => t.run((ctx) => ctx.db.query("rateLimits").collect());
-  return { t, admin, volunteer, applicant, participantId, mealPeriodId, args, preview, redeem, data, rates };
+  return { t, admin, volunteer, applicant, participantId, checkedInId, mealPeriodId, args, preview, redeem, data, rates };
 }
 
 describe("meal redemption", () => {
@@ -67,8 +69,8 @@ describe("meal redemption", () => {
     expect(await s.redeem()).toEqual({ status: "success", redeemedAt: NOW, meal: { mealPeriodId: s.mealPeriodId, name: "Lunch" } });
     const state = await s.data();
     expect(state.participant).toEqual(original);
-    expect(state.redemptions).toEqual([expect.objectContaining({ participantId: s.participantId, mealPeriodId: s.mealPeriodId, scannedBy: s.volunteer.adminId, redeemedAt: NOW })]);
-    expect(state.logs).toEqual([expect.objectContaining({ action: "food_check_in", actorAdminId: s.volunteer.adminId, participantId: s.participantId, mealPeriodId: s.mealPeriodId, createdAt: NOW })]);
+    expect(state.redemptions).toEqual([expect.objectContaining({ checkedInId: s.checkedInId, mealPeriodId: s.mealPeriodId, scannedBy: s.volunteer.adminId, redeemedAt: NOW })]);
+    expect(state.logs).toEqual([expect.objectContaining({ action: "food_check_in", actorAdminId: s.volunteer.adminId, checkedInId: s.checkedInId, mealPeriodId: s.mealPeriodId, createdAt: NOW })]);
     expect(JSON.stringify(state.logs)).not.toMatch(/qrCodeToken|foodRestriction|dietary|sessionToken|peanut/);
     expect(JSON.stringify(state.logs)).not.toContain(QR);
     vi.setSystemTime(NOW + 1000);
@@ -140,7 +142,10 @@ describe("meal redemption", () => {
 
   it("rejects a deleted participant or replaced QR token after preview", async () => {
     const s = await scene(); await s.preview();
-    await s.t.run((ctx) => ctx.db.patch(s.participantId, { qrCodeToken: "cd".repeat(32) }));
+    await s.t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, s.participantId);
+      await ctx.db.patch(attendee!._id, { qrCodeToken: "cd".repeat(32), badgeQrCodeToken: "cd".repeat(32) });
+    });
     expect(await s.redeem()).toEqual({ status: "qr_not_found" });
     await s.t.run((ctx) => ctx.db.delete(s.participantId));
     expect(await s.redeem()).toEqual({ status: "qr_not_found" });
@@ -181,7 +186,7 @@ describe("meal redemption", () => {
     expect(await s.t.mutation(resolveQrForMealRef, adminArgs)).toMatchObject({ status: "ok", meal: { mealPeriodId: s.mealPeriodId } });
     expect(await s.t.mutation(redeemMealRef, adminArgs)).toEqual({ status: "success", redeemedAt: NOW, meal: { mealPeriodId: s.mealPeriodId, name: "Lunch" } });
     expect((await s.data()).logs).toEqual([expect.objectContaining({
-      action: "food_check_in", actorAdminId: s.admin.adminId, participantId: s.participantId, mealPeriodId: s.mealPeriodId,
+      action: "food_check_in", actorAdminId: s.admin.adminId, checkedInId: s.checkedInId, mealPeriodId: s.mealPeriodId,
     })]);
   });
 
@@ -226,6 +231,6 @@ describe("meal redemption", () => {
     expect(await s.t.mutation(resolveQrForScanRef, { ...s.args, purpose: "food_check_in" })).toMatchObject({ status: "ok", meal: { mealPeriodId: s.mealPeriodId } });
     expect(await s.t.mutation(foodCheckInParticipantRef, s.args)).toMatchObject({ status: "success" });
     expect(await s.redeem()).toMatchObject({ status: "already_redeemed" });
-    expect((await s.data()).participant!.foodCheckedInAt).toBe(42);
+    expect((await s.data()).participant).not.toHaveProperty("foodCheckedInAt");
   });
 });

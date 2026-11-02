@@ -24,10 +24,13 @@ import { computeLedgerPoints } from "../../convex/admin/pointsLedger";
 import { SHOP_MAX_QUANTITY } from "../../shared/admin/shopRules";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest } from "../helpers/convexTestContext";
+import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 
 const QR_TOKEN = "ab".repeat(32);
+const REGISTRATION_TOKEN = "ef".repeat(32);
 const UNKNOWN_TOKEN = "cd".repeat(32);
+const UNKNOWN_REGISTRATION = "12".repeat(32);
 const NOW = Date.UTC(2026, 10, 14, 15);
 const MINUTE = 60_000;
 
@@ -56,13 +59,14 @@ async function seedShop(options: { points?: number; status?: string } = {}) {
   const volunteer = await seedStaff(t, { role: "volunteer" });
   await t.run((ctx) => ctx.db.patch(volunteer.adminId, { canRedeemShop: true }));
   const { applicationId, userId } = await seedApplicant(t, { review: { status: options.status ?? "accepted" } });
-  const participantId = await t.run((ctx) =>
-    ctx.db.insert("participants", {
+  const { participantId } = await t.run((ctx) =>
+    insertParticipantWithOptionalCheckIn(ctx, {
       applicationId,
       authUserId: userId,
       acceptedAt: 1,
       acceptedBy: admin.adminId,
-      qrCodeToken: QR_TOKEN,
+      qrCodeToken: REGISTRATION_TOKEN,
+      registrationQrCodeToken: REGISTRATION_TOKEN,
       badgeQrCodeToken: QR_TOKEN,
       checkedInAt: 1,
       points: options.points ?? 100,
@@ -106,7 +110,7 @@ function purchase(
 
 async function state(shop: Shop) {
   return shop.t.run(async (ctx) => ({
-    points: (await ctx.db.get(shop.participantId))?.points,
+    points: (await getCheckedIn(ctx, shop.participantId))?.points,
     redemptions: (await ctx.db.query("shopRedemptions").collect()).length,
     ledger: (await ctx.db.query("volunteerActionLogs").collect()).length,
   }));
@@ -200,7 +204,8 @@ describe("volunteer shop access", () => {
     const adminPurchase = await purchase(shop, itemId, { sessionToken: shop.admin.sessionToken });
     expect(adminPurchase.status).toBe("success");
     const log = await shop.t.run((ctx) => ctx.db.query("volunteerActionLogs").first());
-    expect(log).toMatchObject({ action: "shop_purchase", actorAdminId: shop.admin.adminId, participantId: shop.participantId });
+    const attendee = await shop.t.run((ctx) => getCheckedIn(ctx, shop.participantId));
+    expect(log).toMatchObject({ action: "shop_purchase", actorAdminId: shop.admin.adminId, checkedInId: attendee?._id });
   });
 
   it("previews a scanned participant with their balance", async () => {
@@ -234,13 +239,14 @@ describe("volunteer shop access", () => {
     const shop = await seedShop();
     const { applicationId, userId } = await seedApplicant(shop.t, { email, review: { status: "accepted" } });
     await shop.t.run((ctx) => ctx.db.patch(shop.volunteer.adminId, { email }));
-    const participantId = await shop.t.run((ctx) =>
-      ctx.db.insert("participants", {
+    const { participantId } = await shop.t.run((ctx) =>
+      insertParticipantWithOptionalCheckIn(ctx, {
         applicationId,
         authUserId: userId,
         acceptedAt: 1,
         acceptedBy: shop.admin.adminId,
-        qrCodeToken: UNKNOWN_TOKEN,
+        qrCodeToken: UNKNOWN_REGISTRATION,
+        registrationQrCodeToken: UNKNOWN_REGISTRATION,
         badgeQrCodeToken: UNKNOWN_TOKEN,
         checkedInAt: 1,
         points: 100,
@@ -446,7 +452,10 @@ describe("refunds", () => {
     expect(logs.map((log) => [log.action, log.pointsDelta])).toEqual([
       ["shop_purchase", -40], ["shop_purchase", -20], ["shop_refund", 40], ["shop_refund", 20],
     ]);
-    expect(await shop.t.run((ctx) => computeLedgerPoints(ctx, shop.participantId))).toBe(0);
+    expect(await shop.t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, shop.participantId);
+      return computeLedgerPoints(ctx, attendee!._id);
+    })).toBe(0);
     const history = await shop.t.query(listShopRedemptionsRef, {
       sessionToken: shop.admin.sessionToken, paginationOpts: { numItems: 10, cursor: null },
     });

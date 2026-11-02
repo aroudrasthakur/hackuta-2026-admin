@@ -4,6 +4,7 @@ import { awardEventPointsRef, foodCheckInParticipantRef } from "../../src/convex
 import { QR_SCAN_FAILURE_LIMIT } from "../../convex/admin/volunteerScanRateLimit";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { seedMealPeriod } from "../helpers/mealTestKit";
 
@@ -41,13 +42,13 @@ async function seedParticipant(
     review: { status: options.status ?? "accepted" },
   });
   const admin = await seedStaff(t, { role: "admin" });
-  const participantId = await t.run((ctx) =>
-    ctx.db.insert("participants", {
+  const { participantId, checkedInId } = await t.run((ctx) =>
+    insertParticipantWithOptionalCheckIn(ctx, {
       applicationId,
       authUserId: userId,
       acceptedAt: 1,
       acceptedBy: admin.adminId,
-      qrCodeToken: QR_TOKEN,
+      qrCodeToken: REGISTRATION_TOKEN,
       registrationQrCodeToken: REGISTRATION_TOKEN,
       badgeQrCodeToken: QR_TOKEN,
       checkedInAt: CHECKED_IN_AT,
@@ -55,10 +56,10 @@ async function seedParticipant(
       foodRestriction: DIETARY,
       createdAt: 1,
       updatedAt: 1,
-      ...options.fields,
+      ...(options.fields as object),
     }),
   );
-  return { participantId, adminId: admin.adminId };
+  return { participantId, checkedInId, adminId: admin.adminId };
 }
 
 async function seedEvent(
@@ -92,13 +93,13 @@ function assign(
 /** Volunteer assigned to an active event, with a checked-in participant. */
 async function seedAwardScene(t: ConvexTestInstance, participantFields: Record<string, unknown> = {}) {
   const volunteer = await seedVolunteer(t);
-  const { participantId, adminId } = await seedParticipant(t, { fields: participantFields });
+  const { participantId, checkedInId, adminId } = await seedParticipant(t, { fields: participantFields });
   const eventId = await seedEvent(t);
   const assignmentId = await assign(t, volunteer.adminId, eventId, adminId);
   const scan = () => t.mutation(awardEventPointsRef, {
     sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, eventId,
   });
-  return { volunteer, participantId, adminId, eventId, assignmentId, scan };
+  return { volunteer, participantId, checkedInId, adminId, eventId, assignmentId, scan };
 }
 
 function snapshot(t: ConvexTestInstance) {
@@ -115,6 +116,10 @@ function logs(t: ConvexTestInstance) {
 
 function getParticipant(t: ConvexTestInstance, participantId: GenericId<"participants">) {
   return t.run((ctx) => ctx.db.get(participantId));
+}
+
+function getAttendee(t: ConvexTestInstance, participantId: GenericId<"participants">) {
+  return t.run((ctx) => getCheckedIn(ctx, participantId));
 }
 
 function expectNoSensitiveData(value: unknown) {
@@ -142,7 +147,7 @@ describe("foodCheckInParticipant", () => {
     expect(participant?.checkedInAt).toBe(CHECKED_IN_AT);
     const rows = await logs(t);
     expect(rows).toEqual([expect.objectContaining({
-      actorAdminId: volunteer.adminId, participantId, action: "food_check_in", createdAt: NOW,
+      actorAdminId: volunteer.adminId, checkedInId: (await getAttendee(t, participantId))?._id, action: "food_check_in", createdAt: NOW,
     })]);
     expectNoSensitiveData(rows);
 
@@ -177,18 +182,18 @@ describe("foodCheckInParticipant", () => {
 describe("awardEventPoints", () => {
   it("awards the stored event points once with an accurate audit log", async () => {
     const t = createConvexTest();
-    const { volunteer, participantId, eventId, scan } = await seedAwardScene(t);
+    const { volunteer, participantId, checkedInId, eventId, scan } = await seedAwardScene(t);
 
     const result = await scan();
     expect(result).toEqual({ status: "success", pointsAwarded: 10 });
-    expect(await getParticipant(t, participantId)).toMatchObject({ points: 35, updatedAt: NOW });
+    expect(await getAttendee(t, participantId)).toMatchObject({ points: 35, updatedAt: NOW });
     const state = await snapshot(t);
     expect(state.awards).toEqual([expect.objectContaining({
-      participantId, eventId, pointsAwarded: 10, awardedBy: volunteer.adminId, awardedAt: NOW,
+      checkedInId, eventId, pointsAwarded: 10, awardedBy: volunteer.adminId, awardedAt: NOW,
     })]);
     expect(state.logs).toEqual([expect.objectContaining({
       actorAdminId: volunteer.adminId,
-      participantId,
+      checkedInId,
       action: "point_scan",
       eventId,
       pointsDelta: 10,
@@ -218,13 +223,13 @@ describe("awardEventPoints", () => {
     const { applicationId, userId } = await seedApplicant(t, { email, review: { status: "accepted" } });
     const admin = await seedStaff(t, { role: "admin" });
     await t.run((ctx) => ctx.db.patch(volunteer.adminId, { email }));
-    const participantId = await t.run((ctx) =>
-      ctx.db.insert("participants", {
+    const { participantId } = await t.run((ctx) =>
+      insertParticipantWithOptionalCheckIn(ctx, {
         applicationId,
         authUserId: userId,
         acceptedAt: 1,
         acceptedBy: admin.adminId,
-        qrCodeToken: QR_TOKEN,
+        qrCodeToken: REGISTRATION_TOKEN,
         registrationQrCodeToken: REGISTRATION_TOKEN,
         badgeQrCodeToken: QR_TOKEN,
         checkedInAt: CHECKED_IN_AT,
@@ -238,7 +243,7 @@ describe("awardEventPoints", () => {
     expect(await t.mutation(awardEventPointsRef, {
       sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, eventId,
     })).toEqual({ status: "self_scan_denied" });
-    expect(await getParticipant(t, participantId)).toMatchObject({ points: 25 });
+    expect(await getAttendee(t, participantId)).toMatchObject({ points: 25 });
     expect(await snapshot(t)).toMatchObject({ awards: [], logs: [] });
   });
 
@@ -255,7 +260,9 @@ describe("awardEventPoints", () => {
 
   it("requires door check-in first", async () => {
     const t = createConvexTest();
-    const { scan } = await seedAwardScene(t, { checkedInAt: undefined });
+    const { scan } = await seedAwardScene(t, {
+      qrCodeToken: QR_TOKEN, checkedInAt: undefined, registrationQrCodeToken: undefined, badgeQrCodeToken: undefined,
+    });
     const before = await snapshot(t);
     expect(await scan()).toEqual({ status: "participant_not_checked_in" });
     expect(await snapshot(t)).toEqual(before);
@@ -279,13 +286,34 @@ describe("awardEventPoints", () => {
     expect(await scanAll(REGISTRATION_TOKEN)).toEqual([
       { status: "participant_not_checked_in" }, { status: "participant_not_checked_in" },
     ]);
-    await t.run((ctx) => ctx.db.patch(participantId, { checkedInAt: CHECKED_IN_AT }));
+    await t.run(async (ctx) => {
+      const participant = await ctx.db.get(participantId);
+      await ctx.db.insert("checkedIn", {
+        participantId,
+        applicationId: participant!.applicationId,
+        authUserId: participant!.authUserId,
+        acceptedAt: participant!.acceptedAt,
+        acceptedBy: participant!.acceptedBy,
+        ...(participant!.foodRestriction !== undefined ? { foodRestriction: participant!.foodRestriction } : {}),
+        checkedInAt: CHECKED_IN_AT,
+        checkedInBy: adminId,
+        qrCodeToken: REGISTRATION_TOKEN,
+        registrationQrCodeToken: REGISTRATION_TOKEN,
+        points: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      await ctx.db.patch(participantId, { checkedInAt: CHECKED_IN_AT });
+    });
     expect(await scanAll(REGISTRATION_TOKEN)).toEqual([
       { status: "badge_not_assigned" }, { status: "badge_not_assigned" },
     ]);
-    await t.run((ctx) => ctx.db.patch(participantId, {
-      qrCodeToken: QR_TOKEN, registrationQrCodeToken: REGISTRATION_TOKEN, badgeQrCodeToken: QR_TOKEN,
-    }));
+    await t.run(async (ctx) => {
+      const attendee = await getCheckedIn(ctx, participantId);
+      await ctx.db.patch(attendee!._id, {
+        qrCodeToken: QR_TOKEN, registrationQrCodeToken: REGISTRATION_TOKEN, badgeQrCodeToken: QR_TOKEN,
+      });
+    });
     expect(await scanAll(REGISTRATION_TOKEN.toUpperCase())).toEqual([
       { status: "registration_qr_replaced" }, { status: "registration_qr_replaced" },
     ]);
@@ -377,17 +405,17 @@ describe("awardEventPoints", () => {
 
   it("uses the ledger when the cached balance has not been backfilled", async () => {
     const t = createConvexTest();
-    const { participantId, adminId, volunteer } = await seedAwardScene(t, { points: undefined });
+    const { participantId, checkedInId, adminId, volunteer } = await seedAwardScene(t, { points: undefined });
     const earlierEvent = await seedEvent(t);
     await t.run((ctx) => ctx.db.insert("participantEventAwards", {
-      participantId, eventId: earlierEvent, pointsAwarded: 7, awardedBy: adminId, awardedAt: 1,
+      checkedInId: checkedInId!, eventId: earlierEvent, pointsAwarded: 7, awardedBy: adminId, awardedAt: 1,
     }));
     const eventId = await seedEvent(t);
     await assign(t, volunteer.adminId, eventId, adminId);
     await t.mutation(awardEventPointsRef, {
       sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, eventId,
     });
-    expect((await getParticipant(t, participantId))?.points).toBe(17);
+    expect((await getAttendee(t, participantId))?.points).toBe(10);
   });
 });
 
@@ -403,7 +431,7 @@ describe("concurrent scans", () => {
     const state = await snapshot(t);
     expect(state.awards).toHaveLength(1);
     expect(state.logs).toHaveLength(1);
-    expect((await getParticipant(t, participantId))?.points).toBe(35);
+    expect((await getAttendee(t, participantId))?.points).toBe(35);
   });
 
   it("produce one food redemption", async () => {
@@ -439,7 +467,7 @@ describe("throttling and sessions", () => {
 
   it("throws for missing sessions before writing anything, and allows admins without assignments", async () => {
     const t = createConvexTest();
-    const { eventId, participantId } = await seedAwardScene(t);
+    const { eventId, checkedInId } = await seedAwardScene(t);
     const admin = await seedStaff(t, { role: "admin" });
     const calls = (sessionToken: string) => [
       t.mutation(foodCheckInParticipantRef, { sessionToken, qrCodeToken: QR_TOKEN }),
@@ -457,8 +485,8 @@ describe("throttling and sessions", () => {
     })).toEqual({ status: "success", pointsAwarded: 10 });
     const actionLogs = await logs(t);
     expect(actionLogs).toEqual([
-      expect.objectContaining({ actorAdminId: admin.adminId, participantId, action: "food_check_in", mealPeriodId }),
-      expect.objectContaining({ actorAdminId: admin.adminId, participantId, action: "point_scan", eventId, pointsDelta: 10 }),
+      expect.objectContaining({ actorAdminId: admin.adminId, checkedInId, action: "food_check_in", mealPeriodId }),
+      expect.objectContaining({ actorAdminId: admin.adminId, checkedInId, action: "point_scan", eventId, pointsDelta: 10 }),
     ]);
   });
 });

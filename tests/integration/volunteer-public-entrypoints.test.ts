@@ -16,6 +16,7 @@ import {
 import { awardEventPoints, adjustPoints } from "../../convex/admin/pointsLedger";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest } from "../helpers/convexTestContext";
+import { insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { ORGANIZER_TEST_PASSWORD, seedAdminAccount } from "../helpers/staffTestFixtures";
 
@@ -121,7 +122,7 @@ describe("volunteer authorization contract (public entry points)", () => {
 
   it("keeps participant and ledger modules off the public Convex API", () => {
     for (const file of [
-      "participants.ts", "pointsLedger.ts", "pointsBackfill.ts",
+      "participants.ts", "pointsLedger.ts",
       "volunteerProvisioning.ts", "adminQueryHelpers.ts",
     ]) {
       const source = readFileSync(join(adminDir, file), "utf8");
@@ -197,16 +198,16 @@ describe("volunteer unsafe-path invariants", () => {
         createdAt: 1,
         updatedAt: 1,
       });
-      return ctx.db.insert("participants", {
+      const { participantId } = await insertParticipantWithOptionalCheckIn(ctx, {
         applicationId,
         authUserId: userId,
         acceptedAt: 3,
         acceptedBy: adminId,
         qrCodeToken: "c".repeat(64),
-        points: 0,
         createdAt: 3,
         updatedAt: 3,
       });
+      return participantId;
     });
 
     const { volunteers } = (anyApi as ApiFromModules<{
@@ -268,16 +269,17 @@ describe("volunteer unsafe-path invariants", () => {
         createdAt: 1,
         updatedAt: 1,
       });
-      return ctx.db.insert("participants", {
+      const { participantId } = await insertParticipantWithOptionalCheckIn(ctx, {
         applicationId,
         authUserId: userId,
         acceptedAt: 3,
         acceptedBy: adminId,
         qrCodeToken: "d".repeat(64),
-        points: 0,
+        checkedInAt: 3,
         createdAt: 3,
         updatedAt: 3,
       });
+      return participantId;
     });
 
     await t.run((ctx) =>

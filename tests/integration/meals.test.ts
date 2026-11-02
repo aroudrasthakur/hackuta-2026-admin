@@ -4,6 +4,7 @@ import {
   removeMealPeriodRef, setMealPeriodActiveRef, updateMealPeriodRef,
 } from "../../src/convex/mealsApi";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import type { GenericId } from "convex/values";
@@ -21,11 +22,13 @@ async function setup(fields = {}) {
 async function serve(t: ConvexTestInstance, mealPeriodId: GenericId<"mealPeriods">, adminId: GenericId<"admins">, times: number[]) {
   const applicant = await seedApplicant(t, { review: { status: "accepted" } });
   return t.run(async (ctx) => {
-    const participantId = await ctx.db.insert("participants", {
+    const { participantId, checkedInId } = await insertParticipantWithOptionalCheckIn(ctx, {
       applicationId: applicant.applicationId, authUserId: applicant.userId, acceptedAt: 1, acceptedBy: adminId,
-      qrCodeToken: "ab".repeat(32), foodRestriction: "Private dietary information", foodCheckedInAt: 42, createdAt: 1, updatedAt: 1,
+      qrCodeToken: "ab".repeat(32), foodRestriction: "Private dietary information", checkedInAt: 1, createdAt: 1, updatedAt: 1,
     });
-    for (const redeemedAt of times) await ctx.db.insert("mealRedemptions", { mealPeriodId, participantId, scannedBy: adminId, redeemedAt, countedInServedCount: true });
+    for (const redeemedAt of times) await ctx.db.insert("mealRedemptions", {
+      mealPeriodId, checkedInId: checkedInId!, scannedBy: adminId, redeemedAt, countedInServedCount: true,
+    });
     const meal = await ctx.db.get(mealPeriodId);
     await ctx.db.patch(mealPeriodId, { servedCount: meal!.servedCount! + times.length });
     return participantId;
@@ -59,7 +62,7 @@ describe("admin meal management", () => {
     const meals = await t.query(listMealPeriodsRef, { sessionToken });
     expect(meals.map((meal) => [meal.name, meal.served])).toEqual([["Breakfast", 0], ["Midnight snacks", 1]]);
     expect(meals[1]).toMatchObject({ description: "Fruit", createdBy: adminId, active: true });
-    expect(await t.run((ctx) => ctx.db.query("participants").first())).toMatchObject({ foodCheckedInAt: 42 });
+    expect(await t.run((ctx) => ctx.db.query("participants").first())).not.toHaveProperty("foodCheckedInAt");
   });
 
   it.each([
