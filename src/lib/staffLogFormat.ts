@@ -11,7 +11,7 @@ export const VOLUNTEER_ACTION_LABELS: Record<VolunteerActionLogRow["action"], st
   badge_replaced: "Badge replaced",
 };
 
-export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = {
+export const STAFF_CONFIG_LABELS: Partial<Record<StaffConfigLogRow["action"], string>> = {
   meal_created: "Meal created",
   meal_updated: "Meal updated",
   meal_active_changed: "Meal status changed",
@@ -31,13 +31,11 @@ export const STAFF_CONFIG_LABELS: Record<StaffConfigLogRow["action"], string> = 
   flash_sale_created: "Flash sale created",
   flash_sale_updated: "Flash sale updated",
   flash_sale_cancelled: "Flash sale cancelled",
-  // Historical rows from the removed notification admin. New writes never use these.
-  notification_created: "Notification created",
-  notification_updated: "Notification updated",
-  notification_published: "Notification published",
-  notification_scheduled: "Notification scheduled",
-  notification_cancelled: "Notification cancelled",
 };
+
+export function staffConfigLabel(action: StaffConfigLogRow["action"]) {
+  return STAFF_CONFIG_LABELS[action] ?? action;
+}
 
 /** Short names of the scan permissions a volunteer has, in a fixed order. */
 export function volunteerPermissionList(volunteer: { canCheckIn: boolean; canFoodCheckIn: boolean; canRedeemShop?: boolean }) {

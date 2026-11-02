@@ -28,7 +28,7 @@ import {
   reviewPrimaryButtonClass,
   reviewSecondaryButtonClass,
 } from "../../lib/reviewButtonClasses";
-import { formatLogTime, STAFF_CONFIG_LABELS, volunteerPermissionList } from "../../lib/staffLogFormat";
+import { formatLogTime, staffConfigLabel, volunteerPermissionList } from "../../lib/staffLogFormat";
 import { reportUserFacingError } from "../../lib/userFacingError";
 import { ADMIN_ROUTES } from "../../types/routes";
 
@@ -394,7 +394,7 @@ function AccountHistory({ sessionToken, volunteerAdminId }: { sessionToken: stri
             return (
               <li key={log.logId} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-sm">
                 <span>
-                  <span className="font-semibold text-night">{STAFF_CONFIG_LABELS[log.action]}</span>
+                  <span className="font-semibold text-night">{staffConfigLabel(log.action)}</span>
                   <span className="text-ocean"> by {log.actor.name}{detail ? ` · ${detail}` : ""}</span>
                 </span>
                 <time className="text-ocean" dateTime={new Date(log.createdAt).toISOString()}>{formatLogTime(log.createdAt)}</time>
