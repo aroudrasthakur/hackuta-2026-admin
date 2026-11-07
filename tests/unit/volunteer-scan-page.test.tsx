@@ -390,7 +390,7 @@ describe("check-in workflow", () => {
     await reachIdentityStep("Vegetarian; Allergies: nuts");
     expect(currentStep()).toBe("3. Verify ID");
     expect(text()).toContain("Dietary restrictions");
-    expect(text()).toContain("Food restrictions");
+    expect(text()).not.toContain("Food restrictions");
     expect(text()).toContain("Vegetarian; Allergies: nuts");
     await click("Proceed");
     expect(currentStep()).toBe("4. Confirm");

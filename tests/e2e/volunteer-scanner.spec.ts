@@ -68,8 +68,8 @@ test.describe("volunteer badge check-in", () => {
     await expect(page.getByText("Check government ID")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Avery Arrival" })).toBeVisible();
     await expect(page.getByText("Dietary restrictions")).toBeVisible();
-    await expect(page.getByText("Food restrictions")).toBeVisible();
-    await expect(page.getByText("Vegetarian; Allergies: dairy")).toHaveCount(2);
+    await expect(page.getByText("Food restrictions")).toHaveCount(0);
+    await expect(page.getByText("Vegetarian; Allergies: dairy")).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Confirm check-in" })).toHaveCount(0);
     await expect(page.getByText(E2E_BADGES.unused)).toHaveCount(0);
     await expectNoHorizontalScroll(page);

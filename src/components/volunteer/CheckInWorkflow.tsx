@@ -88,10 +88,6 @@ function DietaryFacts({ name, foodRestriction }: { name: string; foodRestriction
         <dt>Dietary restrictions</dt>
         <dd>{foodRestriction ?? "None listed"}</dd>
       </div>
-      <div className={foodRestriction ? "volunteer-confirm__dietary" : undefined}>
-        <dt>Food restrictions</dt>
-        <dd>{foodRestriction ?? "None listed"}</dd>
-      </div>
     </dl>
   );
 }
