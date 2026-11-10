@@ -226,8 +226,8 @@ function OutboundMailCard({
   return (
     <section className="admin-card admin-card--danger admin-card__body space-y-3" aria-labelledby="outbound-mail-heading">
       <div>
-        <p className="text-center text-xs font-semibold uppercase tracking-wide text-red-800">Danger zone</p>
-        <h2 id="outbound-mail-heading" className="font-semibold text-ink">Outbound mail</h2>
+        <p className="admin-danger-title">Danger zone</p>
+        <h2 id="outbound-mail-heading" className="admin-card__title">Outbound mail</h2>
         <p className="mt-1 text-sm text-red-900/80">
           Set flag for decision and confirmation emails, (off = sending off).
         </p>

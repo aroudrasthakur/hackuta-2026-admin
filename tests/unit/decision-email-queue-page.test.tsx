@@ -413,7 +413,8 @@ describe("DecisionEmailQueuePage", () => {
     expect(container.querySelector(".admin-card--danger")).not.toBeNull();
     expect(
       Array.from(container.querySelectorAll("p")).find((el) => el.textContent === "Danger zone")?.className,
-    ).toContain("text-center");
+    ).toContain("admin-danger-title");
+    expect(container.querySelector("#outbound-mail-heading")?.className).toContain("admin-card__title");
     expect(button("Confirm")?.className).toContain("admin-danger-confirm");
     expect(button("Confirm")?.parentElement?.className).toContain("justify-end");
   });

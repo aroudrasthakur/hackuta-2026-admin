@@ -173,6 +173,16 @@ body:has(.participants-dialog[open]) { overflow: hidden; }
     background: #fff8f8;
   }
 
+  .admin-danger-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.3125rem;
+    font-weight: 400;
+    line-height: 1.25;
+    text-align: center;
+    color: var(--color-negative);
+  }
+
   .admin-danger-confirm {
     border-color: var(--color-negative);
     background: var(--color-negative);
