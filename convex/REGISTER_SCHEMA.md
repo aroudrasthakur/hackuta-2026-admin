@@ -65,8 +65,9 @@ File: [`convex/schema.ts`](schema.ts)
 | `shopItems` | Admin | **Yes** — shop catalog (name, description, price, status; no inventory) |
 | `shopRedemptions` | Admin | **Yes** — completed purchases with the price charged and any refund |
 | `shopFlashSales`, `shopFlashSaleItems` | Admin | **Yes** — timed promotions and their item prices |
+| `participantMediaDisclosures` | Profile | **Yes** — one-time media-disclosure acceptance; door check-in requires a row |
 
-All register-owned blocks must remain identical to [`schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) aside from `applicationReviews` and admin-owned tables listed above.
+All register-owned blocks must remain identical to [`schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) aside from `applicationReviews`, admin-owned tables, and profile-owned tables listed above.
 
 ### `participants` columns
 
