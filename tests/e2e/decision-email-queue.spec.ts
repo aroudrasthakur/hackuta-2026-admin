@@ -64,6 +64,54 @@ test.describe("decision email queue", () => {
     }
   });
 
+  test("pauses decision sending from the outbound mail card after Confirm", async ({ page }) => {
+    await signInOrganizer(page, E2E_ADMIN);
+    await setDecisionQueue(page, "mixed");
+    await openQueue(page);
+    const confirmation = page.getByRole("switch", { name: "Confirmation emails", exact: true });
+    const decision = page.getByRole("switch", { name: "Decision emails", exact: true });
+    const confirm = page.getByRole("button", { name: "Confirm", exact: true });
+    const dangerTitle = page.getByText("Danger zone", { exact: true });
+    const outboundTitle = page.getByRole("heading", { name: "Outbound mail" });
+    await expect(outboundTitle).toBeVisible();
+    await expect(dangerTitle).toBeVisible();
+    await expect(dangerTitle).toHaveCSS("text-align", "center");
+    await expect(dangerTitle).toHaveCSS("font-family", /Gelios/);
+    await expect(outboundTitle).toHaveCSS("font-family", /Gelios/);
+    await expect(page.getByText("Set flag for decision and confirmation emails, (off = sending off).")).toBeVisible();
+    await expect(page.locator(".admin-card--danger")).toHaveCSS("border-top-color", "rgb(155, 48, 59)");
+    await expect(confirm).toHaveClass(/admin-danger-confirm/);
+    await expect(confirm).toHaveCSS("color", "rgb(255, 255, 255)");
+    await expect(confirmation).toHaveAttribute("aria-checked", "true");
+    await expect(decision).toHaveAttribute("aria-checked", "true");
+    await expect(confirm).toBeDisabled();
+
+    await decision.click();
+    await expect(decision).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByText("Unsaved changes")).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Decision emails are paused" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send all queued", exact: true })).toBeEnabled();
+
+    await confirm.click();
+    await expect(page.getByRole("status").filter({ hasText: "Decision emails are paused" })).toBeVisible();
+    for (const name of ["Send selected", "Send all queued", "Retry failed"]) {
+      await expect(page.getByRole("button", { name, exact: true })).toBeDisabled();
+    }
+    await expect(page.getByRole("button", { name: "Hold", exact: true })).toBeEnabled();
+
+    await confirmation.click();
+    await expect(confirmation).toHaveAttribute("aria-checked", "false");
+    await expect(decision).toHaveAttribute("aria-checked", "false");
+    await confirm.click();
+    await expect(confirmation).toHaveAttribute("aria-checked", "false");
+    await expect(decision).toHaveAttribute("aria-checked", "false");
+
+    await decision.click();
+    await confirm.click();
+    await expect(page.getByRole("status").filter({ hasText: "Decision emails are paused" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send all queued", exact: true })).toBeEnabled();
+  });
+
   test("shows contextual loading and empty states", async ({ page }) => {
     await signInOrganizer(page, E2E_ADMIN);
     await setDecisionQueue(page, "loading");

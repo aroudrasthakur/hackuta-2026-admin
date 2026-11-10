@@ -6,6 +6,7 @@ import {
   retryFailedDecisionEmailsRef,
   setApplicationDecisionRef,
   setDecisionEmailHoldRef,
+  setMailConfigRef,
 } from "../../src/convex/adminApi";
 import "../../convex/admin/decisionEmailRelease";
 import "../../convex/admin/sendDecisionEmails";
@@ -394,5 +395,104 @@ describe("decision email queue", () => {
     const result = await release([row!._id, row!._id]);
     expect(result).toEqual({ sent: 1, failed: 0, total: 1 });
     expect(email.sentEmails()).toHaveLength(1);
+  });
+
+  it("applies accept immediately and skips the queue when decision email is paused", async () => {
+    const { t, admin, applicant, decide, release } = await setup();
+    await t.mutation(setMailConfigRef, { sessionToken: admin.sessionToken, decisionEmail: false });
+
+    const result = await decide(admin.sessionToken, applicant.applicationId, "accepted");
+    expect(result).toEqual({ queued: false, applied: true });
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect())).toEqual([]);
+    expect((await getReview(t, applicant.applicationId))?.status).toBe("accepted");
+    expect(await countRows(t, "participants")).toBe(1);
+    expect(await getLogs(t, applicant.applicationId)).toEqual([
+      expect.objectContaining({ action: "accepted" }),
+    ]);
+    expect(email.fetchMock).not.toHaveBeenCalled();
+
+    await expectAdminErrorCode(release(), "DECISION_EMAIL_PAUSED");
+    expect(email.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["rejected", "waitlisted"] as const)(
+    "applies %s immediately without a queue row when decision email is paused",
+    async (decision) => {
+      const { t, admin, applicant, decide } = await setup();
+      await t.mutation(setMailConfigRef, { sessionToken: admin.sessionToken, decisionEmail: false });
+
+      expect(await decide(admin.sessionToken, applicant.applicationId, decision)).toEqual({
+        queued: false,
+        applied: true,
+      });
+      expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect())).toEqual([]);
+      expect((await getReview(t, applicant.applicationId))?.status).toBe(decision);
+      expect(await countRows(t, "participants")).toBe(0);
+      expect(email.fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("promotes a waitlisted applicant immediately while paused", async () => {
+    const { t, admin, applicant, decide } = await setup();
+    await t.mutation(setMailConfigRef, { sessionToken: admin.sessionToken, decisionEmail: false });
+    await decide(admin.sessionToken, applicant.applicationId, "waitlisted");
+    expect(await decide(admin.sessionToken, applicant.applicationId, "accepted")).toEqual({
+      queued: false,
+      applied: true,
+    });
+    expect((await getReview(t, applicant.applicationId))?.status).toBe("accepted");
+    expect(await countRows(t, "participants")).toBe(1);
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect())).toEqual([]);
+  });
+
+  it("leaves already-queued rows queued until sending is turned back on", async () => {
+    const { t, admin, applicant, decide, release } = await setup();
+    await decide(admin.sessionToken, applicant.applicationId, "accepted");
+    const queued = await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique());
+    expect(queued).toMatchObject({ status: "queued", decision: "accepted" });
+
+    await t.mutation(setMailConfigRef, { sessionToken: admin.sessionToken, decisionEmail: false });
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
+      _id: queued!._id,
+      status: "queued",
+    });
+    expect((await getReview(t, applicant.applicationId))?.status).toBe("under_review");
+    expect(await countRows(t, "participants")).toBe(0);
+    await expectAdminErrorCode(release(), "DECISION_EMAIL_PAUSED");
+    expect(email.fetchMock).not.toHaveBeenCalled();
+
+    await t.mutation(setDecisionEmailHoldRef, {
+      sessionToken: admin.sessionToken,
+      itemId: queued!._id,
+      held: true,
+    });
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
+      status: "held",
+    });
+    await t.mutation(setDecisionEmailHoldRef, {
+      sessionToken: admin.sessionToken,
+      itemId: queued!._id,
+      held: false,
+    });
+
+    await t.mutation(setMailConfigRef, { sessionToken: admin.sessionToken, decisionEmail: true });
+    expect(await release()).toEqual({ sent: 1, failed: 0, total: 1 });
+    expect((await getReview(t, applicant.applicationId))?.status).toBe("accepted");
+    expect(await countRows(t, "participants")).toBe(1);
+  });
+
+  it("queues new decisions again after decision email is turned back on", async () => {
+    const { t, admin, applicant, decide } = await setup();
+    await t.mutation(setMailConfigRef, { sessionToken: admin.sessionToken, decisionEmail: false });
+    await t.mutation(setMailConfigRef, { sessionToken: admin.sessionToken, decisionEmail: true });
+    expect(await decide(admin.sessionToken, applicant.applicationId, "rejected")).toEqual({
+      queued: true,
+      duplicate: false,
+    });
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").unique())).toMatchObject({
+      decision: "rejected",
+      status: "queued",
+    });
+    expect((await getReview(t, applicant.applicationId))?.status).toBe("under_review");
   });
 });

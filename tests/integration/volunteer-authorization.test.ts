@@ -2,8 +2,8 @@ import { makeFunctionReference } from "convex/server";
 import { ConvexHttpClient } from "convex/browser";
 import { describe, expect, it, vi } from "vitest";
 import {
-  listDecisionEmailQueueRef, releaseDecisionEmailsRef, retryFailedDecisionEmailsRef,
-  setApplicationDecisionRef, setDecisionEmailHoldRef,
+  getMailConfigRef, listDecisionEmailQueueRef, releaseDecisionEmailsRef, retryFailedDecisionEmailsRef,
+  setApplicationDecisionRef, setDecisionEmailHoldRef, setMailConfigRef,
 } from "../../src/convex/adminApi";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest } from "../helpers/convexTestContext";
@@ -27,6 +27,8 @@ describe("volunteer API boundaries", () => {
     try {
       const calls = [
         () => t.query(listDecisionEmailQueueRef, { sessionToken }),
+        () => t.query(getMailConfigRef, { sessionToken }),
+        () => t.mutation(setMailConfigRef, { sessionToken, decisionEmail: false }),
         () => t.mutation(setDecisionEmailHoldRef, { sessionToken, itemId: before[0]._id, held: true }),
         () => t.mutation(retryFailedDecisionEmailsRef, { sessionToken }),
         () => t.action(releaseDecisionEmailsRef, { sessionToken }),

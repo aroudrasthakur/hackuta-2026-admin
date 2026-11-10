@@ -168,6 +168,32 @@ body:has(.participants-dialog[open]) { overflow: hidden; }
     box-shadow: var(--shadow-panel);
   }
 
+  .admin-card--danger {
+    border: 2px solid var(--color-negative);
+    background: #fff8f8;
+  }
+
+  .admin-danger-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.3125rem;
+    font-weight: 400;
+    line-height: 1.25;
+    text-align: center;
+    color: var(--color-negative);
+  }
+
+  .admin-danger-confirm {
+    border-color: var(--color-negative);
+    background: var(--color-negative);
+    color: #fff;
+  }
+
+  .admin-danger-confirm:hover:not(:disabled) {
+    border-color: #7f242e;
+    background: #7f242e;
+  }
+
   .admin-card--flush {
     overflow: hidden;
   }

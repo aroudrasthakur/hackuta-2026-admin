@@ -2,16 +2,19 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAction, useMutation, useQuery } from "../../convex/reactBindings";
 import {
+  getMailConfigRef,
   listDecisionEmailQueueRef,
   releaseDecisionEmailsRef,
   retryFailedDecisionEmailsRef,
   setDecisionEmailHoldRef,
+  setMailConfigRef,
   type DecisionEmailQueue,
 } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { reportUserFacingError } from "../../lib/userFacingError";
-import { reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
+import { reviewDangerSolidButtonClass, reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { ADMIN_ROUTES } from "../../types/routes";
+import { AccessSwitch } from "../../components/admin/AccessSwitch";
 import { ApplicationDecisionBadge } from "../../components/ApplicationDecisionBadge";
 import { LoadingState } from "../../components/states/LoadingState";
 import { formatApplicationDisplayDate } from "../../lib/dateFormat";
@@ -160,9 +163,113 @@ function RecentlySentSection({ rows, totalSent }: { rows: SentRow[]; totalSent: 
   );
 }
 
+type MailFlags = { confirmationEmail: boolean; decisionEmail: boolean };
+
+function OutboundMailCard({
+  sessionToken,
+}: {
+  sessionToken: string;
+}) {
+  const mail = useQuery(getMailConfigRef, { sessionToken });
+  const setMail = useMutation(setMailConfigRef);
+  const [draft, setDraft] = useState<MailFlags | null>(null);
+  const [saved, setSaved] = useState<MailFlags | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const baseline = saved ?? mail;
+  const flags = draft ?? baseline;
+  const dirty = Boolean(
+    flags
+    && baseline
+    && (flags.confirmationEmail !== baseline.confirmationEmail || flags.decisionEmail !== baseline.decisionEmail),
+  );
+
+  function setFlag(field: keyof MailFlags, enabled: boolean) {
+    if (!baseline || !flags || busy) return;
+    const next = { ...flags, [field]: enabled };
+    if (next.confirmationEmail === baseline.confirmationEmail && next.decisionEmail === baseline.decisionEmail) {
+      setDraft(null);
+      return;
+    }
+    setDraft(next);
+  }
+
+  async function confirm() {
+    if (!flags || !dirty || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await setMail({
+        sessionToken,
+        confirmationEmail: flags.confirmationEmail,
+        decisionEmail: flags.decisionEmail,
+      });
+      setSaved(next);
+      setDraft(null);
+    } catch (caught) {
+      setError(reportUserFacingError(
+        "Unable to update mail settings",
+        caught,
+        "We couldn't update outbound email. Please try again.",
+        { source: "DecisionEmailQueuePage.setMailConfig" },
+      ));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (flags === undefined) {
+    return <LoadingState layout="rows" message="Loading mail settings…" />;
+  }
+
+  return (
+    <section className="admin-card admin-card--danger admin-card__body space-y-3" aria-labelledby="outbound-mail-heading">
+      <div>
+        <p className="admin-danger-title">Danger zone</p>
+        <h2 id="outbound-mail-heading" className="admin-card__title">Outbound mail</h2>
+        <p className="mt-1 text-sm text-red-900/80">
+          Set flag for decision and confirmation emails, (off = sending off).
+        </p>
+      </div>
+      {error ? <p role="alert" className="admin-callout admin-callout--alert">{error}</p> : null}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-ink">Confirmation emails</p>
+        <AccessSwitch
+          label="Confirmation emails"
+          checked={flags.confirmationEmail}
+          disabled={busy}
+          onChange={(enabled) => setFlag("confirmationEmail", enabled)}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-ink">Decision emails</p>
+        <AccessSwitch
+          label="Decision emails"
+          checked={flags.decisionEmail}
+          disabled={busy}
+          onChange={(enabled) => setFlag("decisionEmail", enabled)}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {dirty && !busy ? <p className="text-sm font-semibold text-red-800">Unsaved changes</p> : null}
+        <button
+          type="button"
+          className={reviewDangerSolidButtonClass}
+          disabled={!dirty || busy}
+          onClick={() => void confirm()}
+        >
+          {busy ? "Saving…" : "Confirm"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function DecisionEmailQueueContent() {
   const { sessionToken } = useAdminAuth();
   const queue = useQuery(listDecisionEmailQueueRef, sessionToken ? { sessionToken } : "skip");
+  const mail = useQuery(getMailConfigRef, sessionToken ? { sessionToken } : "skip");
   const release = useAction(releaseDecisionEmailsRef);
   const hold = useMutation(setDecisionEmailHoldRef);
   const retry = useMutation(retryFailedDecisionEmailsRef);
@@ -259,15 +366,23 @@ function DecisionEmailQueueContent() {
     }
   }
 
-  if (!sessionToken || queue === undefined) {
+  if (!sessionToken || queue === undefined || mail === undefined) {
     return <LoadingState layout="rows" message="Loading decision emails…" />;
   }
 
   const sending = queue.counts.sending > 0;
+  const decisionPaused = mail.decisionEmail === false;
+  const sendDisabled = busy || sending || decisionPaused;
   const selectedIds = [...selected] as Array<QueueRow["itemId"]>;
 
   return (
     <div className="space-y-5">
+      <OutboundMailCard sessionToken={sessionToken} />
+      {decisionPaused ? (
+        <p role="status" className="admin-callout">
+          Decision emails are paused. Queued messages stay here until you turn sending back on. New accept, reject, and waitlist decisions apply immediately without email.
+        </p>
+      ) : null}
       <dl aria-label="Delivery counts" className="admin-delivery-counts">
         {(["queued", "held", "sending", "failed"] as const).map((status) => (
           <div key={status}><dt className="capitalize">{status}</dt><dd>{queue.counts[status]}</dd></div>
@@ -281,7 +396,7 @@ function DecisionEmailQueueContent() {
         <button
           type="button"
           className={reviewPrimaryButtonClass}
-          disabled={busy || sending || selectedIds.length === 0}
+          disabled={sendDisabled || selectedIds.length === 0}
           onClick={() => void send(selectedIds)}
         >
           Send selected
@@ -289,7 +404,7 @@ function DecisionEmailQueueContent() {
         <button
           type="button"
           className={reviewSecondaryButtonClass}
-          disabled={busy || sending || queue.counts.queued === 0}
+          disabled={sendDisabled || queue.counts.queued === 0}
           onClick={() => void send()}
         >
           Send all queued
@@ -297,7 +412,7 @@ function DecisionEmailQueueContent() {
         <button
           type="button"
           className={reviewSecondaryButtonClass}
-          disabled={busy || sending || queue.counts.failed === 0}
+          disabled={sendDisabled || queue.counts.failed === 0}
           onClick={() => void retryFailed()}
         >
           Retry failed
