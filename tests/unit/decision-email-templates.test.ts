@@ -17,7 +17,7 @@ describe("decision email templates", () => {
     },
   );
 
-  it("tells accepted applicants when and where to show up, and how to release a spot", () => {
+  it("tells accepted applicants when and where to show up, and how to prepare", () => {
     const { subject, text } = buildDecisionEmailContent({
       decision: "accepted",
       applicantName: "Taylor",
@@ -29,7 +29,11 @@ describe("decision email templates", () => {
     expect(text).toContain("UTA ID for check-in");
     expect(text).toContain("team-formation channel on our discord");
     expect(text).toContain("https://discord.gg/2bVsYS3SgS");
-    expect(text).toContain("offer your spot to someone on the waitlist");
+    expect(text).not.toContain("offer your spot to someone on the waitlist");
+    expect(text).toContain("Before you arrive, please read the guide below");
+    expect(text).toContain("https://docs.hackuta.com/HackUTA%202026%20Hacker%20Instructions.pdf");
+    expect(text).toContain("Check-in is Saturday, November 14, from 9–11 AM at SWSH");
+    expect(text).toContain("Attendance at check-in and the Sunday judging period is required");
     expect(text).toContain("Stay tuned for next steps");
   });
 
