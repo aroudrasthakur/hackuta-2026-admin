@@ -8,10 +8,12 @@ import {
   type AdminAuthContextValue,
 } from "../../src/contexts/adminAuthContext";
 import {
+  getMailConfigRef,
   listDecisionEmailQueueRef,
   releaseDecisionEmailsRef,
   retryFailedDecisionEmailsRef,
   setDecisionEmailHoldRef,
+  setMailConfigRef,
   type DecisionEmailQueue,
 } from "../../src/convex/adminApi";
 import { DecisionEmailQueuePage } from "../../src/pages/admin/DecisionEmailQueuePage";
@@ -21,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   releaseAction: vi.fn(),
   holdMutation: vi.fn(),
   retryMutation: vi.fn(),
+  setMailMutation: vi.fn(),
 }));
 
 vi.mock("../../src/convex/reactBindings", () => ({
@@ -29,6 +32,7 @@ vi.mock("../../src/convex/reactBindings", () => ({
   useMutation: (ref: unknown) => {
     if (ref === setDecisionEmailHoldRef) return mocks.holdMutation;
     if (ref === retryFailedDecisionEmailsRef) return mocks.retryMutation;
+    if (ref === setMailConfigRef) return mocks.setMailMutation;
     throw new Error(`Unexpected mutation ref: ${String(ref)}`);
   },
   useAction: (ref: unknown) => {
@@ -55,6 +59,18 @@ function staffContext(role: "admin"): AdminAuthContextValue {
     signIn: vi.fn(),
     signOut: vi.fn(),
   };
+}
+
+function mailFlags(overrides: { confirmationEmail?: boolean; decisionEmail?: boolean } = {}) {
+  return { confirmationEmail: true, decisionEmail: true, ...overrides };
+}
+
+function mockQueries(queue: DecisionEmailQueue | undefined = sampleQueue(), mail = mailFlags()) {
+  mocks.query.mockImplementation((ref) => {
+    if (ref === listDecisionEmailQueueRef) return queue;
+    if (ref === getMailConfigRef) return mail;
+    return undefined;
+  });
 }
 
 function sampleQueue(overrides: Partial<DecisionEmailQueue> = {}): DecisionEmailQueue {
@@ -122,10 +138,8 @@ describe("DecisionEmailQueuePage", () => {
     mocks.releaseAction.mockReset().mockResolvedValue({ sent: 1, failed: 0, total: 1 });
     mocks.holdMutation.mockReset().mockResolvedValue({ status: "held" });
     mocks.retryMutation.mockReset().mockResolvedValue({ retried: 1 });
-    mocks.query.mockImplementation((ref) => {
-      if (ref === listDecisionEmailQueueRef) return sampleQueue();
-      return undefined;
-    });
+    mocks.setMailMutation.mockReset().mockResolvedValue({ confirmationEmail: true, decisionEmail: true });
+    mockQueries();
 
     container = document.createElement("div");
     document.body.append(container);
@@ -168,7 +182,7 @@ describe("DecisionEmailQueuePage", () => {
     expect(container.querySelector("h1")?.textContent).toBe("Decision emails");
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("Unable to load decision emails");
     expect(container.textContent).not.toContain("network details");
-    mocks.query.mockReturnValue(sampleQueue());
+    mockQueries();
     await act(async () => button("Try again")!.click());
     expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(container.textContent).toContain("Taylor Student");
@@ -198,7 +212,7 @@ describe("DecisionEmailQueuePage", () => {
       sentAt: null,
       errorMessage: null,
     }));
-    mocks.query.mockReturnValue(
+    mockQueries(
       sampleQueue({
         active,
         sent: [],
@@ -244,7 +258,7 @@ describe("DecisionEmailQueuePage", () => {
       sentAt: 1_700_000_000_000 + index,
       errorMessage: null,
     }));
-    mocks.query.mockReturnValue(
+    mockQueries(
       sampleQueue({
         sent,
         counts: { queued: 0, held: 0, sending: 0, failed: 0, sent: 12 },
@@ -256,7 +270,7 @@ describe("DecisionEmailQueuePage", () => {
   });
 
   it("shows empty-state copy when nothing is waiting or sent", async () => {
-    mocks.query.mockReturnValue(
+    mockQueries(
       sampleQueue({
         active: [],
         sent: [],
@@ -322,7 +336,7 @@ describe("DecisionEmailQueuePage", () => {
   });
 
   it("disables admin send actions while a release is in progress", async () => {
-    mocks.query.mockReturnValue(
+    mockQueries(
       sampleQueue({
         counts: { queued: 1, held: 0, sending: 1, failed: 0, sent: 0 },
       }),
@@ -375,5 +389,89 @@ describe("DecisionEmailQueuePage", () => {
     await act(async () => button("Retry failed")!.click());
     await act(async () => Promise.resolve());
     expect(container.textContent).toMatch(/couldn't retry/i);
+  });
+
+  it("disables send actions and shows a pause notice when decision email is off", async () => {
+    mockQueries(sampleQueue(), mailFlags({ decisionEmail: false }));
+    await renderPage("admin");
+    expect(container.textContent).toContain("Decision emails are paused");
+    expect(button("Send selected")?.disabled).toBe(true);
+    expect(button("Send all queued")?.disabled).toBe(true);
+    expect(button("Retry failed")?.disabled).toBe(true);
+    expect(container.textContent).toContain("Confirmation emails (application received)");
+  });
+
+  it("toggles outbound mail flags", async () => {
+    await renderPage("admin");
+    const confirmation = Array.from(container.querySelectorAll("label")).find((el) =>
+      el.textContent?.includes("Confirmation emails"),
+    )?.querySelector("input");
+    const decision = Array.from(container.querySelectorAll("label")).find((el) =>
+      el.textContent?.includes("Decision emails"),
+    )?.querySelector("input");
+    expect(confirmation?.checked).toBe(true);
+    expect(decision?.checked).toBe(true);
+
+    await act(async () => confirmation!.click());
+    await act(async () => Promise.resolve());
+    expect(mocks.setMailMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ confirmationEmail: false }),
+    );
+
+    await act(async () => decision!.click());
+    await act(async () => Promise.resolve());
+    expect(mocks.setMailMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ decisionEmail: false }),
+    );
+  });
+
+  it("shows unchecked flags and still allows hold when only confirmation mail is off", async () => {
+    mockQueries(sampleQueue(), mailFlags({ confirmationEmail: false, decisionEmail: true }));
+    await renderPage("admin");
+    const confirmation = Array.from(container.querySelectorAll("label")).find((el) =>
+      el.textContent?.includes("Confirmation emails"),
+    )?.querySelector("input") as HTMLInputElement;
+    const decision = Array.from(container.querySelectorAll("label")).find((el) =>
+      el.textContent?.includes("Decision emails"),
+    )?.querySelector("input") as HTMLInputElement;
+    expect(confirmation.checked).toBe(false);
+    expect(decision.checked).toBe(true);
+    expect(container.textContent).not.toContain("Decision emails are paused");
+    expect(button("Send all queued")?.disabled).toBe(false);
+
+    const holdButton = Array.from(container.querySelectorAll("button")).find((el) => el.textContent === "Hold");
+    await act(async () => holdButton!.click());
+    await act(async () => Promise.resolve());
+    expect(mocks.holdMutation).toHaveBeenCalled();
+  });
+
+  it("keeps hold available and send selected disabled even with a selection while paused", async () => {
+    mockQueries(sampleQueue(), mailFlags({ decisionEmail: false }));
+    await renderPage("admin");
+    const checkbox = container.querySelector(
+      'input[type="checkbox"][aria-label="Select Taylor Student"]',
+    ) as HTMLInputElement;
+    await act(async () => checkbox.click());
+    expect(button("Send selected")?.disabled).toBe(true);
+    expect(button("Send all queued")?.disabled).toBe(true);
+    expect(mocks.releaseAction).not.toHaveBeenCalled();
+
+    const holdButton = Array.from(container.querySelectorAll("button")).find((el) => el.textContent === "Hold");
+    await act(async () => holdButton!.click());
+    await act(async () => Promise.resolve());
+    expect(mocks.holdMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ itemId: "item-queued", held: true }),
+    );
+  });
+
+  it("surfaces mail setting update failures", async () => {
+    mocks.setMailMutation.mockRejectedValue(new Error("mailer down"));
+    await renderPage("admin");
+    const confirmation = Array.from(container.querySelectorAll("label")).find((el) =>
+      el.textContent?.includes("Confirmation emails"),
+    )?.querySelector("input");
+    await act(async () => confirmation!.click());
+    await act(async () => Promise.resolve());
+    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/couldn't update outbound email/i);
   });
 });

@@ -4,6 +4,7 @@ import {
   E2E_APPLICATION_IDS,
   signInOrganizer,
 } from "./fixtures/auth";
+import { setMailConfig } from "./fixtures/mailConfig";
 import { resetE2eMockBackend } from "./fixtures/resetMock";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
@@ -80,6 +81,18 @@ test.describe("application review workflow", () => {
     await page.getByRole("button", { name: "Confirm acceptance", exact: true }).click();
     await expect(page.locator(".application-review-identity")).toContainText("In review");
     await expect(page.getByText("Queued: Accepted — not released")).toBeVisible();
+  });
+
+  test("applies a decision immediately when decision email is paused", async ({ page }) => {
+    await signInOrganizer(page, E2E_ADMIN);
+    await page.goto(`/admin/applications/${E2E_APPLICATION_IDS.readyForDecision}`);
+    await setMailConfig(page, { decisionEmail: false });
+    await page.getByRole("button", { name: "Change Decision" }).click();
+    await page.getByRole("button", { name: "Accept", exact: true }).click();
+    await expect(page.getByText("This accepts the applicant now. No decision email will be sent.")).toBeVisible();
+    await page.getByRole("button", { name: "Confirm acceptance", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Accepted. No decision email was sent." })).toBeVisible();
+    await expect(page.getByText("Queued: Accepted")).toHaveCount(0);
   });
 
   test("finalized application hides decision controls", async ({ page }) => {

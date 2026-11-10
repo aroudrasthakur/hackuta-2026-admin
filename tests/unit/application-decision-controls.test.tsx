@@ -4,14 +4,14 @@ import { createRoot, type Root } from "react-dom/client";
 import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApplicationDecisionControls } from "../../src/components/ApplicationDecisionControls";
-import { setApplicationDecisionRef, type ApplicationDetail } from "../../src/convex/adminApi";
+import { getMailConfigRef, setApplicationDecisionRef, type ApplicationDetail } from "../../src/convex/adminApi";
 import { ADMIN_ERROR_MESSAGES, adminError } from "../../shared/admin/errors";
 
-const mocks = vi.hoisted(() => ({ mutationHook: vi.fn(), finalize: vi.fn() }));
+const mocks = vi.hoisted(() => ({ mutationHook: vi.fn(), finalize: vi.fn(), query: vi.fn() }));
 vi.mock("../../src/convex/reactBindings", () => ({
   ConvexProvider: ({ children }: { children: ReactNode }) => children,
   useMutation: mocks.mutationHook,
-  useQuery: vi.fn(),
+  useQuery: mocks.query,
   usePaginatedQuery: vi.fn(),
 }));
 
@@ -50,6 +50,10 @@ describe("ApplicationDecisionControls", () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     mocks.mutationHook.mockReset().mockReturnValue(mocks.finalize);
     mocks.finalize.mockReset().mockResolvedValue({ logId: "log", duplicate: false });
+    mocks.query.mockReset().mockImplementation((ref) => {
+      if (ref === getMailConfigRef) return { confirmationEmail: true, decisionEmail: true };
+      return undefined;
+    });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -245,5 +249,32 @@ describe("ApplicationDecisionControls", () => {
     expect(notice?.textContent).toContain("Acceptance queued");
     expect(document.activeElement).toBe(notice);
     expect(button("Accept")).toBeUndefined();
+  });
+
+  it.each([
+    ["Accept", "Confirm acceptance", "Accepted. No decision email was sent."],
+    ["Reject", "Confirm rejection", "Rejected. No decision email was sent."],
+    ["Waitlist", "Confirm waitlist", "Waitlisted. No decision email was sent."],
+  ] as const)("says %s applies now when decision email is paused", async (choice, confirm, success) => {
+    mocks.query.mockImplementation((ref) => {
+      if (ref === getMailConfigRef) return { confirmationEmail: true, decisionEmail: false };
+      return undefined;
+    });
+    await renderControls();
+    await choose(choice);
+    expect(container.textContent).toContain("No decision email will be sent.");
+    expect(container.textContent).not.toContain("until an admin sends the email.");
+    await act(async () => button(confirm)!.click());
+    expect(container.textContent).toContain(success);
+  });
+
+  it("keeps queued copy while mail config is still loading", async () => {
+    mocks.query.mockImplementation((ref) => {
+      if (ref === getMailConfigRef) return undefined;
+      return undefined;
+    });
+    await renderControls();
+    await choose("Accept");
+    expect(container.textContent).toContain("until an admin sends the email.");
   });
 });

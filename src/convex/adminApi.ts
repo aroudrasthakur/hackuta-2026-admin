@@ -17,6 +17,7 @@ import type {
   retryFailedDecisionEmails,
   setDecisionEmailHold,
 } from "../../convex/admin/decisionEmailQueue";
+import type { getMailConfig, setMailConfig } from "../../convex/admin/mailConfig";
 import type { listMyScanOptions, resolveQrForScan, listActiveMealPeriods, resolveQrForMeal, redeemMeal } from "../../convex/admin/volunteerScan";
 import type { awardEventPoints, foodCheckInParticipant } from "../../convex/admin/volunteerOperations";
 import type * as badgeCheckIn from "../../convex/admin/badgeCheckIn";
@@ -156,6 +157,27 @@ export const releaseDecisionEmailsRef = makeFunctionReference<
   { sessionToken: string; itemIds?: Array<DecisionEmailQueue["active"][number]["itemId"]> },
   { sent: number; failed: number; total: number }
 >("admin/decisionEmailRelease:releaseDecisionEmails");
+
+type GetMailConfigQuery = ApiFromModules<{
+  mail: { getMailConfig: typeof getMailConfig };
+}>["mail"]["getMailConfig"];
+export type MailConfigFlags = FunctionReturnType<GetMailConfigQuery>;
+
+export const getMailConfigRef = adminModuleRef<
+  "query",
+  FunctionArgs<GetMailConfigQuery>,
+  FunctionReturnType<GetMailConfigQuery>
+>("admin/mailConfig:getMailConfig");
+
+type SetMailConfigMutation = ApiFromModules<{
+  mail: { setMailConfig: typeof setMailConfig };
+}>["mail"]["setMailConfig"];
+
+export const setMailConfigRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<SetMailConfigMutation>,
+  FunctionReturnType<SetMailConfigMutation>
+>("admin/mailConfig:setMailConfig");
 
 type ScanOptionsQuery = ApiFromModules<{
   scan: { listMyScanOptions: typeof listMyScanOptions };

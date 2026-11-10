@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAction, useMutation, useQuery } from "../../convex/reactBindings";
 import {
+  getMailConfigRef,
   listDecisionEmailQueueRef,
   releaseDecisionEmailsRef,
   retryFailedDecisionEmailsRef,
   setDecisionEmailHoldRef,
+  setMailConfigRef,
   type DecisionEmailQueue,
 } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
@@ -160,9 +162,73 @@ function RecentlySentSection({ rows, totalSent }: { rows: SentRow[]; totalSent: 
   );
 }
 
+function OutboundMailCard({
+  sessionToken,
+}: {
+  sessionToken: string;
+}) {
+  const mail = useQuery(getMailConfigRef, { sessionToken });
+  const setMail = useMutation(setMailConfigRef);
+  const [busy, setBusy] = useState<"confirmationEmail" | "decisionEmail" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle(field: "confirmationEmail" | "decisionEmail", enabled: boolean) {
+    if (busy) return;
+    setBusy(field);
+    setError(null);
+    try {
+      await setMail({ sessionToken, [field]: enabled });
+    } catch (caught) {
+      setError(reportUserFacingError(
+        "Unable to update mail settings",
+        caught,
+        "We couldn't update outbound email. Please try again.",
+        { source: "DecisionEmailQueuePage.setMailConfig" },
+      ));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (mail === undefined) {
+    return <LoadingState layout="rows" message="Loading mail settings…" />;
+  }
+
+  return (
+    <section className="admin-card space-y-3 p-4" aria-labelledby="outbound-mail-heading">
+      <h2 id="outbound-mail-heading" className="font-semibold text-ink">Outbound mail</h2>
+      <p className="text-sm text-ocean">
+        When a flag is off, that email is not sent. Applications still submit. Accept, reject, and waitlist still apply immediately.
+      </p>
+      {error ? <p role="alert" className="admin-callout admin-callout--alert">{error}</p> : null}
+      <label className="flex items-center gap-3 text-sm text-ink">
+        <input
+          type="checkbox"
+          className="size-4 accent-ocean"
+          checked={mail.confirmationEmail}
+          disabled={busy !== null}
+          onChange={(event) => void toggle("confirmationEmail", event.target.checked)}
+        />
+        Confirmation emails (application received)
+      </label>
+      <label className="flex items-center gap-3 text-sm text-ink">
+        <input
+          type="checkbox"
+          className="size-4 accent-ocean"
+          checked={mail.decisionEmail}
+          disabled={busy !== null}
+          onChange={(event) => void toggle("decisionEmail", event.target.checked)}
+        />
+        Decision emails (accept, reject, waitlist)
+      </label>
+    </section>
+  );
+}
+
 function DecisionEmailQueueContent() {
   const { sessionToken } = useAdminAuth();
   const queue = useQuery(listDecisionEmailQueueRef, sessionToken ? { sessionToken } : "skip");
+  const mail = useQuery(getMailConfigRef, sessionToken ? { sessionToken } : "skip");
   const release = useAction(releaseDecisionEmailsRef);
   const hold = useMutation(setDecisionEmailHoldRef);
   const retry = useMutation(retryFailedDecisionEmailsRef);
@@ -259,15 +325,23 @@ function DecisionEmailQueueContent() {
     }
   }
 
-  if (!sessionToken || queue === undefined) {
+  if (!sessionToken || queue === undefined || mail === undefined) {
     return <LoadingState layout="rows" message="Loading decision emails…" />;
   }
 
   const sending = queue.counts.sending > 0;
+  const decisionPaused = mail.decisionEmail === false;
+  const sendDisabled = busy || sending || decisionPaused;
   const selectedIds = [...selected] as Array<QueueRow["itemId"]>;
 
   return (
     <div className="space-y-5">
+      <OutboundMailCard sessionToken={sessionToken} />
+      {decisionPaused ? (
+        <p role="status" className="admin-callout">
+          Decision emails are paused. Queued messages stay here until you turn sending back on. New accept, reject, and waitlist decisions apply immediately without email.
+        </p>
+      ) : null}
       <dl aria-label="Delivery counts" className="admin-delivery-counts">
         {(["queued", "held", "sending", "failed"] as const).map((status) => (
           <div key={status}><dt className="capitalize">{status}</dt><dd>{queue.counts[status]}</dd></div>
@@ -281,7 +355,7 @@ function DecisionEmailQueueContent() {
         <button
           type="button"
           className={reviewPrimaryButtonClass}
-          disabled={busy || sending || selectedIds.length === 0}
+          disabled={sendDisabled || selectedIds.length === 0}
           onClick={() => void send(selectedIds)}
         >
           Send selected
@@ -289,7 +363,7 @@ function DecisionEmailQueueContent() {
         <button
           type="button"
           className={reviewSecondaryButtonClass}
-          disabled={busy || sending || queue.counts.queued === 0}
+          disabled={sendDisabled || queue.counts.queued === 0}
           onClick={() => void send()}
         >
           Send all queued
@@ -297,7 +371,7 @@ function DecisionEmailQueueContent() {
         <button
           type="button"
           className={reviewSecondaryButtonClass}
-          disabled={busy || sending || queue.counts.failed === 0}
+          disabled={sendDisabled || queue.counts.failed === 0}
           onClick={() => void retryFailed()}
         >
           Retry failed

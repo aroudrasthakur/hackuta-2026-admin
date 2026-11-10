@@ -64,6 +64,32 @@ test.describe("decision email queue", () => {
     }
   });
 
+  test("pauses decision sending from the outbound mail card", async ({ page }) => {
+    await signInOrganizer(page, E2E_ADMIN);
+    await setDecisionQueue(page, "mixed");
+    await openQueue(page);
+    const confirmation = page.getByRole("checkbox", { name: "Confirmation emails (application received)" });
+    const decision = page.getByRole("checkbox", { name: "Decision emails (accept, reject, waitlist)" });
+    await expect(page.getByRole("heading", { name: "Outbound mail" })).toBeVisible();
+    await expect(confirmation).toBeChecked();
+    await expect(decision).toBeChecked();
+
+    await decision.uncheck();
+    await expect(page.getByRole("status").filter({ hasText: "Decision emails are paused" })).toBeVisible();
+    for (const name of ["Send selected", "Send all queued", "Retry failed"]) {
+      await expect(page.getByRole("button", { name, exact: true })).toBeDisabled();
+    }
+    await expect(page.getByRole("button", { name: "Hold", exact: true })).toBeEnabled();
+
+    await confirmation.uncheck();
+    await expect(confirmation).not.toBeChecked();
+    await expect(decision).not.toBeChecked();
+
+    await decision.check();
+    await expect(page.getByRole("status").filter({ hasText: "Decision emails are paused" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send all queued", exact: true })).toBeEnabled();
+  });
+
   test("shows contextual loading and empty states", async ({ page }) => {
     await signInOrganizer(page, E2E_ADMIN);
     await setDecisionQueue(page, "loading");

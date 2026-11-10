@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { logApplicationReviewActionRef, setApplicationDecisionRef } from "../../src/convex/adminApi";
+import { logApplicationReviewActionRef, setApplicationDecisionRef, setMailConfigRef } from "../../src/convex/adminApi";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 // Load the action before fake-timer pumps can race its asynchronous module transform.
 import "../../convex/admin/sendDecisionEmails";
@@ -176,6 +176,19 @@ describe("acceptance queue", () => {
     expect(await scheduledJobs(t)).toHaveLength(0);
     expect(email.fetchMock).not.toHaveBeenCalled();
     expect((await getReview(t, applicationId))?.status).not.toBe("rejected");
+  });
+
+  it("applies a decision without an email when decision mail is paused", async () => {
+    const t = createConvexTest();
+    const { sessionToken } = await seedStaff(t);
+    const { applicationId } = await seedApplicant(t, { email: "   " });
+    await t.mutation(setMailConfigRef, { sessionToken, decisionEmail: false });
+    expect(
+      await t.mutation(setApplicationDecisionRef, { sessionToken, applicationId, decision: "rejected" }),
+    ).toEqual({ queued: false, applied: true });
+    expect((await getReview(t, applicationId))?.status).toBe("rejected");
+    expect(await t.run((ctx) => ctx.db.query("decisionEmailQueue").collect())).toEqual([]);
+    expect(email.fetchMock).not.toHaveBeenCalled();
   });
 });
 

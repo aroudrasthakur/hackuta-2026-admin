@@ -1,7 +1,7 @@
-import { useMutation } from "../convex/reactBindings";
+import { useMutation, useQuery } from "../convex/reactBindings";
 import { useEffect, useRef, useState } from "react";
 import type { GenericId } from "convex/values";
-import { setApplicationDecisionRef, type ApplicationDetail } from "../convex/adminApi";
+import { getMailConfigRef, setApplicationDecisionRef, type ApplicationDetail } from "../convex/adminApi";
 import { reportUserFacingError } from "../lib/userFacingError";
 import {
   reviewDangerButtonClass,
@@ -20,7 +20,7 @@ type ApplicationDecisionControlsProps = {
   blockedByOther?: boolean;
 };
 
-const decisionCopy: Record<
+const queuedDecisionCopy: Record<
   PendingDecision,
   { label: string; title: string; body: string; success: string }
 > = {
@@ -44,11 +44,37 @@ const decisionCopy: Record<
   },
 };
 
+const immediateDecisionCopy: Record<
+  PendingDecision,
+  { label: string; title: string; body: string; success: string }
+> = {
+  accepted: {
+    label: "Accept",
+    title: "Confirm acceptance",
+    body: "This accepts the applicant now. No decision email will be sent.",
+    success: "Accepted. No decision email was sent.",
+  },
+  rejected: {
+    label: "Reject",
+    title: "Confirm rejection",
+    body: "This rejects the applicant now. No decision email will be sent.",
+    success: "Rejected. No decision email was sent.",
+  },
+  waitlisted: {
+    label: "Waitlist",
+    title: "Confirm waitlist",
+    body: "This waitlists the applicant now. No decision email will be sent.",
+    success: "Waitlisted. No decision email was sent.",
+  },
+};
+
 export function ApplicationDecisionControls({
   detail,
   sessionToken,
   blockedByOther = false,
 }: ApplicationDecisionControlsProps) {
+  const mail = useQuery(getMailConfigRef, { sessionToken });
+  const decisionCopy = mail?.decisionEmail === false ? immediateDecisionCopy : queuedDecisionCopy;
   const finalizeDecision = useMutation(setApplicationDecisionRef);
   const [pendingDecision, setPendingDecision] = useState<PendingDecision | null>(null);
   const [confirming, setConfirming] = useState(false);

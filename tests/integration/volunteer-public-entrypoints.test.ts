@@ -34,6 +34,8 @@ const PUBLIC_ENTRY_GUARDS = [
   { file: "decisionEmailQueue.ts", exportName: "listDecisionEmailQueue", guard: "requireAdminRole" },
   { file: "decisionEmailQueue.ts", exportName: "setDecisionEmailHold", guard: "requireAdminRole" },
   { file: "decisionEmailQueue.ts", exportName: "retryFailedDecisionEmails", guard: "requireAdminRole" },
+  { file: "mailConfig.ts", exportName: "getMailConfig", guard: "requireAdminRole" },
+  { file: "mailConfig.ts", exportName: "setMailConfig", guard: "requireAdminRole" },
   { file: "auth.ts", exportName: "createAndProvisionAdmin", guard: "requireAdminRole" },
   ...[
     "createVolunteer", "listVolunteers", "getVolunteer", "resetVolunteerPassword",
