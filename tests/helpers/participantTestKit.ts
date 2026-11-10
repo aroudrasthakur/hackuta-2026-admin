@@ -17,6 +17,8 @@ export type ParticipantSeedFields = CheckedInFields & {
   checkedInAt?: number;
   createdAt?: number;
   updatedAt?: number;
+  /** Defaults to accepted for pre-check-in seeds so door-scan tests match production after disclosure. */
+  mediaDisclosureAccepted?: boolean;
 };
 
 /**
@@ -49,6 +51,7 @@ export async function insertParticipantWithOptionalCheckIn(
     points,
     pointsReachedAt,
     foodCheckedInAt: _foodCheckedInAt,
+    mediaDisclosureAccepted,
   } = args;
   void _foodCheckedInAt;
 
@@ -63,6 +66,14 @@ export async function insertParticipantWithOptionalCheckIn(
     createdAt,
     updatedAt,
   });
+
+  const acceptDisclosure = mediaDisclosureAccepted ?? checkedInAt === undefined;
+  if (acceptDisclosure) {
+    await ctx.db.insert("participantMediaDisclosures", {
+      participantId,
+      acceptedAt,
+    });
+  }
 
   const onSite = checkedInAt !== undefined || badgeQrCodeToken !== undefined || registrationQrCodeToken !== undefined;
   if (!onSite) {

@@ -101,6 +101,21 @@ describe("two-step badge check-in", () => {
     expect(await s.participant(participantId)).toEqual(before);
   });
 
+  it("rejects door check-in until the participant accepts the media disclosure", async () => {
+    const s = await scene();
+    await s.t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("participantMediaDisclosures")
+        .withIndex("by_participant", (q) => q.eq("participantId", s.participantId))
+        .unique();
+      if (row) await ctx.db.delete(row._id);
+    });
+    const before = await s.snapshot();
+    expect(await s.registration()).toEqual({ status: "media_disclosure_required" });
+    expect(await s.checkIn()).toEqual({ status: "media_disclosure_required" });
+    expect(await s.snapshot()).toEqual(before);
+  });
+
   it("returns the dietary snapshot on preview without writing", async () => {
     const s = await scene();
     await s.t.run((ctx) => ctx.db.patch(s.participantId, { foodRestriction: "Vegan; peanut allergy" }));

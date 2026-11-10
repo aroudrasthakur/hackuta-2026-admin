@@ -236,6 +236,7 @@ describe("check-in workflow", () => {
     [{ status: "registration_qr_used", participant: { name: "Sam Lee", checkedInAt: 1 } }, "Registration QR already used"],
     [{ status: "qr_not_found" }, "Participant not found"],
     [{ status: "participant_not_eligible" }, "Participant not eligible"],
+    [{ status: "media_disclosure_required" }, "Media disclosure required"],
     [{ status: "not_authorized" }, "Permission required"],
   ])("ends the flow for a registration lookup %j", async (response, title) => {
     mocks.resolveRegistration.mockResolvedValue(response);
