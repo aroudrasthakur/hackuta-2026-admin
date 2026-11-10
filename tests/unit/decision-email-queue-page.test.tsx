@@ -167,6 +167,16 @@ describe("DecisionEmailQueuePage", () => {
     return Array.from(container.querySelectorAll("button")).find((el) => el.textContent === name);
   }
 
+  function mailSwitch(label: string) {
+    return container.querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label}"]`);
+  }
+
+  async function flipMailSwitch(label: string) {
+    const control = mailSwitch(label);
+    if (!control) throw new Error(`Missing switch ${label}`);
+    await act(async () => control.click());
+  }
+
   it("shows loading until the queue query resolves", async () => {
     mocks.query.mockReturnValue(undefined);
     await renderPage("admin");
@@ -398,44 +408,52 @@ describe("DecisionEmailQueuePage", () => {
     expect(button("Send selected")?.disabled).toBe(true);
     expect(button("Send all queued")?.disabled).toBe(true);
     expect(button("Retry failed")?.disabled).toBe(true);
-    expect(container.textContent).toContain("Confirmation emails (application received)");
+    expect(container.textContent).toContain("Danger zone");
+    expect(container.textContent).toContain("Set flag for decision and confirmation emails, (off = sending off).");
+    expect(container.querySelector(".admin-card--danger")).not.toBeNull();
   });
 
-  it("toggles outbound mail flags", async () => {
+  it("does not save outbound mail flags until Confirm is pressed", async () => {
     await renderPage("admin");
-    const confirmation = Array.from(container.querySelectorAll("label")).find((el) =>
-      el.textContent?.includes("Confirmation emails"),
-    )?.querySelector("input");
-    const decision = Array.from(container.querySelectorAll("label")).find((el) =>
-      el.textContent?.includes("Decision emails"),
-    )?.querySelector("input");
-    expect(confirmation?.checked).toBe(true);
-    expect(decision?.checked).toBe(true);
+    expect(mailSwitch("Confirmation emails")?.getAttribute("aria-checked")).toBe("true");
+    expect(mailSwitch("Decision emails")?.getAttribute("aria-checked")).toBe("true");
+    expect(button("Confirm")?.disabled).toBe(true);
 
-    await act(async () => confirmation!.click());
-    await act(async () => Promise.resolve());
-    expect(mocks.setMailMutation).toHaveBeenCalledWith(
-      expect.objectContaining({ confirmationEmail: false }),
-    );
+    await flipMailSwitch("Confirmation emails");
+    await flipMailSwitch("Decision emails");
+    expect(mailSwitch("Confirmation emails")?.getAttribute("aria-checked")).toBe("false");
+    expect(mailSwitch("Decision emails")?.getAttribute("aria-checked")).toBe("false");
+    expect(container.textContent).toContain("Unsaved changes");
+    expect(container.textContent).not.toContain("Decision emails are paused");
+    expect(mocks.setMailMutation).not.toHaveBeenCalled();
+    expect(button("Confirm")?.disabled).toBe(false);
 
-    await act(async () => decision!.click());
+    await act(async () => button("Confirm")!.click());
     await act(async () => Promise.resolve());
+    expect(mocks.setMailMutation).toHaveBeenCalledTimes(1);
     expect(mocks.setMailMutation).toHaveBeenCalledWith(
-      expect.objectContaining({ decisionEmail: false }),
+      expect.objectContaining({ confirmationEmail: false, decisionEmail: false }),
     );
+    expect(container.textContent).not.toContain("Unsaved changes");
+    expect(button("Confirm")?.disabled).toBe(true);
   });
 
-  it("shows unchecked flags and still allows hold when only confirmation mail is off", async () => {
+  it("clears a misclicked toggle without saving when it is flipped back", async () => {
+    await renderPage("admin");
+    await flipMailSwitch("Decision emails");
+    expect(button("Confirm")?.disabled).toBe(false);
+    await flipMailSwitch("Decision emails");
+    expect(mailSwitch("Decision emails")?.getAttribute("aria-checked")).toBe("true");
+    expect(button("Confirm")?.disabled).toBe(true);
+    expect(container.textContent).not.toContain("Unsaved changes");
+    expect(mocks.setMailMutation).not.toHaveBeenCalled();
+  });
+
+  it("shows off switches and still allows hold when only confirmation mail is off", async () => {
     mockQueries(sampleQueue(), mailFlags({ confirmationEmail: false, decisionEmail: true }));
     await renderPage("admin");
-    const confirmation = Array.from(container.querySelectorAll("label")).find((el) =>
-      el.textContent?.includes("Confirmation emails"),
-    )?.querySelector("input") as HTMLInputElement;
-    const decision = Array.from(container.querySelectorAll("label")).find((el) =>
-      el.textContent?.includes("Decision emails"),
-    )?.querySelector("input") as HTMLInputElement;
-    expect(confirmation.checked).toBe(false);
-    expect(decision.checked).toBe(true);
+    expect(mailSwitch("Confirmation emails")?.getAttribute("aria-checked")).toBe("false");
+    expect(mailSwitch("Decision emails")?.getAttribute("aria-checked")).toBe("true");
     expect(container.textContent).not.toContain("Decision emails are paused");
     expect(button("Send all queued")?.disabled).toBe(false);
 
@@ -464,14 +482,41 @@ describe("DecisionEmailQueuePage", () => {
     );
   });
 
-  it("surfaces mail setting update failures", async () => {
+  it("surfaces mail setting update failures after Confirm", async () => {
     mocks.setMailMutation.mockRejectedValue(new Error("mailer down"));
     await renderPage("admin");
-    const confirmation = Array.from(container.querySelectorAll("label")).find((el) =>
-      el.textContent?.includes("Confirmation emails"),
-    )?.querySelector("input");
-    await act(async () => confirmation!.click());
+    await flipMailSwitch("Confirmation emails");
+    await act(async () => button("Confirm")!.click());
     await act(async () => Promise.resolve());
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/couldn't update outbound email/i);
+    expect(button("Confirm")?.disabled).toBe(false);
+    expect(mailSwitch("Confirmation emails")?.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("ignores a second Confirm while the first save is still running", async () => {
+    let resolveSave: (value: { confirmationEmail: boolean; decisionEmail: boolean }) => void;
+    mocks.setMailMutation.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    await renderPage("admin");
+    await flipMailSwitch("Decision emails");
+    const confirmMail = () =>
+      Array.from(container.querySelectorAll("button")).find(
+        (el) => el.textContent === "Confirm" || el.textContent === "Saving…",
+      );
+    await act(async () => confirmMail()!.click());
+    await act(async () => confirmMail()!.click());
+    expect(mocks.setMailMutation).toHaveBeenCalledTimes(1);
+    expect(confirmMail()?.textContent).toBe("Saving…");
+    expect(mailSwitch("Decision emails")?.disabled).toBe(true);
+    await act(async () => {
+      resolveSave!({ confirmationEmail: true, decisionEmail: false });
+      await Promise.resolve();
+    });
+    expect(button("Confirm")?.disabled).toBe(true);
+    expect(mailSwitch("Decision emails")?.disabled).toBe(false);
   });
 });

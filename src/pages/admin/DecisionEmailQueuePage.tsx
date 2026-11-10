@@ -12,8 +12,9 @@ import {
 } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { reportUserFacingError } from "../../lib/userFacingError";
-import { reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
+import { reviewDangerButtonClass, reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { ADMIN_ROUTES } from "../../types/routes";
+import { AccessSwitch } from "../../components/admin/AccessSwitch";
 import { ApplicationDecisionBadge } from "../../components/ApplicationDecisionBadge";
 import { LoadingState } from "../../components/states/LoadingState";
 import { formatApplicationDisplayDate } from "../../lib/dateFormat";
@@ -162,6 +163,8 @@ function RecentlySentSection({ rows, totalSent }: { rows: SentRow[]; totalSent: 
   );
 }
 
+type MailFlags = { confirmationEmail: boolean; decisionEmail: boolean };
+
 function OutboundMailCard({
   sessionToken,
 }: {
@@ -169,15 +172,41 @@ function OutboundMailCard({
 }) {
   const mail = useQuery(getMailConfigRef, { sessionToken });
   const setMail = useMutation(setMailConfigRef);
-  const [busy, setBusy] = useState<"confirmationEmail" | "decisionEmail" | null>(null);
+  const [draft, setDraft] = useState<MailFlags | null>(null);
+  const [saved, setSaved] = useState<MailFlags | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function toggle(field: "confirmationEmail" | "decisionEmail", enabled: boolean) {
-    if (busy) return;
-    setBusy(field);
+  const baseline = saved ?? mail;
+  const flags = draft ?? baseline;
+  const dirty = Boolean(
+    flags
+    && baseline
+    && (flags.confirmationEmail !== baseline.confirmationEmail || flags.decisionEmail !== baseline.decisionEmail),
+  );
+
+  function setFlag(field: keyof MailFlags, enabled: boolean) {
+    if (!baseline || !flags || busy) return;
+    const next = { ...flags, [field]: enabled };
+    if (next.confirmationEmail === baseline.confirmationEmail && next.decisionEmail === baseline.decisionEmail) {
+      setDraft(null);
+      return;
+    }
+    setDraft(next);
+  }
+
+  async function confirm() {
+    if (!flags || !dirty || busy) return;
+    setBusy(true);
     setError(null);
     try {
-      await setMail({ sessionToken, [field]: enabled });
+      const next = await setMail({
+        sessionToken,
+        confirmationEmail: flags.confirmationEmail,
+        decisionEmail: flags.decisionEmail,
+      });
+      setSaved(next);
+      setDraft(null);
     } catch (caught) {
       setError(reportUserFacingError(
         "Unable to update mail settings",
@@ -186,41 +215,53 @@ function OutboundMailCard({
         { source: "DecisionEmailQueuePage.setMailConfig" },
       ));
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
-  if (mail === undefined) {
+  if (flags === undefined) {
     return <LoadingState layout="rows" message="Loading mail settings…" />;
   }
 
   return (
-    <section className="admin-card space-y-3 p-4" aria-labelledby="outbound-mail-heading">
-      <h2 id="outbound-mail-heading" className="font-semibold text-ink">Outbound mail</h2>
-      <p className="text-sm text-ocean">
-        When a flag is off, that email is not sent. Applications still submit. Accept, reject, and waitlist still apply immediately.
-      </p>
+    <section className="admin-card admin-card--danger admin-card__body space-y-3" aria-labelledby="outbound-mail-heading">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-red-800">Danger zone</p>
+        <h2 id="outbound-mail-heading" className="font-semibold text-ink">Outbound mail</h2>
+        <p className="mt-1 text-sm text-red-900/80">
+          Set flag for decision and confirmation emails, (off = sending off).
+        </p>
+      </div>
       {error ? <p role="alert" className="admin-callout admin-callout--alert">{error}</p> : null}
-      <label className="flex items-center gap-3 text-sm text-ink">
-        <input
-          type="checkbox"
-          className="size-4 accent-ocean"
-          checked={mail.confirmationEmail}
-          disabled={busy !== null}
-          onChange={(event) => void toggle("confirmationEmail", event.target.checked)}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-ink">Confirmation emails</p>
+        <AccessSwitch
+          label="Confirmation emails"
+          checked={flags.confirmationEmail}
+          disabled={busy}
+          onChange={(enabled) => setFlag("confirmationEmail", enabled)}
         />
-        Confirmation emails (application received)
-      </label>
-      <label className="flex items-center gap-3 text-sm text-ink">
-        <input
-          type="checkbox"
-          className="size-4 accent-ocean"
-          checked={mail.decisionEmail}
-          disabled={busy !== null}
-          onChange={(event) => void toggle("decisionEmail", event.target.checked)}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-ink">Decision emails</p>
+        <AccessSwitch
+          label="Decision emails"
+          checked={flags.decisionEmail}
+          disabled={busy}
+          onChange={(enabled) => setFlag("decisionEmail", enabled)}
         />
-        Decision emails (accept, reject, waitlist)
-      </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className={reviewDangerButtonClass}
+          disabled={!dirty || busy}
+          onClick={() => void confirm()}
+        >
+          {busy ? "Saving…" : "Confirm"}
+        </button>
+        {dirty && !busy ? <p className="text-sm font-semibold text-red-800">Unsaved changes</p> : null}
+      </div>
     </section>
   );
 }

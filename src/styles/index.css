@@ -168,6 +168,11 @@ body:has(.participants-dialog[open]) { overflow: hidden; }
     box-shadow: var(--shadow-panel);
   }
 
+  .admin-card--danger {
+    border-color: #efc9cc;
+    background: #fff8f8;
+  }
+
   .admin-card--flush {
     overflow: hidden;
   }
