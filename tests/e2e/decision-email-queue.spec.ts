@@ -72,8 +72,13 @@ test.describe("decision email queue", () => {
     const decision = page.getByRole("switch", { name: "Decision emails", exact: true });
     const confirm = page.getByRole("button", { name: "Confirm", exact: true });
     await expect(page.getByRole("heading", { name: "Outbound mail" })).toBeVisible();
-    await expect(page.getByText("Danger zone", { exact: true })).toBeVisible();
+    const dangerTitle = page.getByText("Danger zone", { exact: true });
+    await expect(dangerTitle).toBeVisible();
+    await expect(dangerTitle).toHaveCSS("text-align", "center");
     await expect(page.getByText("Set flag for decision and confirmation emails, (off = sending off).")).toBeVisible();
+    await expect(page.locator(".admin-card--danger")).toHaveCSS("border-top-color", "rgb(155, 48, 59)");
+    await expect(confirm).toHaveClass(/admin-danger-confirm/);
+    await expect(confirm).toHaveCSS("color", "rgb(255, 255, 255)");
     await expect(confirmation).toHaveAttribute("aria-checked", "true");
     await expect(decision).toHaveAttribute("aria-checked", "true");
     await expect(confirm).toBeDisabled();

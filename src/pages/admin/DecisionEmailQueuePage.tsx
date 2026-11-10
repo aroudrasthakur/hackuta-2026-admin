@@ -12,7 +12,7 @@ import {
 } from "../../convex/adminApi";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { reportUserFacingError } from "../../lib/userFacingError";
-import { reviewDangerButtonClass, reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
+import { reviewDangerSolidButtonClass, reviewPrimaryButtonClass, reviewSecondaryButtonClass } from "../../lib/reviewButtonClasses";
 import { ADMIN_ROUTES } from "../../types/routes";
 import { AccessSwitch } from "../../components/admin/AccessSwitch";
 import { ApplicationDecisionBadge } from "../../components/ApplicationDecisionBadge";
@@ -226,7 +226,7 @@ function OutboundMailCard({
   return (
     <section className="admin-card admin-card--danger admin-card__body space-y-3" aria-labelledby="outbound-mail-heading">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-red-800">Danger zone</p>
+        <p className="text-center text-xs font-semibold uppercase tracking-wide text-red-800">Danger zone</p>
         <h2 id="outbound-mail-heading" className="font-semibold text-ink">Outbound mail</h2>
         <p className="mt-1 text-sm text-red-900/80">
           Set flag for decision and confirmation emails, (off = sending off).
@@ -251,16 +251,16 @@ function OutboundMailCard({
           onChange={(enabled) => setFlag("decisionEmail", enabled)}
         />
       </div>
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {dirty && !busy ? <p className="text-sm font-semibold text-red-800">Unsaved changes</p> : null}
         <button
           type="button"
-          className={reviewDangerButtonClass}
+          className={reviewDangerSolidButtonClass}
           disabled={!dirty || busy}
           onClick={() => void confirm()}
         >
           {busy ? "Saving…" : "Confirm"}
         </button>
-        {dirty && !busy ? <p className="text-sm font-semibold text-red-800">Unsaved changes</p> : null}
       </div>
     </section>
   );

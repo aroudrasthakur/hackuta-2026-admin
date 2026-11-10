@@ -169,8 +169,19 @@ body:has(.participants-dialog[open]) { overflow: hidden; }
   }
 
   .admin-card--danger {
-    border-color: #efc9cc;
+    border: 2px solid var(--color-negative);
     background: #fff8f8;
+  }
+
+  .admin-danger-confirm {
+    border-color: var(--color-negative);
+    background: var(--color-negative);
+    color: #fff;
+  }
+
+  .admin-danger-confirm:hover:not(:disabled) {
+    border-color: #7f242e;
+    background: #7f242e;
   }
 
   .admin-card--flush {

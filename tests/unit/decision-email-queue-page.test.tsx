@@ -411,6 +411,11 @@ describe("DecisionEmailQueuePage", () => {
     expect(container.textContent).toContain("Danger zone");
     expect(container.textContent).toContain("Set flag for decision and confirmation emails, (off = sending off).");
     expect(container.querySelector(".admin-card--danger")).not.toBeNull();
+    expect(
+      Array.from(container.querySelectorAll("p")).find((el) => el.textContent === "Danger zone")?.className,
+    ).toContain("text-center");
+    expect(button("Confirm")?.className).toContain("admin-danger-confirm");
+    expect(button("Confirm")?.parentElement?.className).toContain("justify-end");
   });
 
   it("does not save outbound mail flags until Confirm is pressed", async () => {

@@ -17,5 +17,8 @@ export const reviewSuccessButtonClass =
 export const reviewDangerButtonClass =
   `${adminButtonBase} border-red-300 bg-white text-red-800 hover:border-red-400 hover:bg-red-50`;
 
+export const reviewDangerSolidButtonClass =
+  `${adminButtonBase} admin-danger-confirm`;
+
 export const reviewWaitlistButtonClass =
   `${adminButtonBase} border-amber-300 bg-white text-amber-950 hover:border-amber-400 hover:bg-amber-50`;
