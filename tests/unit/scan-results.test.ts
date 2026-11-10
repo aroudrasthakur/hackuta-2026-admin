@@ -130,7 +130,7 @@ describe("operation outcomes", () => {
       tone: "error", title: "Registration QR already used", detail: expect.stringContaining(`Sam already checked in at ${formatScanTime(at)}`),
     });
     for (const status of [
-      "qr_not_found", "participant_not_eligible", "not_authorized", "rate_limited",
+      "qr_not_found", "participant_not_eligible", "media_disclosure_required", "not_authorized", "rate_limited",
       "badge_invalid", "badge_is_registration", "badge_in_use", "badge_retired",
       "self_scan_denied",
     ] as const) {

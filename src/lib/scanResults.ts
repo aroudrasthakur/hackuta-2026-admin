@@ -129,6 +129,11 @@ const OUTCOMES = {
     title: "Participant not eligible",
     detail: "This person isn't an accepted participant, so no action is allowed. Direct them to the registration desk.",
   },
+  media_disclosure_required: {
+    tone: "error",
+    title: "Media disclosure required",
+    detail: "This participant hasn't accepted the media disclosure yet. Ask them to open the Check-in tab in the participant portal and confirm, then scan again.",
+  },
   not_authorized: {
     tone: "error",
     title: "Permission required",
