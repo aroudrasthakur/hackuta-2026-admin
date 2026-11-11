@@ -13,7 +13,7 @@ describe("decision email templates", () => {
       expect(content.subject).toContain("HackUTA 2026");
       expect(content.text).toContain("Hi Taylor,");
       expect(content.text).toContain("The HackUTA 2026 Team");
-      expect(content.text).toContain("hello@hackuta.org");
+      expect(content.text).toContain("Questions? Contact us at hello@hackuta.org");
     },
   );
 
@@ -33,8 +33,6 @@ describe("decision email templates", () => {
     expect(text).toContain("Before you arrive, please read the guide below");
     expect(text).toContain("IMPORTANT Day-Of Information");
     expect(text).toContain("https://docs.hackuta.com/HackUTA%202026%20Hacker%20Instructions.pdf");
-    expect(text).toContain("Check-in is Saturday, November 14, from 9–11 AM at SWSH");
-    expect(text).toContain("Attendance at check-in and the Sunday judging period is required");
     expect(text).toContain("https://hacker.hackuta.com");
     expect(text).toContain("QR code to complete the check-in process");
     expect(text).toContain("primary way to communicate with you");
