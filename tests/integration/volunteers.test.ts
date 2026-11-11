@@ -432,7 +432,11 @@ describe("audit log queries", () => {
   async function logFixture() {
     const base = await managedFixture();
     const { t, actor, adminId, eventId } = base;
-    const { participantId } = await seedParticipant(t, actor.adminId);
+    const { applicationId, userId } = await seedApplicant(t, { email: "taylor@example.com", review: { status: "accepted" } });
+    const { participantId } = await t.run((ctx) => insertParticipantWithOptionalCheckIn(ctx, {
+      applicationId, authUserId: userId, acceptedBy: actor.adminId, acceptedAt: 1,
+      qrCodeToken: "ab".repeat(32), checkedInAt: 1, points: 0, createdAt: 1, updatedAt: 1,
+    }));
     const otherEvent = await seedEvent(t, "Hacking");
     await t.run(async (ctx) => {
       const attendee = await getCheckedIn(ctx, participantId);

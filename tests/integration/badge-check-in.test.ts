@@ -13,6 +13,7 @@ import { hashBadgeToken } from "../../convex/admin/participantQr";
 import { awardEventPoints } from "../../convex/admin/pointsLedger";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
+import { CHECK_IN_STARTING_POINTS } from "../../shared/admin/volunteerRules";
 import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
 import { seedMealPeriod } from "../helpers/mealTestKit";
@@ -160,11 +161,17 @@ describe("two-step badge check-in", () => {
       badgeAssignedAt: NOW + 1000,
       badgeAssignedBy: s.volunteer.adminId,
       updatedAt: NOW + 1000,
-      points: 0,
+      points: CHECK_IN_STARTING_POINTS,
     });
     const { logs } = await s.snapshot();
     expect(logs).toEqual([expect.objectContaining({
-      actorAdminId: s.volunteer.adminId, checkedInId: (await s.attendee())!._id, action: "check_in", createdAt: NOW + 1000,
+      actorAdminId: s.volunteer.adminId,
+      checkedInId: (await s.attendee())!._id,
+      action: "check_in",
+      pointsDelta: CHECK_IN_STARTING_POINTS,
+      previousPoints: 0,
+      newPoints: CHECK_IN_STARTING_POINTS,
+      createdAt: NOW + 1000,
     })]);
     expectNoQrValues(logs);
   });
@@ -186,14 +193,14 @@ describe("two-step badge check-in", () => {
     expect(await s.t.query(listParticipantsRef, {
       sessionToken: s.admin.sessionToken, paginationOpts: page,
     })).toMatchObject({
-      page: [{ participantId: s.participantId, checkedInAt: NOW, badgeAssigned: true, points: 0 }],
+      page: [{ participantId: s.participantId, checkedInAt: NOW, badgeAssigned: true, points: CHECK_IN_STARTING_POINTS }],
     });
     expect(await s.t.query(getParticipantDetailsRef, {
       sessionToken: s.admin.sessionToken, participantId: s.participantId,
     })).toMatchObject({
       checkedInAt: NOW,
-      points: 0,
-      ledgerPoints: 0,
+      points: CHECK_IN_STARTING_POINTS,
+      ledgerPoints: CHECK_IN_STARTING_POINTS,
       badge: { assignedAt: NOW, assignedBy: { adminId: s.volunteer.adminId } },
     });
   });
@@ -210,7 +217,7 @@ describe("two-step badge check-in", () => {
       qrCodeToken: BADGE,
       badgeQrCodeToken: BADGE,
       registrationQrCodeToken: REGISTRATION,
-      points: 0,
+      points: CHECK_IN_STARTING_POINTS,
     });
 
     const eventId = await s.t.run((ctx) => ctx.db.insert("events", {
@@ -220,7 +227,7 @@ describe("two-step badge check-in", () => {
       actorAdminId: s.admin.adminId, participantId: s.participantId, eventId, now: NOW + 1,
     }));
     expect(await s.participant()).not.toHaveProperty("points");
-    expect((await s.attendee())?.points).toBe(10);
+    expect((await s.attendee())?.points).toBe(CHECK_IN_STARTING_POINTS + 10);
   });
 
   it("retires the registration QR everywhere and accepts the badge after check-in", async () => {
@@ -253,7 +260,11 @@ describe("two-step badge check-in", () => {
   it("rejects unusable badges and leaves the participant unchanged", async () => {
     const s = await scene();
     const otherId = await seedParticipant(s.t, s.admin.adminId, {
-      qrCodeToken: OTHER_REGISTRATION, registrationQrCodeToken: OTHER_REGISTRATION, badgeQrCodeToken: OTHER_BADGE, checkedInAt: 1,
+      qrCodeToken: OTHER_REGISTRATION,
+      registrationQrCodeToken: OTHER_REGISTRATION,
+      badgeQrCodeToken: OTHER_BADGE,
+      checkedInAt: 1,
+      points: 0,
     });
     await s.t.run(async (ctx) => {
       const attendee = await getCheckedIn(ctx, otherId);
@@ -334,6 +345,7 @@ describe("admin badge replacement", () => {
       await ctx.db.insert("participantEventAwards", {
         checkedInId: attendee!._id, eventId, pointsAwarded: 10, awardedBy: s.volunteer.adminId, awardedAt: NOW,
       });
+      await ctx.db.patch(attendee!._id, { points: CHECK_IN_STARTING_POINTS + 10 });
     });
     const replace = (sessionToken: string, fields: Partial<{ badgeQrCodeToken: string; reason: string; expectedBadgeAssignedAt: number | null }> = {}) =>
       s.t.mutation(assignParticipantBadgeRef, {
@@ -357,7 +369,8 @@ describe("admin badge replacement", () => {
     });
     expect(await s.attendee()).toMatchObject({
       qrCodeToken: OTHER_BADGE, badgeQrCodeToken: OTHER_BADGE, registrationQrCodeToken: REGISTRATION,
-      badgeAssignedAt: NOW + 60_000, badgeAssignedBy: s.admin.adminId, checkedInAt: NOW, points: 0,
+      badgeAssignedAt: NOW + 60_000, badgeAssignedBy: s.admin.adminId, checkedInAt: NOW,
+      points: CHECK_IN_STARTING_POINTS + 10,
     });
     expect(await s.history()).toEqual(historyBefore);
     expect(await s.shopScan(BADGE)).toEqual({ status: "badge_retired" });

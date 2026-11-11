@@ -188,7 +188,12 @@ describe("getParticipantDetails", () => {
     });
     const eventId = await seedEvent(t, "Workshop", 15);
     await t.run((ctx) => awardEventPoints(ctx, { actorAdminId: admin.adminId, participantId, eventId, now: 50 }));
-    await t.mutation(api.setParticipantPoints, { sessionToken, participantId, points: 10, reason: "Duplicate scan" });
+    await t.mutation(api.setParticipantPoints, {
+      sessionToken,
+      participantId,
+      points: 10,
+      reason: "Duplicate scan",
+    });
 
     const details = await t.query(api.getParticipantDetails, { sessionToken, participantId });
     expect(details).toMatchObject({

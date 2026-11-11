@@ -1,5 +1,6 @@
 import type { GenericId } from "convex/values";
 import type { MutationCtx } from "../../convex/lib/dataModel";
+import { CHECK_IN_STARTING_POINTS } from "../../shared/admin/volunteerRules";
 
 type CheckedInFields = {
   badgeQrCodeToken?: string;
@@ -94,11 +95,26 @@ export async function insertParticipantWithOptionalCheckIn(
     ...(badgeQrCodeToken !== undefined ? { badgeQrCodeToken } : {}),
     ...(badgeAssignedAt !== undefined ? { badgeAssignedAt } : {}),
     ...(badgeAssignedBy !== undefined ? { badgeAssignedBy } : {}),
-    points: points ?? 0,
-    ...(pointsReachedAt !== undefined ? { pointsReachedAt } : {}),
+    points: points ?? CHECK_IN_STARTING_POINTS,
+    ...(pointsReachedAt !== undefined
+      ? { pointsReachedAt }
+      : points === undefined
+        ? { pointsReachedAt: checkedInAt ?? badgeAssignedAt ?? updatedAt }
+        : {}),
     createdAt,
     updatedAt,
   });
+  if (points === undefined) {
+    await ctx.db.insert("volunteerActionLogs", {
+      actorAdminId: badgeAssignedBy ?? acceptedBy,
+      checkedInId,
+      action: "check_in",
+      pointsDelta: CHECK_IN_STARTING_POINTS,
+      previousPoints: 0,
+      newPoints: CHECK_IN_STARTING_POINTS,
+      createdAt,
+    });
+  }
   return { participantId, checkedInId };
 }
 

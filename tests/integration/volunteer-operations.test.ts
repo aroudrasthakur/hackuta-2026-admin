@@ -405,7 +405,7 @@ describe("awardEventPoints", () => {
 
   it("uses the ledger when the cached balance has not been backfilled", async () => {
     const t = createConvexTest();
-    const { participantId, checkedInId, adminId, volunteer } = await seedAwardScene(t, { points: undefined });
+    const { participantId, checkedInId, adminId, volunteer } = await seedAwardScene(t, { points: 0 });
     const earlierEvent = await seedEvent(t);
     await t.run((ctx) => ctx.db.insert("participantEventAwards", {
       checkedInId: checkedInId!, eventId: earlierEvent, pointsAwarded: 7, awardedBy: adminId, awardedAt: 1,
