@@ -69,8 +69,15 @@ export async function scanQr(page: Page, value: string) {
     qrWindow.qrNextId = (qrWindow.qrNextId ?? 0) + 1;
     qrWindow.qrShown = { id: qrWindow.qrNextId, image };
   }, svg);
-  const startButton = page.getByRole("button", { name: /^(Scan with camera|Try camera again)$/ });
-  if (await startButton.isVisible()) await startButton.click();
+  const scanner = page.getByLabel("Camera scanner");
+  const startButton = scanner.getByRole("button", { name: /^(Scan with camera|Try camera again)$/ });
+  const stopButton = scanner.getByRole("button", { name: /^Stop camera/ });
+  if (!(await stopButton.isVisible())) {
+    if (await startButton.isVisible()) {
+      await startButton.click({ timeout: 5_000 });
+    }
+    await stopButton.waitFor({ state: "visible", timeout: 15_000 });
+  }
   await page.waitForFunction(() => (window as QrWindow).qrShown === null, undefined, { timeout: 15_000 });
 }
 
