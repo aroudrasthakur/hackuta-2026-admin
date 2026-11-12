@@ -17,6 +17,19 @@ export type PurchaseOutcome = { outcome: ScanOutcome; next: PurchaseNext; receip
 
 const NOTHING_CHARGED = "Nothing was charged.";
 
+export function purchaseCooldownOutcome(result: {
+  itemName: string;
+  remainingMs: number;
+}): ScanOutcome {
+  const seconds = Math.max(1, Math.ceil(result.remainingMs / 1000));
+  const remaining = seconds < 60 ? `${seconds} sec` : `${Math.ceil(seconds / 60)} min`;
+  return {
+    tone: "error",
+    title: "Purchase Cooldown Active",
+    detail: `${result.itemName} can be purchased again in ${remaining}. ${NOTHING_CHARGED} Choose another item or scan another participant.`,
+  };
+}
+
 export function purchaseOutcome(result: ShopPurchaseResult, name: string): PurchaseOutcome {
   const end = (outcome: ScanOutcome, next: PurchaseNext = "result"): PurchaseOutcome => ({ outcome, next, receipt: null });
   switch (result.status) {
@@ -44,6 +57,8 @@ export function purchaseOutcome(result: ShopPurchaseResult, name: string): Purch
         title: "Not enough points",
         detail: `${name} has ${formatPoints(result.points)} points and needs ${formatPoints(result.totalPointsCost)}. ${NOTHING_CHARGED}`,
       }, "choose");
+    case "purchase_cooldown_active":
+      return end(purchaseCooldownOutcome(result), "choose");
     case "item_unavailable":
       return end({ tone: "error", title: "Item unavailable", detail: `This item is no longer for sale. ${NOTHING_CHARGED}` }, "choose");
     case "invalid_quantity":

@@ -26,7 +26,7 @@ export type ShopWorkflowState =
   | { step: "scan" }
   | { step: "resolving" }
   | { step: "choose"; customer: ShopCustomerInfo; selection: ShopSelection | null; notice: ScanOutcome | null }
-  | { step: "review"; customer: ShopCustomerInfo; selection: ShopSelection; submitting: boolean; error: ScanOutcome | null }
+  | { step: "review"; customer: ShopCustomerInfo; selection: ShopSelection; submitting: boolean; error: ScanOutcome | null; retryUnitPointsCost: number | null }
   | { step: "result"; outcome: ScanOutcome; receipt: ShopReceipt | null; customer: ShopCustomerInfo | null };
 
 /**
@@ -82,7 +82,7 @@ export function useShopWorkflow() {
   const review = useCallback(() => {
     if (state.step !== "choose" || !state.selection) return;
     keyRef.current ??= newIdempotencyKey();
-    setState({ step: "review", customer: state.customer, selection: state.selection, submitting: false, error: null });
+    setState({ step: "review", customer: state.customer, selection: state.selection, submitting: false, error: null, retryUnitPointsCost: null });
   }, [state]);
 
   /** Back to item choice for the same participant. A new choice gets a new key. */
@@ -102,7 +102,8 @@ export function useShopWorkflow() {
     busyRef.current = true;
     const request = ++requestRef.current;
     setState({ ...state, submitting: true, error: null });
-    const retry = (error: ScanOutcome) => setState({ step: "review", customer, selection, submitting: false, error });
+    const retry = (error: ScanOutcome, retryUnitPointsCost: number | null = null) =>
+      setState({ step: "review", customer, selection, submitting: false, error, retryUnitPointsCost });
     try {
       const result = await withScanTimeout(() => purchase({
         sessionToken,
@@ -114,12 +115,12 @@ export function useShopWorkflow() {
       }));
       if (request !== requestRef.current) return;
       const { outcome, next, receipt } = purchaseOutcome(result, customer.name);
-      if (next === "review") retry(outcome);
+      if (next === "review") retry(outcome, result.status === "rate_limited" ? state.retryUnitPointsCost : null);
       else finish(outcome, next === "choose" ? customer : null, receipt);
     } catch (caught) {
       if (request !== requestRef.current) return;
       const outcome = scanErrorOutcome(caught, "Volunteer shop purchase failed");
-      if (outcome === scanFailureOutcome("network")) retry(outcome);
+      if (outcome === scanFailureOutcome("network")) retry(outcome, expectedUnitPointsCost);
       else finish(outcome);
     } finally {
       if (request === requestRef.current) busyRef.current = false;

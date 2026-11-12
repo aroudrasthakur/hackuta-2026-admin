@@ -76,7 +76,8 @@ export async function scanQr(page: Page, value: string) {
     if (await startButton.isVisible()) {
       await startButton.click({ timeout: 5_000 });
     }
-    await stopButton.waitFor({ state: "visible", timeout: 15_000 });
+    // Fast decoders can finish before Playwright sees the transient Stop button.
+    // The consumed code below, and each caller's outcome assertion, prove scanning.
   }
   await page.waitForFunction(() => (window as QrWindow).qrShown === null, undefined, { timeout: 15_000 });
 }

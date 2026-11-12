@@ -16,7 +16,7 @@ import {
 import { ShopDialog } from "./ShopDialog";
 
 type Status = ShopItemAdminRow["status"];
-type Errors = Partial<Record<"name" | "price", string | undefined>>;
+type Errors = Partial<Record<"name" | "price" | "cooldown", string | undefined>>;
 
 const STATUS_OPTIONS: Array<{ value: Status; label: string }> = [
   { value: "active", label: "Active: Shown and sellable" },
@@ -38,6 +38,8 @@ export function ShopItemForm({ item, onClose, onSaved }: {
   const [name, setName] = useState(item?.name ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [price, setPrice] = useState(item ? String(item.pointsCost) : "");
+  const [cooldownEnabled, setCooldownEnabled] = useState(item?.purchaseCooldownMinutes !== undefined);
+  const [cooldownMinutes, setCooldownMinutes] = useState(String(item?.purchaseCooldownMinutes ?? 60));
   const [status, setStatusValue] = useState<Status>(item?.status ?? "active");
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -46,9 +48,13 @@ export function ShopItemForm({ item, onClose, onSaved }: {
   async function save() {
     if (!sessionToken || saving) return;
     const pointsCost = parseWholeNumber(price, 1);
+    const purchaseCooldownMinutes = cooldownEnabled ? Number(cooldownMinutes) : undefined;
+    const invalidCooldown = purchaseCooldownMinutes !== undefined
+      && (!Number.isFinite(purchaseCooldownMinutes) || purchaseCooldownMinutes <= 0 || !Number.isFinite(purchaseCooldownMinutes * 60_000));
     const next: Errors = {
       ...(name.trim() ? {} : { name: "Enter a name." }),
       ...(pointsCost === null ? { price: "Enter a whole number of 1 point or more." } : {}),
+      ...(invalidCooldown ? { cooldown: "Enter a positive number of minutes." } : {}),
     };
     setErrors(next);
     if (Object.values(next).some(Boolean) || pointsCost === null) return;
@@ -61,6 +67,7 @@ export function ShopItemForm({ item, onClose, onSaved }: {
         name: name.trim(),
         description: description.trim(),
         pointsCost,
+        ...(purchaseCooldownMinutes === undefined ? {} : { purchaseCooldownMinutes }),
       };
       if (item) {
         await update({ ...fields, itemId: item.itemId });
@@ -108,6 +115,17 @@ export function ShopItemForm({ item, onClose, onSaved }: {
         <input id={field("price")} className="admin-field__control" inputMode="numeric" value={price} aria-invalid={errors.price ? true : undefined} onChange={(event) => setPrice(event.target.value)} />
       </label>
       {errors.price ? <p className="shop-field-error">{errors.price}</p> : null}
+      <label className="admin-field" htmlFor={field("cooldown-enabled")}>
+        <span><input id={field("cooldown-enabled")} type="checkbox" checked={cooldownEnabled} onChange={(event) => setCooldownEnabled(event.target.checked)} /> Enable purchase cooldown</span>
+      </label>
+      {cooldownEnabled ? <>
+        <label className="admin-field" htmlFor={field("cooldown")}>
+          Cooldown (minutes)
+          <input id={field("cooldown")} className="admin-field__control" inputMode="decimal" value={cooldownMinutes} aria-invalid={errors.cooldown ? true : undefined} aria-describedby={errors.cooldown ? `${field("cooldown-help")} ${field("cooldown-error")}` : field("cooldown-help")} onChange={(event) => setCooldownMinutes(event.target.value)} />
+        </label>
+        <p id={field("cooldown-help")} className="text-sm text-muted">Time each participant must wait before buying this item again. Existing non-refunded purchases count.</p>
+        {errors.cooldown ? <p id={field("cooldown-error")} role="alert" className="shop-field-error">{errors.cooldown}</p> : null}
+      </> : null}
       <label className="admin-field" htmlFor={field("status")}>
         Status
         <select id={field("status")} className="admin-field__control" value={status} onChange={(event) => setStatusValue(event.target.value as Status)}>

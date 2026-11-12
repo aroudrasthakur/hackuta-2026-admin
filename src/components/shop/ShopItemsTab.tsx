@@ -105,12 +105,13 @@ export function ShopItemsTab() {
                     <th scope="col">Price</th>
                     <th scope="col">Status</th>
                     <th scope="col">Flash sale</th>
+                    <th scope="col">Cooldown</th>
                     <th scope="col"><span className="sr-only">Edit</span></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.length === 0 ? (
-                    <tr><td colSpan={6} className="py-8 text-center text-muted">No items match.</td></tr>
+                    <tr><td colSpan={7} className="py-8 text-center text-muted">No items match.</td></tr>
                   ) : rows.map((item) => {
                     const listing = ITEM_STATUS[item.status];
                     return (
@@ -125,6 +126,9 @@ export function ShopItemsTab() {
                         </td>
                         <td className="shop-table__sale">
                           {item.flashSaleId ? <AdminStatusBadge className="admin-badge--sale">On sale</AdminStatusBadge> : <span className="text-muted">—</span>}
+                        </td>
+                        <td className="shop-table__edit">
+                          <span className="text-muted">{item.purchaseCooldownMinutes === undefined ? "None" : `${item.purchaseCooldownMinutes} min`}</span>
                         </td>
                         <td className="shop-table__edit">
                           <button type="button" className="shop-pill shop-pill--sm shop-pill--ghost" aria-label={`Edit ${item.name}`} onClick={() => setEditing({ kind: "edit", item })}>Edit</button>
