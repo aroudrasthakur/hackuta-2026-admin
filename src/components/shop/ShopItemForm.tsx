@@ -115,8 +115,15 @@ export function ShopItemForm({ item, onClose, onSaved }: {
         <input id={field("price")} className="admin-field__control" inputMode="numeric" value={price} aria-invalid={errors.price ? true : undefined} onChange={(event) => setPrice(event.target.value)} />
       </label>
       {errors.price ? <p className="shop-field-error">{errors.price}</p> : null}
-      <label className="admin-field" htmlFor={field("cooldown-enabled")}>
-        <span><input id={field("cooldown-enabled")} type="checkbox" checked={cooldownEnabled} onChange={(event) => setCooldownEnabled(event.target.checked)} /> Enable purchase cooldown</span>
+      <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-night" htmlFor={field("cooldown-enabled")}>
+        <input
+          id={field("cooldown-enabled")}
+          type="checkbox"
+          className="size-4 shrink-0 accent-ocean"
+          checked={cooldownEnabled}
+          onChange={(event) => setCooldownEnabled(event.target.checked)}
+        />
+        Enable purchase cooldown
       </label>
       {cooldownEnabled ? <>
         <label className="admin-field" htmlFor={field("cooldown")}>
