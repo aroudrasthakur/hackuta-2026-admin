@@ -18,7 +18,7 @@ import { usePriceClock, useWatchPriceChange } from "../../hooks/usePriceClock";
 import { useShopWorkflow, type ShopSelection, type ShopWorkflowState } from "../../hooks/useShopWorkflow";
 import { scanConfirmButtonClass, scanPrimaryButtonClass, scanSecondaryButtonClass } from "../../lib/scanButtonClasses";
 import { formatPoints } from "../../lib/shopFormat";
-import type { ShopCustomerInfo, ShopReceipt } from "../../lib/shopScanResults";
+import { purchaseCooldownOutcome, type ShopCustomerInfo, type ShopReceipt } from "../../lib/shopScanResults";
 import type { ScanOutcome } from "../../lib/scanResults";
 import { ADMIN_ROUTES } from "../../types/routes";
 
@@ -123,13 +123,15 @@ function ShopWorkflow() {
   const { nowBucket, watch } = usePriceClock();
   const shopping = state.step === "choose" || state.step === "review";
   const catalog = useQuery(listShopCatalogForVolunteerRef, sessionToken && shopping ? { sessionToken, nowBucket } : "skip");
-  useWatchPriceChange(watch, catalog?.nextPriceChangeAt);
   const customer = shopping ? state.customer : null;
   const live = useQuery(getShopCustomerRef, sessionToken && customer ? { sessionToken, participantId: customer.participantId } : "skip");
   const selection = state.step === "review" ? state.selection : null;
   const preview = useQuery(previewShopPurchaseRef, sessionToken && customer && selection ? {
     sessionToken, participantId: customer.participantId, itemId: selection.itemId, quantity: selection.quantity, nowBucket,
   } : "skip");
+  const cooldownEndsAt = preview?.status === "purchase_cooldown_active" ? preview.availableAt : null;
+  const nextRefreshAt = Math.min(catalog?.nextPriceChangeAt ?? Infinity, cooldownEndsAt ?? Infinity);
+  useWatchPriceChange(watch, Number.isFinite(nextRefreshAt) ? nextRefreshAt : null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (state.step === "review") headingRef.current?.focus();
@@ -150,7 +152,7 @@ function ShopWorkflow() {
       ) : null}
 
       {shopping && customer ? <CustomerCard customer={customer} points={points} /> : null}
-      {shopping && live === null ? (
+      {shopping && live === null && (state.step !== "review" || state.retryUnitPointsCost === null) ? (
         <Notice outcome={{ tone: "error", title: "Participant not eligible", detail: "This participant can no longer buy from the shop. Nothing was charged." }} />
       ) : null}
 
@@ -170,8 +172,12 @@ function ShopWorkflow() {
       {state.step === "review" ? (() => {
         const item = items.find((candidate) => candidate.itemId === state.selection.itemId);
         const ready = preview?.status === "ok" ? preview : null;
-        const short = ready ? !ready.hasEnoughPoints : false;
-        const blocked = preview && preview.status !== "ok";
+        // An uncertain response may already have charged this exact attempt.
+        // Retry its original key even when its own purchase invalidated preview.
+        const uncertain = state.retryUnitPointsCost !== null;
+        const unitPointsCost = state.retryUnitPointsCost ?? ready?.unitPointsCost;
+        const short = !uncertain && ready ? !ready.hasEnoughPoints : false;
+        const blocked = !uncertain && preview && preview.status !== "ok";
         return (
           <section aria-labelledby="shop-review-heading" className="shop-panel">
             <h2 id="shop-review-heading" ref={headingRef} tabIndex={-1} className="volunteer-section-title">Review purchase</h2>
@@ -186,26 +192,29 @@ function ShopWorkflow() {
                 <div className="shop-summary__total"><dt>Total</dt><dd>{formatPoints(ready.totalPointsCost)} pts</dd></div>
                 <div><dt>Balance after</dt><dd className={short ? "text-negative" : ""}>{short ? "Not enough" : `${formatPoints(ready.pointsAfter)} pts`}</dd></div>
               </dl>
-            ) : blocked ? null : <LoadingState message="Checking the price…" />}
+            ) : blocked || uncertain ? null : <LoadingState message="Checking the price…" />}
             {short && ready ? (
               <div role="alert" className="admin-callout admin-callout--alert text-base">
                 <p className="font-semibold">Not enough points</p>
                 <p>{customer?.name} has {formatPoints(ready.points)} points and needs {formatPoints(ready.totalPointsCost)}. Lower the quantity or pick another item.</p>
               </div>
             ) : null}
-            {blocked ? <div role="alert" className="admin-callout admin-callout--alert text-base"><p className="font-semibold">This purchase can't go ahead</p><p>The item or participant is no longer available. Go back and choose again.</p></div> : null}
+            {!uncertain && preview?.status === "purchase_cooldown_active"
+              ? <Notice outcome={purchaseCooldownOutcome(preview)} />
+              : blocked ? <div role="alert" className="admin-callout admin-callout--alert text-base"><p className="font-semibold">This purchase can't go ahead</p><p>The item or participant is no longer available. Go back and choose again.</p></div> : null}
             {state.error ? <Notice outcome={state.error} /> : ready && !short ? <p className="text-base">Hand over the item after you confirm. The points come off right away.</p> : null}
             <div className="volunteer-confirm__actions">
               <button
                 type="button"
                 className={scanConfirmButtonClass}
-                disabled={!ready || short || state.submitting || live === null}
+                disabled={unitPointsCost === undefined || short || state.submitting || (!uncertain && live === null)}
                 aria-busy={state.submitting || undefined}
-                onClick={() => ready && void confirm(ready.unitPointsCost)}
+                onClick={() => unitPointsCost !== undefined && void confirm(unitPointsCost)}
               >
-                {state.submitting ? "Saving…" : ready ? `Confirm · ${formatPoints(ready.totalPointsCost)} pts` : "Confirm purchase"}
+                {state.submitting ? "Saving…" : unitPointsCost !== undefined ? `Confirm · ${formatPoints(unitPointsCost * state.selection.quantity)} pts` : "Confirm purchase"}
               </button>
               <button type="button" className={scanSecondaryButtonClass} disabled={state.submitting} onClick={() => chooseAgain()}>Change item</button>
+              <button type="button" className={scanSecondaryButtonClass} disabled={state.submitting} onClick={reset}>Scan another participant</button>
             </div>
           </section>
         );

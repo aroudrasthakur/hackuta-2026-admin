@@ -205,6 +205,46 @@ describe("ShopPage", () => {
 });
 
 describe("Items tab", () => {
+  it("creates a 60-minute cooldown and validates its duration", async () => {
+    mutation(createShopItemRef).mockResolvedValue({ itemId: "new" });
+    await render();
+    await click("Add item");
+    await type("Name", "Hat");
+    await type("Price (points)", "20");
+    await act(async () => field("Enable purchase cooldown").click());
+    expect(field("Cooldown (minutes)").value).toBe("60");
+    await type("Cooldown (minutes)", "0");
+    await submit(container.querySelector("dialog form"));
+    expect(text()).toContain("Enter a positive number of minutes.");
+    const descriptionIds = field("Cooldown (minutes)").getAttribute("aria-describedby")!.split(" ");
+    expect(descriptionIds.map((id) => document.getElementById(id)?.textContent).join(" ")).toContain("Enter a positive number of minutes.");
+    expect(mutation(createShopItemRef)).not.toHaveBeenCalled();
+    await type("Cooldown (minutes)", "60");
+    await submit(container.querySelector("dialog form"));
+    expect(mutation(createShopItemRef)).toHaveBeenCalledWith({
+      sessionToken: "session", name: "Hat", description: "", pointsCost: 20, active: true, purchaseCooldownMinutes: 60,
+    });
+  });
+
+  it("displays existing cooldowns and allows editing or disabling them", async () => {
+    mocks.queries.set(listShopItemsAdminRef, { items: [{ ...stickers, purchaseCooldownMinutes: 60 }], nextPriceChangeAt: null });
+    await render();
+    expect(text()).toContain("60 min");
+    await click("Edit Sticker pack");
+    expect(field("Enable purchase cooldown").checked).toBe(true);
+    expect(field("Cooldown (minutes)").value).toBe("60");
+    await type("Cooldown (minutes)", "0.5");
+    await submit(container.querySelector("dialog form"));
+    expect(mutation(updateShopItemRef)).toHaveBeenLastCalledWith(expect.objectContaining({ purchaseCooldownMinutes: 0.5 }));
+    await click("Edit Sticker pack");
+    await act(async () => field("Enable purchase cooldown").click());
+    expect(container.querySelector('[id$="-cooldown"]')).toBeNull();
+    await submit(container.querySelector("dialog form"));
+    expect(mutation(updateShopItemRef)).toHaveBeenLastCalledWith({
+      sessionToken: "session", itemId: "stickers", name: "Sticker pack", description: "", pointsCost: 50,
+    });
+  });
+
   it("summarizes items and filters the table", async () => {
     await render();
     const stats = container.querySelector("[aria-label='Item summary']")!.textContent;

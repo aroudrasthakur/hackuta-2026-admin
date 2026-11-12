@@ -32,6 +32,46 @@ async function expectNoHorizontalScroll(page: Page) {
 }
 
 test.describe("admin shop", () => {
+  test("configures a cooldown, blocks a repeat scan, and allows disabling it", async ({ page }) => {
+    await installQrCamera(page);
+    await signInOrganizer(page, E2E_ADMIN);
+    await openShop(page);
+    await page.getByRole("button", { name: "Edit Sticker pack", exact: true }).click();
+    let drawer = page.getByRole("dialog", { name: "Edit Sticker pack" });
+    await drawer.getByLabel("Enable purchase cooldown").check();
+    await expect(drawer.getByLabel("Cooldown (minutes)")).toHaveValue("60");
+    await drawer.getByRole("button", { name: "Save item" }).click();
+    await expect(page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "Sticker pack", exact: true }) })).toContainText("60 min");
+    await page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Scan", exact: true }).click();
+    await page.getByRole("link", { name: /Shop redemption/ }).click();
+    await lookUp(page, E2E_BADGES.ready);
+    await page.getByRole("button", { name: /Sticker pack/ }).click();
+    await page.getByRole("button", { name: "Review purchase" }).click();
+    await page.getByRole("button", { name: "Confirm · 50 pts" }).click();
+    await expect(page.getByRole("status")).toContainText("Purchase complete");
+    await page.getByRole("button", { name: "Scan next" }).click();
+    await lookUp(page, E2E_BADGES.ready);
+    await page.getByRole("button", { name: /Sticker pack/ }).click();
+    await page.getByRole("button", { name: "Review purchase" }).click();
+    await expect(page.getByRole("alert")).toContainText("Purchase Cooldown Active");
+    await expect(page.getByRole("alert")).toContainText("Sticker pack can be purchased again in 60 min");
+    await expect(page.getByRole("button", { name: "Confirm purchase", exact: true })).toBeDisabled();
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expectNoHorizontalScroll(page);
+    await page.getByRole("button", { name: "Change item" }).click();
+    await expect(page.getByRole("heading", { name: "Choose an item" })).toBeVisible();
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openShop(page);
+    await page.getByRole("button", { name: "Edit Sticker pack", exact: true }).click();
+    drawer = page.getByRole("dialog", { name: "Edit Sticker pack" });
+    await expect(drawer.getByLabel("Enable purchase cooldown")).toBeChecked();
+    await drawer.getByLabel("Enable purchase cooldown").uncheck();
+    await drawer.getByRole("button", { name: "Save item" }).click();
+    await page.getByRole("button", { name: "Edit Sticker pack", exact: true }).click();
+    await expect(drawer.getByLabel("Enable purchase cooldown")).not.toBeChecked();
+  });
+
   test("manages items, volunteers, and flash sales", async ({ page }) => {
     await signInOrganizer(page, E2E_ADMIN);
     await openShop(page);

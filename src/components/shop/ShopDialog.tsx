@@ -31,6 +31,7 @@ export function ShopDialog({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
+    const opener = document.activeElement;
     if (typeof dialog.showModal === "function" && !dialog.open) dialog.showModal();
     else dialog.setAttribute("open", "");
     const cancel = (event: Event) => {
@@ -41,6 +42,7 @@ export function ShopDialog({
     return () => {
       dialog.removeEventListener("cancel", cancel);
       if (typeof dialog.close === "function" && dialog.open) dialog.close();
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
 

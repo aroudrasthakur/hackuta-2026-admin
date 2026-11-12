@@ -81,7 +81,7 @@ type Shop = Awaited<ReturnType<typeof seedShop>>;
 
 async function createItem(
   shop: Shop,
-  fields: { name?: string; pointsCost?: number; active?: boolean } = {},
+  fields: { name?: string; pointsCost?: number; active?: boolean; purchaseCooldownMinutes?: number } = {},
 ) {
   const { itemId } = await shop.t.mutation(createShopItemRef, {
     sessionToken: shop.admin.sessionToken,
@@ -89,6 +89,7 @@ async function createItem(
     description: "Five stickers",
     pointsCost: fields.pointsCost ?? 20,
     ...(fields.active !== undefined ? { active: fields.active } : {}),
+    ...(fields.purchaseCooldownMinutes !== undefined ? { purchaseCooldownMinutes: fields.purchaseCooldownMinutes } : {}),
   });
   return itemId;
 }
@@ -115,6 +116,120 @@ async function state(shop: Shop) {
     ledger: (await ctx.db.query("volunteerActionLogs").collect()).length,
   }));
 }
+
+describe("per-item purchase cooldowns", () => {
+  const preview = (shop: Shop, itemId: GenericId<"shopItems">, sessionToken = shop.volunteer.sessionToken) =>
+    shop.t.query(previewShopPurchaseRef, { sessionToken, participantId: shop.participantId, itemId, quantity: 1 });
+
+  const editCooldown = (shop: Shop, itemId: GenericId<"shopItems">, minutes?: number) =>
+    shop.t.mutation(updateShopItemRef, {
+      sessionToken: shop.admin.sessionToken, itemId, name: "Sticker pack", description: "Five stickers", pointsCost: 20,
+      ...(minutes === undefined ? {} : { purchaseCooldownMinutes: minutes }),
+    });
+
+  it("configures, displays, edits, and disables cooldowns", async () => {
+    const shop = await seedShop();
+    const itemId = await createItem(shop, { purchaseCooldownMinutes: 60 });
+    expect((await shop.t.query(listShopItemsAdminRef, { sessionToken: shop.admin.sessionToken })).items[0])
+      .toMatchObject({ purchaseCooldownMinutes: 60 });
+    expect(await editCooldown(shop, itemId, 30)).toEqual({ ok: true, changed: true });
+    expect(await editCooldown(shop, itemId, 30)).toEqual({ ok: true, changed: false });
+    await editCooldown(shop, itemId);
+    expect(await shop.t.run((ctx) => ctx.db.get(itemId))).not.toHaveProperty("purchaseCooldownMinutes");
+  });
+
+  it.each([0, -1, NaN, Infinity, -Infinity, Number.MAX_VALUE])("rejects invalid duration %s on create and update", async (minutes) => {
+    const shop = await seedShop();
+    await expectAdminErrorCode(createItem(shop, { purchaseCooldownMinutes: minutes }), "INVALID_SHOP_ITEM");
+    const itemId = await createItem(shop);
+    await expectAdminErrorCode(editCooldown(shop, itemId, minutes), "INVALID_SHOP_ITEM");
+  });
+
+  it.each(["admin", "volunteer"] as const)("blocks %s preview and confirmation without charging, and expires at the exact boundary", async (role) => {
+    const shop = await seedShop();
+    const itemId = await createItem(shop, { purchaseCooldownMinutes: 60 });
+    const sessionToken = shop[role].sessionToken;
+    expect(await preview(shop, itemId, sessionToken)).toMatchObject({ status: "ok" });
+    const key = newKey();
+    expect(await purchase(shop, itemId, { key, sessionToken })).toMatchObject({ status: "success" });
+    const before = await state(shop);
+    const blocked = { status: "purchase_cooldown_active", itemName: "Sticker pack", availableAt: NOW + 60 * MINUTE, remainingMs: 60 * MINUTE };
+    expect(await preview(shop, itemId, sessionToken)).toEqual(blocked);
+    expect(await purchase(shop, itemId, { sessionToken })).toEqual(blocked);
+    expect(await state(shop)).toEqual(before);
+    expect(await purchase(shop, itemId, { key, sessionToken })).toMatchObject({ status: "duplicate" });
+    vi.setSystemTime(NOW + 60 * MINUTE - 1);
+    expect(await purchase(shop, itemId, { sessionToken })).toMatchObject({ status: "purchase_cooldown_active", remainingMs: 1 });
+    vi.setSystemTime(NOW + 60 * MINUTE);
+    expect(await preview(shop, itemId, sessionToken)).toMatchObject({ status: "ok" });
+    expect(await purchase(shop, itemId, { sessionToken })).toMatchObject({ status: "success" });
+  });
+
+  it("applies new and changed settings to existing purchases, and allows fractional minutes", async () => {
+    const shop = await seedShop();
+    const itemId = await createItem(shop);
+    expect(await purchase(shop, itemId)).toMatchObject({ status: "success" });
+    await editCooldown(shop, itemId, 60);
+    expect(await purchase(shop, itemId)).toMatchObject({ status: "purchase_cooldown_active" });
+    vi.setSystemTime(NOW + MINUTE);
+    await editCooldown(shop, itemId, 0.5);
+    expect(await purchase(shop, itemId)).toMatchObject({ status: "success" });
+    await editCooldown(shop, itemId, 60);
+    expect(await purchase(shop, itemId)).toMatchObject({ status: "purchase_cooldown_active" });
+    await editCooldown(shop, itemId);
+    expect(await purchase(shop, itemId)).toMatchObject({ status: "success" });
+  });
+
+  it("ignores refunds but still checks older non-refunded purchases", async () => {
+    const shop = await seedShop();
+    const itemId = await createItem(shop);
+    const first = await purchase(shop, itemId);
+    vi.setSystemTime(NOW + MINUTE);
+    const latest = await purchase(shop, itemId);
+    if (first.status !== "success" || latest.status !== "success") throw new Error("Expected purchases");
+    await shop.t.mutation(refundShopRedemptionRef, { sessionToken: shop.admin.sessionToken, redemptionId: latest.receipt.redemptionId, reason: "Returned" });
+    await editCooldown(shop, itemId, 60);
+    expect(await preview(shop, itemId)).toMatchObject({ status: "purchase_cooldown_active", availableAt: NOW + 60 * MINUTE });
+    await shop.t.mutation(refundShopRedemptionRef, { sessionToken: shop.admin.sessionToken, redemptionId: first.receipt.redemptionId, reason: "Returned" });
+    expect(await preview(shop, itemId)).toMatchObject({ status: "ok" });
+    expect(await purchase(shop, itemId)).toMatchObject({ status: "success" });
+  });
+
+  it("applies independently to each participant and item", async () => {
+    const shop = await seedShop();
+    const itemId = await createItem(shop, { purchaseCooldownMinutes: 60 });
+    const secondItem = await createItem(shop, { purchaseCooldownMinutes: 60 });
+    await purchase(shop, itemId);
+    expect(await purchase(shop, secondItem)).toMatchObject({ status: "success" });
+    const { applicationId, userId } = await seedApplicant(shop.t, { review: { status: "accepted" } });
+    await shop.t.run((ctx) => insertParticipantWithOptionalCheckIn(ctx, {
+      applicationId, authUserId: userId, acceptedBy: shop.admin.adminId,
+      qrCodeToken: UNKNOWN_REGISTRATION, badgeQrCodeToken: UNKNOWN_TOKEN, checkedInAt: 1, points: 100,
+    }));
+    expect(await purchase(shop, itemId, { qr: UNKNOWN_TOKEN })).toMatchObject({ status: "success" });
+    expect(await purchase(shop, itemId)).toMatchObject({ status: "purchase_cooldown_active" });
+  });
+
+  it("rechecks a successful preview when another staff member buys first", async () => {
+    const shop = await seedShop();
+    const itemId = await createItem(shop, { purchaseCooldownMinutes: 60 });
+    expect(await preview(shop, itemId)).toMatchObject({ status: "ok" });
+    expect(await purchase(shop, itemId, { sessionToken: shop.admin.sessionToken })).toMatchObject({ status: "success" });
+    expect(await purchase(shop, itemId)).toMatchObject({ status: "purchase_cooldown_active" });
+    expect(await state(shop)).toMatchObject({ points: 80, redemptions: 1, ledger: 1 });
+  });
+
+  it("allows only one purchase when staff submit concurrently", async () => {
+    const shop = await seedShop();
+    const itemId = await createItem(shop, { purchaseCooldownMinutes: 60 });
+    const outcomes = await Promise.all([
+      purchase(shop, itemId),
+      purchase(shop, itemId, { sessionToken: shop.admin.sessionToken }),
+    ]);
+    expect(outcomes.map((result) => result.status).sort()).toEqual(["purchase_cooldown_active", "success"]);
+    expect(await state(shop)).toMatchObject({ points: 80, redemptions: 1, ledger: 1 });
+  });
+});
 
 describe("admin shop items", () => {
   it("creates an item and writes an audit log", async () => {

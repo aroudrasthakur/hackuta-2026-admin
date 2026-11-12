@@ -132,6 +132,104 @@ afterEach(async () => {
 });
 
 describe("VolunteerShopPage", () => {
+  it("retries an uncertain purchase with its original key despite its own reactive cooldown", async () => {
+    mocks.purchase
+      .mockImplementationOnce(async () => {
+        mocks.queries.set(previewShopPurchaseRef, {
+          status: "purchase_cooldown_active", itemName: "HackUTA 2026 T-shirt",
+          remainingMs: 3_600_000, availableAt: Date.now() + 3_600_000,
+        });
+        throw new ScanNetworkError();
+      })
+      .mockResolvedValueOnce({ status: "rate_limited" })
+      .mockResolvedValueOnce({ status: "duplicate", receipt });
+    await render();
+    await reviewTee();
+    await click("Confirm · 600 pts");
+    expect(text()).toContain("Connection problem");
+    expect(text()).not.toContain("Purchase Cooldown Active");
+    expect(text()).not.toContain("Nothing was charged.");
+    expect(button("Confirm · 600 pts").disabled).toBe(false);
+    mocks.queries.set(getShopCustomerRef, null);
+    await click("Confirm · 600 pts");
+    expect(text()).toContain("Too many scans");
+    expect(text()).not.toContain("Nothing was charged.");
+    expect(button("Confirm · 600 pts").disabled).toBe(false);
+    await click("Confirm · 600 pts");
+    expect(text()).toContain("Already purchased");
+    expect(new Set(mocks.purchase.mock.calls.map(([args]) => args.idempotencyKey)).size).toBe(1);
+  });
+
+  it("still lets the server reject an uncertain retry when another purchase caused the cooldown", async () => {
+    mocks.purchase
+      .mockRejectedValueOnce(new ScanNetworkError())
+      .mockResolvedValueOnce({
+        status: "purchase_cooldown_active", itemName: "HackUTA 2026 T-shirt",
+        remainingMs: 3_600_000, availableAt: Date.now() + 3_600_000,
+      });
+    await render();
+    await reviewTee();
+    await click("Confirm · 600 pts");
+    await click("Confirm · 600 pts");
+    expect(text()).toContain("Purchase Cooldown Active");
+    expect(text()).toContain("Nothing was charged.");
+    await click("Choose another item");
+    expect(text()).toContain("Choose an item");
+  });
+
+  it("refreshes the preview when the cooldown expires without another scan", async () => {
+    vi.useFakeTimers();
+    const expiresAt = Date.now() + 2_000;
+    mocks.queries.set(previewShopPurchaseRef, (args: { itemId: string; quantity: number }) => Date.now() < expiresAt
+      ? { status: "purchase_cooldown_active", itemName: "HackUTA 2026 T-shirt", remainingMs: expiresAt - Date.now(), availableAt: expiresAt }
+      : preview(args));
+    try {
+      await render();
+      await reviewTee();
+      expect(button("Confirm purchase").disabled).toBe(true);
+      await act(async () => vi.advanceTimersByTime(2_501));
+      expect(button("Confirm · 600 pts").disabled).toBe(false);
+      expect(text()).not.toContain("Purchase Cooldown Active");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("blocks confirmation during cooldown and lets staff change item or participant", async () => {
+    mocks.queries.set(previewShopPurchaseRef, {
+      status: "purchase_cooldown_active", itemName: "HackUTA 2026 T-shirt",
+      remainingMs: 3_600_000, availableAt: Date.now() + 3_600_000,
+    });
+    await render();
+    await reviewTee();
+    expect(container.querySelector("[role=alert]")?.textContent).toContain("Purchase Cooldown Active");
+    expect(text()).toContain("HackUTA 2026 T-shirt can be purchased again in 60 min.");
+    expect(button("Confirm purchase").disabled).toBe(true);
+    expect(mocks.purchase).not.toHaveBeenCalled();
+    await click("Change item");
+    expect(text()).toContain("Choose an item");
+    await click("Review purchase");
+    await click("Scan another participant");
+    expect(container.querySelector("[data-testid=scanner]")).not.toBeNull();
+  });
+
+  it("explains a cooldown activated after preview and allows another selection", async () => {
+    mocks.purchase.mockResolvedValueOnce({
+      status: "purchase_cooldown_active", itemName: "HackUTA 2026 T-shirt",
+      remainingMs: 15_000, availableAt: Date.now() + 15_000,
+    });
+    await render();
+    await reviewTee();
+    await click("Confirm · 600 pts");
+    expect(container.querySelector("[role=alert]")?.textContent).toContain("Purchase Cooldown Active");
+    expect(text()).toContain("15 sec");
+    expect(text()).toContain("Nothing was charged.");
+    await click("Choose another item");
+    await click("Sticker pack");
+    await click("Review purchase");
+    expect(button("Confirm · 50 pts").disabled).toBe(false);
+  });
+
   it("sells an item once with the server price and shows the receipt", async () => {
     await render();
     expect(text()).toContain("Shop redemption");
