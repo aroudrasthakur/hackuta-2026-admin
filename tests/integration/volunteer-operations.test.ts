@@ -449,20 +449,19 @@ describe("concurrent scans", () => {
 });
 
 describe("throttling and sessions", () => {
-  it("keeps failure counters from returned denials and then rate limits without writing", async () => {
+  it("does not rate limit food redemptions after repeated denials", async () => {
     const t = createConvexTest();
     const volunteer = await seedVolunteer(t);
     const { adminId } = await seedParticipant(t);
     const mealPeriodId = await seedMealPeriod(t, adminId);
     const args = { sessionToken: volunteer.sessionToken, qrCodeToken: QR_TOKEN, mealPeriodId };
-    for (let i = 0; i < QR_SCAN_FAILURE_LIMIT; i++) {
+    for (let i = 0; i < QR_SCAN_FAILURE_LIMIT + 3; i++) {
       expect(await t.mutation(foodCheckInParticipantRef, args)).toEqual({ status: "not_authorized" });
     }
     await t.run((ctx) => ctx.db.patch(volunteer.adminId, { canFoodCheckIn: true }));
-    const before = await t.run((ctx) => ctx.db.query("rateLimits").collect());
-    expect(await t.mutation(foodCheckInParticipantRef, args)).toEqual({ status: "rate_limited" });
-    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual(before);
-    expect(await logs(t)).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual([]);
+    expect(await t.mutation(foodCheckInParticipantRef, args)).toMatchObject({ status: "success" });
+    expect(await logs(t)).toHaveLength(1);
   });
 
   it("throws for missing sessions before writing anything, and allows admins without assignments", async () => {

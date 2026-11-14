@@ -3,7 +3,7 @@ import {
   listActiveMealPeriodsRef, resolveQrForMealRef, redeemMealRef, resolveQrForScanRef, foodCheckInParticipantRef,
 } from "../../src/convex/adminApi";
 import { listMealPeriodsRef, listMealRedemptionsRef, removeMealPeriodRef, updateMealPeriodRef } from "../../src/convex/mealsApi";
-import { QR_SCAN_ATTEMPT_LIMIT, QR_SCAN_FAILURE_LIMIT, QR_SCAN_FAILURE_WINDOW_MS } from "../../convex/admin/volunteerScanRateLimit";
+import { QR_SCAN_ATTEMPT_LIMIT, QR_SCAN_FAILURE_LIMIT } from "../../convex/admin/volunteerScanRateLimit";
 import { createConvexTest } from "../helpers/convexTestContext";
 import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedStaff, seedApplicant } from "../helpers/reviewTestKit";
@@ -61,7 +61,7 @@ describe("meal redemption", () => {
       participant: { name: "Taylor Student", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan; peanut allergy" },
     });
     expect(await s.data()).toEqual(before);
-    expect(await s.rates()).toHaveLength(1);
+    expect(await s.rates()).toEqual([]);
   });
 
   it("records one collection and audit log without modifying legacy timestamps, check-in, or points", async () => {
@@ -163,7 +163,7 @@ describe("meal redemption", () => {
     expect(await s.preview()).toEqual({ status: "not_authorized" }); expect(await s.redeem()).toEqual({ status: "not_authorized" });
     expect(await s.t.query(listActiveMealPeriodsRef, { sessionToken: s.volunteer.sessionToken })).toEqual([]);
     expect((await s.data()).redemptions).toEqual([]);
-    expect((await s.rates()).filter((row) => row.bucket.includes("failure"))).toHaveLength(2);
+    expect(await s.rates()).toEqual([]);
   });
 
   it.each(["inactive", "expired", "deleted_session"])("revalidates a %s session after preview", async (change) => {
@@ -199,29 +199,26 @@ describe("meal redemption", () => {
     expect(Object.keys(meals[0]!).sort()).toEqual(["endsAt", "mealPeriodId", "name", "startsAt", "updatedAt"]);
   });
 
-  it("preserves failure counters for bad QR codes across preview and redemption", async () => {
+  it("does not rate limit food previews or redemptions", async () => {
     const s = await scene();
-    for (let i = 0; i < QR_SCAN_FAILURE_LIMIT; i++) {
+    for (let i = 0; i < QR_SCAN_FAILURE_LIMIT + 5; i++) {
       const ref = i % 2 ? resolveQrForMealRef : redeemMealRef;
-      expect(await s.t.mutation(ref, { ...s.args, qrCodeToken: i % 2 ? "malformed" : "cd".repeat(32) })).toEqual({ status: "qr_not_found" });
+      const token = i % 2 ? "malformed" : "cd".repeat(32);
+      expect(await s.t.mutation(ref, { ...s.args, qrCodeToken: token })).toEqual({ status: "qr_not_found" });
     }
-    const before = await s.rates();
-    expect(before.filter((row) => row.bucket.includes("failure"))).toHaveLength(QR_SCAN_FAILURE_LIMIT);
-    expect(JSON.stringify(before)).not.toMatch(/malformed|cdcd/);
-    expect(await s.preview()).toEqual({ status: "rate_limited" }); expect(await s.redeem()).toEqual({ status: "rate_limited" });
-    expect(await s.rates()).toEqual(before);
-    vi.setSystemTime(NOW + QR_SCAN_FAILURE_WINDOW_MS + 1);
-    await s.t.run((ctx) => ctx.db.patch(s.mealPeriodId, { endsAt: NOW + QR_SCAN_FAILURE_WINDOW_MS + 10_000 }));
+    expect(await s.rates()).toEqual([]);
+    expect(await s.preview()).toMatchObject({ status: "ok" });
     expect(await s.redeem()).toMatchObject({ status: "success" });
   });
 
-  it("shares the attempt limit across previews, redemptions, and legacy food calls", async () => {
+  it("allows many food previews before redeeming without volunteer scan rate limits", async () => {
     const s = await scene();
-    for (let i = 0; i < QR_SCAN_ATTEMPT_LIMIT; i++) expect(await s.preview()).toMatchObject({ status: "ok" });
-    const before = await s.rates();
-    expect(await s.redeem()).toEqual({ status: "rate_limited" });
-    expect(await s.t.mutation(foodCheckInParticipantRef, s.args)).toEqual({ status: "rate_limited" });
-    expect(await s.rates()).toEqual(before);
+    for (let i = 0; i < QR_SCAN_ATTEMPT_LIMIT + 5; i++) {
+      expect(await s.preview()).toMatchObject({ status: "ok" });
+    }
+    expect(await s.rates()).toEqual([]);
+    expect(await s.redeem()).toMatchObject({ status: "success" });
+    expect(await s.t.mutation(foodCheckInParticipantRef, s.args)).toMatchObject({ status: "already_redeemed" });
   });
 
   it("requires a selected meal on legacy endpoints and shares the per-meal duplicate guard", async () => {
