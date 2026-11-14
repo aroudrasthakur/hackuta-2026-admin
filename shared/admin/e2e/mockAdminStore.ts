@@ -1283,6 +1283,24 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       bump();
       return { retried };
     }
+    case "admin/participantsAdmin:lookupParticipantByQr": {
+      requireAdmin(sessionToken);
+      const value = normalizeBadgeQr(String(args.qrValue ?? ""));
+      const roster = value === null ? undefined : [...participants.values()].find((row) => row.badgeToken === value);
+      if (roster) return { status: "ok", participantId: roster.participantId, name: roster.name, matchedBy: "badge" };
+      if (value !== null && retiredRosterBadges.has(value)) return { status: "badge_retired" };
+      const scanned = resolveMockScan(String(args.qrValue ?? ""));
+      if (!("participant" in scanned)) {
+        return { status: scanned.kind === "badge_retired" ? "badge_retired" : "qr_not_found" };
+      }
+      if (!scanned.participant.eligible) return { status: "participant_not_eligible" };
+      return {
+        status: "ok",
+        participantId: scanned.participant.participantId,
+        name: scanned.participant.name,
+        matchedBy: scanned.kind === "badge" ? "badge" : "registration",
+      };
+    }
     case "admin/participantsAdmin:setParticipantPoints": {
       requireAdmin(sessionToken);
       const participant = participants.get(String(args.participantId ?? ""));

@@ -8,6 +8,7 @@ import {
   assignParticipantBadgeRef,
   getParticipantDetailsRef,
   listParticipantsRef,
+  lookupParticipantByQrRef,
   promoteParticipantToVolunteerRef,
   restoreVolunteerRef,
   revokeVolunteerRef,
@@ -28,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   restore: vi.fn(),
   assignBadge: vi.fn(),
   loadMore: vi.fn(),
+  lookup: vi.fn(),
 }));
 
 vi.mock("../../src/convex/reactBindings", () => ({
@@ -35,6 +37,8 @@ vi.mock("../../src/convex/reactBindings", () => ({
   usePaginatedQuery: mocks.paginatedQuery,
   useMutation: mocks.useMutation,
 }));
+
+const BADGE = "HACKUTA-BADGE-0003";
 
 const row: ParticipantRow = {
   participantId: "participant-1" as ParticipantRow["participantId"],
@@ -127,6 +131,7 @@ beforeEach(() => {
   }));
   mocks.revoke.mockReset().mockResolvedValue({ ok: true });
   mocks.restore.mockReset().mockResolvedValue({ ok: true });
+  mocks.lookup.mockReset().mockResolvedValue({ status: "ok", participantId: row.participantId, name: row.name, matchedBy: "badge" });
   mocks.assignBadge.mockReset().mockResolvedValue({ ok: true, replaced: true, assignedAt: 2 });
   mocks.useMutation.mockReset().mockImplementation((ref) => {
     if (ref === setParticipantPointsRef) return mocks.setPoints;
@@ -134,6 +139,7 @@ beforeEach(() => {
     if (ref === revokeVolunteerRef) return mocks.revoke;
     if (ref === restoreVolunteerRef) return mocks.restore;
     if (ref === assignParticipantBadgeRef) return mocks.assignBadge;
+    if (ref === lookupParticipantByQrRef) return mocks.lookup;
     throw new Error("Unexpected mutation reference");
   });
   vi.spyOn(HTMLDialogElement.prototype, "showModal").mockImplementation(function (this: HTMLDialogElement) {
@@ -204,7 +210,48 @@ async function openDetails() {
   expect(container.querySelector("dialog[open]")).not.toBeNull();
 }
 
+async function scanBadge(value = BADGE) {
+  await click("Scan badge");
+  await fill("Or enter the badge code", value);
+  await click("Look up badge");
+}
+
 describe("ParticipantsPage", () => {
+  it("scans a badge and opens the assigned participant's details", async () => {
+    await render();
+    await click("Scan badge");
+    expect(container.querySelector("dialog[open]")?.textContent).toContain("Scan badge");
+    await fill("Or enter the badge code", BADGE);
+    await click("Look up badge");
+    expect(mocks.lookup).toHaveBeenCalledWith({ sessionToken: "session-token", qrValue: BADGE });
+    const open = container.querySelectorAll("dialog[open]");
+    expect(open).toHaveLength(1);
+    expect(open[0].textContent).toContain("Participant details");
+    expect(open[0].textContent).toContain("alex@example.com");
+    expect(open[0].textContent).not.toContain("Found by registration QR");
+    expect(mocks.query).toHaveBeenLastCalledWith(
+      getParticipantDetailsRef,
+      { sessionToken: "session-token", participantId: row.participantId },
+    );
+  });
+
+  it("notes when a scan matched a registration QR instead of a badge", async () => {
+    mocks.lookup.mockResolvedValue({ status: "ok", participantId: row.participantId, name: row.name, matchedBy: "registration" });
+    await render();
+    await scanBadge();
+    expect(container.querySelector("dialog[open]")?.textContent).toContain("Found by registration QR, not a badge");
+  });
+
+  it("keeps the badge scanner open with a message when no participant matches", async () => {
+    mocks.lookup.mockResolvedValue({ status: "badge_retired" });
+    await render();
+    await scanBadge();
+    const open = container.querySelector("dialog[open]");
+    expect(open?.textContent).toContain("That badge was replaced");
+    expect(open?.textContent).not.toContain("Participant details");
+    expect(button("Look up badge")).toBeDefined();
+  });
+
   it("shows loading, empty, and filtered-empty roster states", async () => {
     paginationStatus = "LoadingFirstPage";
     currentRows = [];

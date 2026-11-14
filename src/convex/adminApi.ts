@@ -33,6 +33,7 @@ import type {
 import type {
   getParticipantDetails,
   listParticipants,
+  lookupParticipantByQr,
   promoteParticipantToVolunteer,
   setParticipantPoints,
 } from "../../convex/admin/participantsAdmin";
@@ -385,6 +386,7 @@ type ParticipantsAdmin = ApiFromModules<{
   participants: {
     getParticipantDetails: typeof getParticipantDetails;
     listParticipants: typeof listParticipants;
+    lookupParticipantByQr: typeof lookupParticipantByQr;
     promoteParticipantToVolunteer: typeof promoteParticipantToVolunteer;
     setParticipantPoints: typeof setParticipantPoints;
   };
@@ -404,6 +406,14 @@ export const getParticipantDetailsRef = adminModuleRef<
   FunctionArgs<ParticipantsAdmin["getParticipantDetails"]>,
   FunctionReturnType<ParticipantsAdmin["getParticipantDetails"]>
 >("admin/participantsAdmin:getParticipantDetails");
+
+export type ParticipantQrLookup = FunctionReturnType<ParticipantsAdmin["lookupParticipantByQr"]>;
+
+export const lookupParticipantByQrRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<ParticipantsAdmin["lookupParticipantByQr"]>,
+  FunctionReturnType<ParticipantsAdmin["lookupParticipantByQr"]>
+>("admin/participantsAdmin:lookupParticipantByQr");
 
 export const setParticipantPointsRef = adminModuleRef<
   "mutation",
