@@ -114,10 +114,7 @@ export function useCheckInWorkflow() {
       finish,
     );
     if (!result) return;
-    if (result.status !== "ok") {
-      if (result.status === "rate_limited") return setState({ step: "registration", error: checkInStepOutcome(result) });
-      return finish(checkInStepOutcome(result));
-    }
+    if (result.status !== "ok") return finish(checkInStepOutcome(result));
     registrationRef.current = registration;
     setState({ step: "badge", participant: participantOf(result.participant), error: null });
   }, [finish, resolveRegistration, run, sessionToken, state.step]);
@@ -125,7 +122,7 @@ export function useCheckInWorkflow() {
   /** A badge problem keeps the participant and asks for another badge; anything else ends the flow. */
   const failAtBadge = useCallback((participant: Participant, result: CheckInStepFailure) => {
     badgeRef.current = null;
-    if (BADGE_RETRY_STATUSES.has(result.status) || result.status === "rate_limited") {
+    if (BADGE_RETRY_STATUSES.has(result.status)) {
       setState({ step: "badge", participant, error: checkInStepOutcome(result) });
     } else {
       finish(checkInStepOutcome(result));
@@ -175,7 +172,6 @@ export function useCheckInWorkflow() {
     );
     if (!result) return;
     if (result.status === "success") return finish(checkedInOutcome(participant.name));
-    if (result.status === "rate_limited") return retryable(checkInStepOutcome(result));
     failAtBadge(participant, result);
   }, [checkIn, failAtBadge, finish, run, sessionToken, state]);
 

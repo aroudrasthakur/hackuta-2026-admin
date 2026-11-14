@@ -97,21 +97,17 @@ export function useScanWorkflow(purpose: ScanPurpose, eventId?: GenericId<"event
       const name = preview.participant.name;
       const args = { sessionToken, qrCodeToken: token };
       let outcome: ScanOutcome;
-      let rateLimited: boolean;
       if (preview.purpose === "point_scan") {
         const result = await withScanTimeout(() => awardPoints({ ...args, eventId: preview.event.eventId }));
         outcome = awardOutcome(result, name, preview.event.name);
-        rateLimited = result.status === "rate_limited";
       } else if (preview.purpose === "food_check_in") {
         const result = await withScanTimeout(() => redeemFood({ ...args, mealPeriodId: preview.meal.mealPeriodId }));
         outcome = foodOutcome(result, name);
-        rateLimited = result.status === "rate_limited";
       } else {
         return finish(scanFailureOutcome("unexpected"));
       }
       if (request !== requestRef.current) return;
-      if (rateLimited) retryable(outcome);
-      else finish(outcome);
+      finish(outcome);
     } catch (caught) {
       if (request !== requestRef.current) return;
       const outcome = scanErrorOutcome(caught, "Volunteer scan confirmation failed");
