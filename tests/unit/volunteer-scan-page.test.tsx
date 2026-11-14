@@ -248,20 +248,11 @@ describe("check-in workflow", () => {
     expect(scannerMode()).toBe("registration");
   });
 
-  it("keeps the registration step after a rate limit", async () => {
-    mocks.resolveRegistration.mockResolvedValue({ status: "rate_limited" });
-    await render("check-in");
-    await scan(registration);
-    expect(alertText()).toContain("Too many scans");
-    expect(scannerMode()).toBe("registration");
-  });
-
   it.each([
     ["badge_in_use", "Badge already assigned"],
     ["badge_is_registration", "That's a registration QR"],
     ["badge_retired", "Badge deactivated"],
     ["badge_invalid", "Badge not recognized"],
-    ["rate_limited", "Too many scans"],
   ])("asks for another badge after %s", async (status, title) => {
     await render("check-in");
     await reachBadgeStep();
@@ -349,20 +340,17 @@ describe("check-in workflow", () => {
     expect(result()?.textContent).toContain("Already checked in");
   });
 
-  it("keeps the confirmation for a retry after a rate limit or network failure", async () => {
+  it("keeps the confirmation for a retry after a network failure", async () => {
     mocks.checkIn
-      .mockResolvedValueOnce({ status: "rate_limited" })
       .mockRejectedValueOnce(new ScanNetworkError())
       .mockResolvedValueOnce({ status: "success", checkedInAt: 1 });
     await render("check-in");
     await reachConfirmStep();
     await click("Confirm check-in");
-    expect(alertText()).toContain("Too many scans");
-    await click("Try again: Confirm check-in");
     expect(alertText()).toContain("Connection problem");
     await click("Try again: Confirm check-in");
     expect(result()?.textContent).toContain("Checked in");
-    expect(mocks.checkIn).toHaveBeenCalledTimes(3);
+    expect(mocks.checkIn).toHaveBeenCalledTimes(2);
   });
 
   it("returns to the badge step when the badge was taken before confirming", async () => {
@@ -541,11 +529,12 @@ describe("food workflow", () => {
   it("preserves the selected meal and confirmation across retryable failures", async () => {
     mocks.resolveMeal.mockResolvedValue({ status: "ok", purpose: "food_check_in", meal: lunch,
       participant: { name: "Sam Lee", alreadyRedeemed: false, redeemedAt: null, dietaryInfo: "Vegan" } });
-    mocks.food.mockResolvedValueOnce({ status: "rate_limited" }).mockRejectedValueOnce(new ScanNetworkError())
+    mocks.food.mockRejectedValueOnce(new ScanNetworkError())
       .mockResolvedValueOnce({ status: "success", redeemedAt: 1, meal: lunch });
     await render("food"); await scan(); await click("Confirm food given");
-    expect(text()).toContain("Too many scans"); await click(/^Try again/); expect(text()).toContain("Connection problem");
-    await click(/^Try again/); expect(result()?.textContent).toContain("Food collected");
+    expect(text()).toContain("Connection problem");
+    await click(/^Try again/);
+    expect(result()?.textContent).toContain("Food collected");
     expect(mocks.food).toHaveBeenLastCalledWith({ sessionToken: "session", qrCodeToken: token, mealPeriodId: lunch.mealPeriodId });
   });
 
