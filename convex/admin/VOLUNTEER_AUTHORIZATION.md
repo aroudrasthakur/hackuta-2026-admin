@@ -63,7 +63,6 @@ If you add a new public mutation that imports `pointsLedger`, add a row to the e
 | `participantShop.ts` | `listShop`, `getMyShopHistory` | Signed-in applicant (`getAuthUser`); own data only |
 | `shopLedger.ts`, `shopPricing.ts` | — | **Helpers only** (callers must guard first) |
 | `badgeCheckIn.ts` | `resolveRegistrationForCheckIn`, `resolveBadgeForCheckIn`, `checkInWithBadge` | `requireVolunteerAccess`, then `canCheckIn` |
-| `badgeAdmin.ts` | `assignParticipantBadge` | `requireAdminRole` (volunteers get `NOT_AUTHORIZED`) |
 | `participantQr.ts` | — | **Helpers only** (callers must guard first) |
 | `volunteerOperations.ts` | `foodCheckInParticipant`, `awardEventPoints` | `requireVolunteerAccess`, then capability / assignment checks |
 | `volunteerScanRateLimit.ts` | `pruneVolunteerScanRateLimits` | **Internal only** (`internalMutation`) |
@@ -89,10 +88,6 @@ Each call runs `requireVolunteerAccess` (throws), the throttle (`rate_limited`),
 - Retrying a confirmation that already succeeded with the same badge returns `already_checked_in` and writes nothing. A failed check writes nothing to the participant, so a rejected badge never leaves a partial check-in.
 - Two desks assigning one badge at once: Convex serializes the transactions and the second sees the first holder (`badge_in_use`).
 - Logs, responses, and errors never contain registration or badge values.
-
-## Badge replacement (`badgeAdmin.ts`)
-
-`assignParticipantBadge({ participantId, badgeQrCodeToken, reason, expectedBadgeAssignedAt })` is admin-only. It requires a checked-in, accepted participant, a reason (1–200 characters), and `expectedBadgeAssignedAt` equal to the current `badgeAssignedAt` (`null` for none), otherwise `BADGE_ASSIGNMENT_CHANGED`. The badge goes through the same availability checks (`INVALID_BADGE`, `BADGE_IS_REGISTRATION`, `BADGE_IN_USE`, `BADGE_RETIRED`). The old badge is retired by storing its SHA-256 hash in `retiredBadgeTokens`, and it stops working immediately. Points, awards, meals, and purchases are keyed by participant and do not change. One `badge_replaced` or `badge_assigned` log records the admin and reason. Volunteers cannot call it, and check-in never reassigns a badge.
 
 ## QR scan preview (`volunteerScan.ts`)
 

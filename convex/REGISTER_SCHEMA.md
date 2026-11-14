@@ -82,7 +82,7 @@ All register-owned blocks must remain identical to [`schema.reference.ts`](../sc
 | `registrationQrCodeToken` | `string` (optional) | Original registration token, kept after badge assignment so a rescan can be explained (`by_registration_qr_token`). Never accepted for food, points, or the shop |
 | `badgeQrCodeToken` | `string` (optional) | Preprinted badge value exactly as scanned (trimmed). Equal to `qrCodeToken` whenever set (`by_badge_qr_token`) |
 | `badgeAssignedAt` | `number` (optional) | When the current badge was assigned |
-| `badgeAssignedBy` | `Id<"admins">` (optional) | Volunteer (door check-in) or admin (replacement) who assigned the current badge |
+| `badgeAssignedBy` | `Id<"admins">` (optional) | Staff member who assigned the badge at door check-in |
 | `foodRestriction` | `string` (optional) | Snapshot from the linked application’s `dietaryRestrictions`, `otherDietaryRestrictions`, and `allergyDetails` at participant creation |
 | `checkedInAt` | `number` (optional) | General hackathon door check-in. New check-ins set it together with the badge fields in one mutation |
 | `foodCheckedInAt` | `number` (optional) | Legacy single-use food check-in; preserve historical values when switching to meal redemptions |
@@ -92,7 +92,7 @@ All register-owned blocks must remain identical to [`schema.reference.ts`](../sc
 
 ### Badges
 
-Badge QR codes are preprinted and supplied externally; the backend never generates them. `admin/badgeCheckIn:checkInWithBadge` assigns one at the door, and `admin/badgeAdmin:assignParticipantBadge` lets an admin replace one (or assign one to a participant checked in before badges). Both run in one mutation that rechecks every rule, moves the registration token into `registrationQrCodeToken` (first assignment only), and sets `qrCodeToken`, `badgeQrCodeToken`, `badgeAssignedAt`, and `badgeAssignedBy`. A badge must not match any participant's `qrCodeToken`, `badgeQrCodeToken`, or `registrationQrCodeToken`, or a retired badge. Convex indexes do not enforce uniqueness; the reads and the write share one serializable transaction, so concurrent assignments of one badge leave exactly one holder.
+Badge QR codes are preprinted and supplied externally; the backend never generates them. `admin/badgeCheckIn:checkInWithBadge` assigns one at the door. Badges cannot be replaced or reassigned afterwards. Check-in runs in one mutation that rechecks every rule, moves the registration token into `registrationQrCodeToken`, and sets `qrCodeToken`, `badgeQrCodeToken`, `badgeAssignedAt`, and `badgeAssignedBy`. A badge must not match any participant's `qrCodeToken`, `badgeQrCodeToken`, or `registrationQrCodeToken`, or a retired badge. Convex indexes do not enforce uniqueness; the reads and the write share one serializable transaction, so concurrent assignments of one badge leave exactly one holder.
 
 `retiredBadgeTokens` (admin-owned) records replaced badges so they can never be reused or scanned again: `tokenHash` (SHA-256 hex of the badge value, never the raw value), `participantId`, `retiredBy` (`Id<"admins">`), and `retiredAt`, indexed `by_token_hash`. Points, awards, meal redemptions, and purchases reference `participantId`, so a replacement keeps all history.
 

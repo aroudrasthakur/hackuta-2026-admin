@@ -21,7 +21,6 @@ import type { getMailConfig, setMailConfig } from "../../convex/admin/mailConfig
 import type { listMyScanOptions, resolveQrForScan, listActiveMealPeriods, resolveQrForMeal, redeemMeal } from "../../convex/admin/volunteerScan";
 import type { awardEventPoints, foodCheckInParticipant } from "../../convex/admin/volunteerOperations";
 import type * as badgeCheckIn from "../../convex/admin/badgeCheckIn";
-import type * as badgeAdmin from "../../convex/admin/badgeAdmin";
 import type {
   createEvent,
   getEvent,
@@ -252,14 +251,6 @@ export const checkInWithBadgeRef = adminModuleRef<
   FunctionArgs<BadgeCheckIn["checkInWithBadge"]>,
   CheckInWithBadgeResult
 >("admin/badgeCheckIn:checkInWithBadge");
-
-type BadgeAdmin = ApiFromModules<{ badges: typeof badgeAdmin }>["badges"];
-
-export const assignParticipantBadgeRef = adminModuleRef<
-  "mutation",
-  FunctionArgs<BadgeAdmin["assignParticipantBadge"]>,
-  FunctionReturnType<BadgeAdmin["assignParticipantBadge"]>
->("admin/badgeAdmin:assignParticipantBadge");
 
 export const foodCheckInParticipantRef = adminModuleRef<
   "mutation",

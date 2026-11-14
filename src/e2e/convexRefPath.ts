@@ -1,5 +1,4 @@
 import {
-  assignParticipantBadgeRef,
   awardEventPointsRef,
   checkInWithBadgeRef,
   foodCheckInParticipantRef,
@@ -76,7 +75,6 @@ const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
   [resolveRegistrationForCheckInRef, "admin/badgeCheckIn:resolveRegistrationForCheckIn"],
   [resolveBadgeForCheckInRef, "admin/badgeCheckIn:resolveBadgeForCheckIn"],
   [checkInWithBadgeRef, "admin/badgeCheckIn:checkInWithBadge"],
-  [assignParticipantBadgeRef, "admin/badgeAdmin:assignParticipantBadge"],
   [foodCheckInParticipantRef, "admin/volunteerOperations:foodCheckInParticipant"],
   [awardEventPointsRef, "admin/volunteerOperations:awardEventPoints"],
   [listSubmittedApplicationsRef, "admin/applications:listSubmittedApplications"],

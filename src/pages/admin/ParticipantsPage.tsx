@@ -624,18 +624,7 @@ function ParticipantsPageContent() {
                     </dd></div>
                   </dl>
 
-                  {sessionToken ? (
-                    <ParticipantBadgeSection
-                      key={details.participantId}
-                      sessionToken={sessionToken}
-                      participantId={details.participantId}
-                      name={details.name}
-                      checkedInAt={details.checkedInAt}
-                      badge={details.badge}
-                      disabled={busy !== null}
-                      onDone={(message) => { setError(null); setNotice(message); }}
-                    />
-                  ) : null}
+                  <ParticipantBadgeSection checkedInAt={details.checkedInAt} badge={details.badge} />
 
                   {details.pointsConsistent ? null : (
                     <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">

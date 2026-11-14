@@ -75,8 +75,6 @@ export const ADMIN_ERROR_MESSAGES = {
   BADGE_IS_REGISTRATION: "That's a registration QR code, not a badge. Scan the code printed on the badge.",
   BADGE_IN_USE: "That badge is already assigned to a participant. Use a different badge.",
   BADGE_RETIRED: "That badge was taken out of service and can't be used again. Use a different badge.",
-  BADGE_ASSIGNMENT_CHANGED: "This participant's badge changed while you were editing. Review the latest details and try again.",
-  INVALID_BADGE_REASON: "Enter a reason for the badge change (up to 200 characters).",
 } as const;
 
 export type AdminErrorCode = keyof typeof ADMIN_ERROR_MESSAGES;
