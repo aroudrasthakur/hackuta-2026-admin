@@ -7,6 +7,8 @@ import {
   MAX_PARTICIPANT_SEARCH_LENGTH,
 } from "../../convex/admin/participantsAdmin";
 import { awardEventPoints, computeLedgerPoints } from "../../convex/admin/pointsLedger";
+import { hashBadgeToken } from "../../convex/admin/participantQr";
+import { QR_SCAN_FAILURE_LIMIT } from "../../convex/admin/volunteerScanRateLimit";
 import { ADJUSTMENT_REASON_MAX_LENGTH } from "../../shared/admin/volunteerRules";
 import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
@@ -219,6 +221,66 @@ describe("getParticipantDetails", () => {
     await t.run((ctx) => ctx.db.delete(removed.participantId));
     expect(await t.query(api.getParticipantDetails, { sessionToken, participantId: rejected.participantId })).toBeNull();
     expect(await t.query(api.getParticipantDetails, { sessionToken, participantId: removed.participantId })).toBeNull();
+  });
+});
+
+describe("lookupParticipantByQr", () => {
+  const BADGE = "HACKUTA-BADGE-7001";
+
+  it("returns the participant assigned to a printed badge without any QR value", async () => {
+    const { t, admin, sessionToken } = await fixture();
+    const { participantId } = await seedParticipant(t, admin.adminId, {
+      firstName: "Badge", lastName: "Holder",
+      fields: { checkedInAt: 5, badgeQrCodeToken: BADGE, badgeAssignedAt: 5, badgeAssignedBy: admin.adminId },
+    });
+    const result = await t.mutation(api.lookupParticipantByQr, { sessionToken, qrValue: `  ${BADGE}
+` });
+    expect(result).toEqual({ status: "ok", participantId, name: "Badge Holder", matchedBy: "badge" });
+    const registration = (await getParticipant(t, participantId))!.qrCodeToken;
+    expect(JSON.stringify(result)).not.toContain(registration);
+    expect(JSON.stringify(result)).not.toContain(BADGE);
+  });
+
+  it("also finds a participant by registration QR and says so", async () => {
+    const { t, admin, sessionToken } = await fixture();
+    const { participantId } = await seedParticipant(t, admin.adminId);
+    const registration = (await getParticipant(t, participantId))!.qrCodeToken;
+    expect(await t.mutation(api.lookupParticipantByQr, { sessionToken, qrValue: registration.toUpperCase() }))
+      .toMatchObject({ status: "ok", participantId, matchedBy: "registration" });
+  });
+
+  it("reports unknown, retired, and non-accepted codes without changing participant data", async () => {
+    const { t, admin, sessionToken } = await fixture();
+    const rejected = await seedParticipant(t, admin.adminId, { status: "rejected" });
+    const holder = await seedParticipant(t, admin.adminId, { fields: { checkedInAt: 5 } });
+    await t.run(async (ctx) => ctx.db.insert("retiredBadgeTokens", {
+      tokenHash: await hashBadgeToken("HACKUTA-BADGE-OLD"),
+      checkedInId: holder.checkedInId!, retiredBy: admin.adminId, retiredAt: 6,
+    }));
+    const snapshot = () => t.run(async (ctx) => ({
+      participants: await ctx.db.query("participants").collect(),
+      checkedIn: await ctx.db.query("checkedIn").collect(),
+    }));
+    const before = await snapshot();
+    const lookup = (qrValue: string) => t.mutation(api.lookupParticipantByQr, { sessionToken, qrValue });
+    expect(await lookup("HACKUTA-BADGE-NOPE")).toEqual({ status: "qr_not_found" });
+    expect(await lookup("   ")).toEqual({ status: "qr_not_found" });
+    expect(await lookup("HACKUTA-BADGE-OLD")).toEqual({ status: "badge_retired" });
+    const rejectedToken = (await getParticipant(t, rejected.participantId))!.qrCodeToken;
+    expect(await lookup(rejectedToken)).toEqual({ status: "participant_not_eligible" });
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("throttles repeated unknown codes", async () => {
+    const { t, admin, sessionToken } = await fixture();
+    await seedParticipant(t, admin.adminId, {
+      fields: { checkedInAt: 5, badgeQrCodeToken: BADGE, badgeAssignedAt: 5, badgeAssignedBy: admin.adminId },
+    });
+    for (let attempt = 0; attempt < QR_SCAN_FAILURE_LIMIT; attempt += 1) {
+      await t.mutation(api.lookupParticipantByQr, { sessionToken, qrValue: `UNKNOWN-${attempt}` });
+    }
+    expect(await t.mutation(api.lookupParticipantByQr, { sessionToken, qrValue: BADGE }))
+      .toEqual({ status: "rate_limited" });
   });
 });
 
@@ -455,6 +517,7 @@ describe("participant admin access", () => {
       () => t.query(api.listPointAdjustments, { sessionToken, paginationOpts: page }),
       () => t.mutation(api.setParticipantPoints, { sessionToken, participantId, points: 100, reason: "Escalation" }),
       () => t.mutation(api.promoteParticipantToVolunteer, { sessionToken, participantId, password: ORGANIZER_TEST_PASSWORD }),
+      () => t.mutation(api.lookupParticipantByQr, { sessionToken, qrValue: "HACKUTA-BADGE-0001" }),
     ];
     for (const call of calls) await expectAdminErrorCode(call(), code);
     expect(await snapshot()).toEqual(before);

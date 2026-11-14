@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { E2E_BADGES } from "../../shared/admin/e2e/credentials";
 import { E2E_ADMIN, signInOrganizer } from "./fixtures/auth";
 import { reviewScreenshot } from "./fixtures/reviewScreenshot";
 
@@ -68,36 +67,6 @@ test("a promoted volunteer starts with no access until an admin switches it on",
   await page.setViewportSize({ width: 390, height: 844 });
   await reviewScreenshot(page, "volunteer-access-granted-mobile.png", test.info());
 });
-
-test("admins replace a lost badge with a reason and the old badge stops working", async ({ page }) => {
-  await signInOrganizer(page, E2E_ADMIN);
-  await page.getByRole("link", { name: "Participants", exact: true }).click();
-  await page.getByRole("button", { name: "Alex Accepted", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Participant details" });
-  const badge = dialog.getByRole("region", { name: "Badge" });
-  await expect(badge).toContainText("Assigned");
-
-  const replaceWith = async (value: string) => {
-    await badge.getByRole("button", { name: "Replace badge" }).click();
-    await badge.getByLabel("Or enter the badge code").fill(value);
-    await badge.getByRole("button", { name: "Look up badge" }).click();
-    await badge.getByLabel("Reason").fill("Badge lost");
-    await badge.getByRole("button", { name: "Confirm badge replacement" }).click();
-  };
-
-  await replaceWith(E2E_BADGES.ready);
-  await expect(badge.getByRole("alert")).toBeVisible();
-  await expect(badge.getByLabel("Or enter the badge code")).toBeVisible();
-  await badge.getByRole("button", { name: "Cancel" }).click();
-
-  await replaceWith(E2E_BADGES.unusedSecond);
-  await expect(dialog.getByRole("status")).toContainText("Badge replaced");
-  await expect(dialog).not.toContainText(E2E_BADGES.unusedSecond);
-
-  await replaceWith(E2E_BADGES.alex);
-  await expect(badge.getByRole("alert")).toBeVisible();
-});
-
 test("participant roster and details fit a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await signInOrganizer(page, E2E_ADMIN);

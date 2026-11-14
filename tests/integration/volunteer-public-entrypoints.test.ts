@@ -57,7 +57,6 @@ const PUBLIC_ENTRY_GUARDS = [
   ...["resolveRegistrationForCheckIn", "resolveBadgeForCheckIn", "checkInWithBadge"].map((exportName) => ({
     file: "badgeCheckIn.ts", exportName, guard: "requireVolunteerAccess",
   })),
-  { file: "badgeAdmin.ts", exportName: "assignParticipantBadge", guard: "requireAdminRole" },
   { file: "volunteerOperations.ts", exportName: "foodCheckInParticipant", guard: "requireVolunteerAccess" },
   { file: "volunteerOperations.ts", exportName: "awardEventPoints", guard: "requireVolunteerAccess" },
   ...[

@@ -30,6 +30,12 @@ import {
 } from "./pointsLedger";
 import { requireAdminRole, sessionTokenArgs, volunteerCapabilities } from "./staffAuth";
 import { promoteParticipant } from "./volunteerProvisioning";
+import { participantName, resolveScannedQr } from "./participantQr";
+import {
+  isVolunteerScanThrottled,
+  recordVolunteerScanAttempt,
+  recordVolunteerScanFailure,
+} from "./volunteerScanRateLimit";
 
 /** Participants scanned per `listParticipants` call; bounds reads regardless of filters. */
 export const MAX_PARTICIPANT_PAGE_SIZE = 100;
@@ -183,6 +189,41 @@ export const getParticipantDetails = query({
           ...volunteerCapabilities(volunteer),
         }
         : null,
+    };
+  },
+});
+
+/**
+ * Finds the accepted participant behind a scanned QR code so the admin UI can
+ * open their details. Accepts a printed badge or a registration QR (including
+ * one replaced by a badge); `matchedBy` says which. Writes only rate-limit
+ * rows: it shares the per-staff scan throttle with volunteer scans, and
+ * unknown or retired codes count as failures to stop guessing. Mutation (not
+ * query) so every attempt is counted; results after the throttle are
+ * returned, not thrown, so those rows are kept. QR values are never returned.
+ */
+export const lookupParticipantByQr = mutation({
+  args: { ...sessionTokenArgs, qrValue: v.string() },
+  handler: async (ctx, { sessionToken, qrValue }) => {
+    const actor = await requireAdminRole(ctx, sessionToken);
+    const now = Date.now();
+    if (await isVolunteerScanThrottled(ctx, actor._id, now)) {
+      return { status: "rate_limited" as const };
+    }
+    await recordVolunteerScanAttempt(ctx, actor._id, now);
+    const scanned = await resolveScannedQr(ctx, qrValue);
+    if (scanned.kind === "not_found" || scanned.kind === "badge_retired") {
+      await recordVolunteerScanFailure(ctx, actor._id, now);
+      return { status: scanned.kind === "badge_retired" ? "badge_retired" as const : "qr_not_found" as const };
+    }
+    if (!await isParticipantEligible(ctx, scanned.participant)) {
+      return { status: "participant_not_eligible" as const };
+    }
+    return {
+      status: "ok" as const,
+      participantId: scanned.participant._id,
+      name: await participantName(ctx, scanned.participant),
+      matchedBy: scanned.kind === "badge" ? "badge" as const : "registration" as const,
     };
   },
 });

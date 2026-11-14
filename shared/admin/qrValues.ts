@@ -11,9 +11,6 @@
 /** Longest scanned value accepted, after trimming. */
 export const MAX_SCAN_VALUE_LENGTH = 256;
 
-/** Longest reason an admin can give for a badge change. */
-export const BADGE_REASON_MAX_LENGTH = 200;
-
 const REGISTRATION_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 // eslint-disable-next-line no-control-regex -- control characters never appear in a printed QR payload
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;

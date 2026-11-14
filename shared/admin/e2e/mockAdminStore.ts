@@ -180,7 +180,6 @@ let mailConfig = { confirmationEmail: true, decisionEmail: true };
 let nextLogId = 100;
 const participantsByToken = new Map<string, ScanParticipantRecord>();
 /** Badges retired from roster participants by an admin replacement. */
-const retiredRosterBadges = new Set<string>();
 const events = new Map<string, EventRecord>();
 const eventAssignments = new Map<string, string[]>();
 const volunteerActionLogs: VolunteerActionLogRecord[] = [];
@@ -283,7 +282,6 @@ function resetStore() {
   mailConfig = { confirmationEmail: true, decisionEmail: true };
   nextLogId = 100;
   participantsByToken.clear();
-  retiredRosterBadges.clear();
   events.clear();
   eventAssignments.clear();
   volunteerActionLogs.length = 0;
@@ -662,7 +660,7 @@ function mockBadgeConflict(raw: string): { badge: string } | { conflict: MockBad
   const scanned = resolveMockScan(badge);
   if (scanned.kind === "registration" || scanned.kind === "registration_replaced") return { conflict: "badge_is_registration" as const };
   if (scanned.kind === "badge" || [...participants.values()].some((row) => row.badgeToken === badge)) return { conflict: "badge_in_use" as const };
-  if (scanned.kind === "badge_retired" || retiredRosterBadges.has(badge)) return { conflict: "badge_retired" as const };
+  if (scanned.kind === "badge_retired") return { conflict: "badge_retired" as const };
   return { badge };
 }
 
@@ -1124,29 +1122,6 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       return mockCheckIn(requireVolunteer(sessionToken), args, "badge");
     case "admin/badgeCheckIn:checkInWithBadge":
       return mockCheckIn(requireVolunteer(sessionToken), args, "commit");
-    case "admin/badgeAdmin:assignParticipantBadge": {
-      const admin = requireAdmin(sessionToken);
-      const participant = participants.get(String(args.participantId ?? ""));
-      if (!participant) throw adminError("PARTICIPANT_NOT_FOUND");
-      const reason = String(args.reason ?? "").trim();
-      if (!reason || reason.length > 200) throw adminError("INVALID_BADGE_REASON");
-      if (participant.checkedInAt === null) throw adminError("PARTICIPANT_NOT_CHECKED_IN");
-      if ((participant.badge?.assignedAt ?? null) !== args.expectedBadgeAssignedAt) throw adminError("BADGE_ASSIGNMENT_CHANGED");
-      const checked = mockBadgeConflict(String(args.badgeQrCodeToken ?? ""));
-      if ("conflict" in checked) {
-        throw adminError(({
-          badge_invalid: "INVALID_BADGE", badge_is_registration: "BADGE_IS_REGISTRATION",
-          badge_in_use: "BADGE_IN_USE", badge_retired: "BADGE_RETIRED",
-        } as const)[checked.conflict]);
-      }
-      const replaced = participant.badge !== null;
-      if (participant.badgeToken) retiredRosterBadges.add(participant.badgeToken);
-      participant.badgeToken = checked.badge;
-      participant.badge = { assignedAt: now, assignedBy: { adminId: admin.adminId, name: admin.name } };
-      logVolunteerAction({ actorAdminId: admin.adminId, action: replaced ? "badge_replaced" : "badge_assigned", participantName: participant.name, reason });
-      bump();
-      return { ok: true, replaced, assignedAt: now };
-    }
     case "admin/volunteerOperations:foodCheckInParticipant": {
       return runMockMealScan(requireVolunteer(sessionToken), args, true);
     }
@@ -1282,6 +1257,23 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       }
       bump();
       return { retried };
+    }
+    case "admin/participantsAdmin:lookupParticipantByQr": {
+      requireAdmin(sessionToken);
+      const value = normalizeBadgeQr(String(args.qrValue ?? ""));
+      const roster = value === null ? undefined : [...participants.values()].find((row) => row.badgeToken === value);
+      if (roster) return { status: "ok", participantId: roster.participantId, name: roster.name, matchedBy: "badge" };
+      const scanned = resolveMockScan(String(args.qrValue ?? ""));
+      if (!("participant" in scanned)) {
+        return { status: scanned.kind === "badge_retired" ? "badge_retired" : "qr_not_found" };
+      }
+      if (!scanned.participant.eligible) return { status: "participant_not_eligible" };
+      return {
+        status: "ok",
+        participantId: scanned.participant.participantId,
+        name: scanned.participant.name,
+        matchedBy: scanned.kind === "badge" ? "badge" : "registration",
+      };
     }
     case "admin/participantsAdmin:setParticipantPoints": {
       requireAdmin(sessionToken);

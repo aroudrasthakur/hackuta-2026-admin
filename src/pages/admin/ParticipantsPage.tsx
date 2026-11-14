@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { Link, useSearchParams } from "react-router-dom";
 import { AdminPageHeader } from "../../components/AdminPageHeader";
 import { ApplicationsQueuePagination } from "../../components/ApplicationsQueuePagination";
+import { BadgeLookupDialog, type BadgeLookupMatch } from "../../components/admin/BadgeLookupDialog";
 import { ParticipantBadgeSection } from "../../components/admin/ParticipantBadgeSection";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { EmptyState } from "../../components/states/EmptyState";
@@ -328,8 +329,8 @@ function ParticipantsRoster({ sessionToken, onOpen }: {
 }
 
 type SelectedParticipant = {
-  participant: ParticipantRow;
-  trigger: HTMLButtonElement;
+  participant: Pick<ParticipantRow, "participantId" | "name">;
+  trigger: HTMLButtonElement | null;
 };
 
 export function ParticipantsPage() {
@@ -350,6 +351,8 @@ export function ParticipantsPage() {
 function ParticipantsPageContent() {
   const { sessionToken, staff } = useAdminAuth();
   const [selected, setSelected] = useState<SelectedParticipant | null>(null);
+  const [scanningBadge, setScanningBadge] = useState(false);
+  const scanBadgeButton = useRef<HTMLButtonElement>(null);
   const [editingPoints, setEditingPoints] = useState(false);
   const [newPoints, setNewPoints] = useState("");
   const [reason, setReason] = useState("");
@@ -379,13 +382,26 @@ function ParticipantsPageContent() {
     }
   }, [selected]);
 
-  function openDetails(participant: ParticipantRow, trigger: HTMLButtonElement) {
+  function openDetails(participant: SelectedParticipant["participant"], trigger: HTMLButtonElement | null) {
     setEditingPoints(false);
     setPromoting(false);
     setConfirmRevoke(false);
     setError(null);
     setNotice(null);
     setSelected({ participant, trigger });
+  }
+
+  function openScannedBadge(match: BadgeLookupMatch) {
+    setScanningBadge(false);
+    openDetails(match, scanBadgeButton.current);
+    if (match.matchedBy === "registration") {
+      setNotice("Found by registration QR, not a badge. Check the badge section below.");
+    }
+  }
+
+  function closeBadgeScanner() {
+    setScanningBadge(false);
+    scanBadgeButton.current?.focus();
   }
 
   function closeDetails() {
@@ -535,9 +551,32 @@ function ParticipantsPageContent() {
 
   return (
     <section aria-labelledby="participants-heading" className="space-y-5">
-      <AdminPageHeader id="participants-heading" title="Participants" description="Manage accepted participants, check-in and food status, points, and linked volunteer access." />
+      <AdminPageHeader
+        id="participants-heading"
+        title="Participants"
+        description="Manage accepted participants, check-in and food status, points, and linked volunteer access."
+        actions={staff?.role === "admin" && sessionToken ? (
+          <button
+            ref={scanBadgeButton}
+            type="button"
+            aria-haspopup="dialog"
+            className={reviewPrimaryButtonClass}
+            onClick={() => setScanningBadge(true)}
+          >
+            Scan badge
+          </button>
+        ) : null}
+      />
       {staff?.role === "admin" && sessionToken ? (
-        <ParticipantsRoster sessionToken={sessionToken} onOpen={openDetails} />
+        <>
+          <ParticipantsRoster sessionToken={sessionToken} onOpen={openDetails} />
+          <BadgeLookupDialog
+            sessionToken={sessionToken}
+            open={scanningBadge}
+            onClose={closeBadgeScanner}
+            onFound={openScannedBadge}
+          />
+        </>
       ) : (
         <div role="status" className="admin-card admin-card__body">Verifying administrator access…</div>
       )}
@@ -585,18 +624,7 @@ function ParticipantsPageContent() {
                     </dd></div>
                   </dl>
 
-                  {sessionToken ? (
-                    <ParticipantBadgeSection
-                      key={details.participantId}
-                      sessionToken={sessionToken}
-                      participantId={details.participantId}
-                      name={details.name}
-                      checkedInAt={details.checkedInAt}
-                      badge={details.badge}
-                      disabled={busy !== null}
-                      onDone={(message) => { setError(null); setNotice(message); }}
-                    />
-                  ) : null}
+                  <ParticipantBadgeSection checkedInAt={details.checkedInAt} badge={details.badge} />
 
                   {details.pointsConsistent ? null : (
                     <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">

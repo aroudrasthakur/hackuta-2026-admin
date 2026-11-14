@@ -21,7 +21,6 @@ import type { getMailConfig, setMailConfig } from "../../convex/admin/mailConfig
 import type { listMyScanOptions, resolveQrForScan, listActiveMealPeriods, resolveQrForMeal, redeemMeal } from "../../convex/admin/volunteerScan";
 import type { awardEventPoints, foodCheckInParticipant } from "../../convex/admin/volunteerOperations";
 import type * as badgeCheckIn from "../../convex/admin/badgeCheckIn";
-import type * as badgeAdmin from "../../convex/admin/badgeAdmin";
 import type {
   createEvent,
   getEvent,
@@ -33,6 +32,7 @@ import type {
 import type {
   getParticipantDetails,
   listParticipants,
+  lookupParticipantByQr,
   promoteParticipantToVolunteer,
   setParticipantPoints,
 } from "../../convex/admin/participantsAdmin";
@@ -252,14 +252,6 @@ export const checkInWithBadgeRef = adminModuleRef<
   CheckInWithBadgeResult
 >("admin/badgeCheckIn:checkInWithBadge");
 
-type BadgeAdmin = ApiFromModules<{ badges: typeof badgeAdmin }>["badges"];
-
-export const assignParticipantBadgeRef = adminModuleRef<
-  "mutation",
-  FunctionArgs<BadgeAdmin["assignParticipantBadge"]>,
-  FunctionReturnType<BadgeAdmin["assignParticipantBadge"]>
->("admin/badgeAdmin:assignParticipantBadge");
-
 export const foodCheckInParticipantRef = adminModuleRef<
   "mutation",
   FunctionArgs<VolunteerOperations["foodCheckInParticipant"]>,
@@ -385,6 +377,7 @@ type ParticipantsAdmin = ApiFromModules<{
   participants: {
     getParticipantDetails: typeof getParticipantDetails;
     listParticipants: typeof listParticipants;
+    lookupParticipantByQr: typeof lookupParticipantByQr;
     promoteParticipantToVolunteer: typeof promoteParticipantToVolunteer;
     setParticipantPoints: typeof setParticipantPoints;
   };
@@ -404,6 +397,14 @@ export const getParticipantDetailsRef = adminModuleRef<
   FunctionArgs<ParticipantsAdmin["getParticipantDetails"]>,
   FunctionReturnType<ParticipantsAdmin["getParticipantDetails"]>
 >("admin/participantsAdmin:getParticipantDetails");
+
+export type ParticipantQrLookup = FunctionReturnType<ParticipantsAdmin["lookupParticipantByQr"]>;
+
+export const lookupParticipantByQrRef = adminModuleRef<
+  "mutation",
+  FunctionArgs<ParticipantsAdmin["lookupParticipantByQr"]>,
+  FunctionReturnType<ParticipantsAdmin["lookupParticipantByQr"]>
+>("admin/participantsAdmin:lookupParticipantByQr");
 
 export const setParticipantPointsRef = adminModuleRef<
   "mutation",

@@ -1,7 +1,6 @@
 import type { GenericId } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  assignParticipantBadgeRef,
   checkInWithBadgeRef,
   getParticipantDetailsRef,
   listParticipantsRef,
@@ -11,12 +10,10 @@ import {
 } from "../../src/convex/adminApi";
 import { hashBadgeToken } from "../../convex/admin/participantQr";
 import { awardEventPoints } from "../../convex/admin/pointsLedger";
-import { expectAdminErrorCode } from "../helpers/adminErrors";
 import { createConvexTest, type ConvexTestInstance } from "../helpers/convexTestContext";
 import { CHECK_IN_STARTING_POINTS } from "../../shared/admin/volunteerRules";
 import { getCheckedIn, insertParticipantWithOptionalCheckIn } from "../helpers/participantTestKit";
 import { seedApplicant, seedStaff } from "../helpers/reviewTestKit";
-import { seedMealPeriod } from "../helpers/mealTestKit";
 
 const REGISTRATION = "ab".repeat(32);
 const OTHER_REGISTRATION = "cd".repeat(32);
@@ -328,118 +325,5 @@ describe("two-step badge check-in", () => {
     expect((await s.snapshot()).logs.at(-1)).toMatchObject({
       actorAdminId: s.admin.adminId, checkedInId: (await s.attendee(freshId))!._id, action: "check_in",
     });
-  });
-});
-
-describe("admin badge replacement", () => {
-  async function checkedInScene() {
-    const s = await scene();
-    await s.checkIn();
-    const mealPeriodId = await seedMealPeriod(s.t, s.admin.adminId);
-    await s.t.run(async (ctx) => {
-      const attendee = await getCheckedIn(ctx, s.participantId);
-      await ctx.db.insert("mealRedemptions", { checkedInId: attendee!._id, mealPeriodId, scannedBy: s.volunteer.adminId, redeemedAt: NOW });
-      const eventId = await ctx.db.insert("events", {
-        name: "Workshop", pointsAwarded: 10, startsAt: 1, endsAt: 2, active: true, createdAt: 1, updatedAt: 1,
-      });
-      await ctx.db.insert("participantEventAwards", {
-        checkedInId: attendee!._id, eventId, pointsAwarded: 10, awardedBy: s.volunteer.adminId, awardedAt: NOW,
-      });
-      await ctx.db.patch(attendee!._id, { points: CHECK_IN_STARTING_POINTS + 10 });
-    });
-    const replace = (sessionToken: string, fields: Partial<{ badgeQrCodeToken: string; reason: string; expectedBadgeAssignedAt: number | null }> = {}) =>
-      s.t.mutation(assignParticipantBadgeRef, {
-        sessionToken, participantId: s.participantId, badgeQrCodeToken: OTHER_BADGE, reason: "Badge lost", expectedBadgeAssignedAt: NOW, ...fields,
-      });
-    const history = () => s.t.run(async (ctx) => ({
-      meals: await ctx.db.query("mealRedemptions").collect(),
-      awards: await ctx.db.query("participantEventAwards").collect(),
-    }));
-    return { ...s, replace, history };
-  }
-
-  it("retires the old badge, activates the new one, and keeps history", async () => {
-    const s = await checkedInScene();
-    const historyBefore = await s.history();
-    vi.setSystemTime(NOW + 60_000);
-    expect(await s.replace(s.admin.sessionToken)).toEqual({ ok: true, replaced: true, assignedAt: NOW + 60_000 });
-
-    expect(await s.participant()).toMatchObject({
-      qrCodeToken: REGISTRATION, checkedInAt: NOW,
-    });
-    expect(await s.attendee()).toMatchObject({
-      qrCodeToken: OTHER_BADGE, badgeQrCodeToken: OTHER_BADGE, registrationQrCodeToken: REGISTRATION,
-      badgeAssignedAt: NOW + 60_000, badgeAssignedBy: s.admin.adminId, checkedInAt: NOW,
-      points: CHECK_IN_STARTING_POINTS + 10,
-    });
-    expect(await s.history()).toEqual(historyBefore);
-    expect(await s.shopScan(BADGE)).toEqual({ status: "badge_retired" });
-    expect(await s.shopScan(REGISTRATION)).toEqual({ status: "registration_qr_replaced" });
-    expect(await s.shopScan(OTHER_BADGE)).toMatchObject({ status: "ok" });
-
-    const { logs, retired } = await s.snapshot();
-    expect(logs.at(-1)).toMatchObject({
-      actorAdminId: s.admin.adminId, checkedInId: (await s.attendee())!._id, action: "badge_replaced", reason: "Badge lost", createdAt: NOW + 60_000,
-    });
-    expect(retired).toEqual([expect.objectContaining({ tokenHash: await hashBadgeToken(BADGE), checkedInId: (await s.attendee())!._id })]);
-    expectNoQrValues({ logs, retired });
-
-    await expectAdminErrorCode(s.replace(s.admin.sessionToken, {
-      badgeQrCodeToken: BADGE, expectedBadgeAssignedAt: NOW + 60_000,
-    }), "BADGE_RETIRED");
-  });
-
-  it("rejects stale screens, used badges, missing reasons, and non-admins without changes", async () => {
-    const s = await checkedInScene();
-    await seedParticipant(s.t, s.admin.adminId, {
-      qrCodeToken: OTHER_REGISTRATION, badgeQrCodeToken: "HACKUTA-BADGE-0003", registrationQrCodeToken: OTHER_REGISTRATION, checkedInAt: 1,
-    });
-    const before = await s.snapshot();
-    await expectAdminErrorCode(s.replace(s.admin.sessionToken, { expectedBadgeAssignedAt: NOW - 1 }), "BADGE_ASSIGNMENT_CHANGED");
-    await expectAdminErrorCode(s.replace(s.admin.sessionToken, { badgeQrCodeToken: BADGE }), "BADGE_IN_USE");
-    await expectAdminErrorCode(s.replace(s.admin.sessionToken, { badgeQrCodeToken: "HACKUTA-BADGE-0003" }), "BADGE_IN_USE");
-    await expectAdminErrorCode(s.replace(s.admin.sessionToken, { badgeQrCodeToken: OTHER_REGISTRATION }), "BADGE_IS_REGISTRATION");
-    await expectAdminErrorCode(s.replace(s.admin.sessionToken, { badgeQrCodeToken: "" }), "INVALID_BADGE");
-    await expectAdminErrorCode(s.replace(s.admin.sessionToken, { reason: "  " }), "INVALID_BADGE_REASON");
-    await expectAdminErrorCode(s.replace(s.volunteer.sessionToken), "NOT_AUTHORIZED");
-    expect(await s.snapshot()).toEqual(before);
-  });
-
-  it("assigns a first badge to a legacy check-in and requires a check-in first", async () => {
-    const s = await scene();
-    await s.t.run(async (ctx) => {
-      const participant = await ctx.db.get(s.participantId);
-      await ctx.db.insert("checkedIn", {
-        participantId: s.participantId,
-        applicationId: participant!.applicationId,
-        authUserId: participant!.authUserId,
-        acceptedAt: participant!.acceptedAt,
-        acceptedBy: participant!.acceptedBy,
-        checkedInAt: 5,
-        checkedInBy: s.admin.adminId,
-        qrCodeToken: REGISTRATION,
-        registrationQrCodeToken: REGISTRATION,
-        points: 0,
-        createdAt: 1,
-        updatedAt: 1,
-      });
-      await ctx.db.patch(s.participantId, { checkedInAt: 5 });
-    });
-    const assign = (fields: Partial<{ expectedBadgeAssignedAt: number | null }> = {}) => s.t.mutation(assignParticipantBadgeRef, {
-      sessionToken: s.admin.sessionToken, participantId: s.participantId, badgeQrCodeToken: BADGE,
-      reason: "Checked in before badges", expectedBadgeAssignedAt: null, ...fields,
-    });
-    expect(await s.shopScan(REGISTRATION)).toEqual({ status: "badge_not_assigned" });
-    expect(await assign()).toEqual({ ok: true, replaced: false, assignedAt: NOW });
-    expect(await s.participant()).toMatchObject({ qrCodeToken: REGISTRATION });
-    expect(await s.attendee()).toMatchObject({ qrCodeToken: BADGE, registrationQrCodeToken: REGISTRATION, badgeQrCodeToken: BADGE });
-    expect(await s.shopScan(REGISTRATION)).toEqual({ status: "registration_qr_replaced" });
-    expect((await s.snapshot()).logs.at(-1)).toMatchObject({ action: "badge_assigned", reason: "Checked in before badges" });
-    expect((await s.snapshot()).retired).toEqual([]);
-
-    const fresh = await seedParticipant(s.t, s.admin.adminId, { qrCodeToken: OTHER_REGISTRATION });
-    await expectAdminErrorCode(s.t.mutation(assignParticipantBadgeRef, {
-      sessionToken: s.admin.sessionToken, participantId: fresh, badgeQrCodeToken: OTHER_BADGE, reason: "Early", expectedBadgeAssignedAt: null,
-    }), "PARTICIPANT_NOT_CHECKED_IN");
   });
 });
