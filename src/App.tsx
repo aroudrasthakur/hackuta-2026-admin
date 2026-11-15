@@ -15,6 +15,7 @@ import { EventsPage } from "./pages/admin/EventsPage";
 import { MealsPage } from "./pages/admin/MealsPage";
 import { ShopPage } from "./pages/admin/ShopPage";
 import { VolunteerShopPage } from "./pages/admin/VolunteerShopPage";
+import { ArcadePage } from "./pages/admin/ArcadePage";
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="events" element={<EventsPage />} />
         <Route path="meals" element={<MealsPage />} />
         <Route path="shop" element={<ShopPage />} />
+        <Route path="arcade" element={<ArcadePage />} />
       </Route>
       <Route path="*" element={<AdminProtectedRoute />} />
     </Routes>
