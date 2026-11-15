@@ -66,6 +66,10 @@ File: [`convex/schema.ts`](schema.ts)
 | `shopItems` | Admin | **Yes** — shop catalog (name, description, price, status; no inventory) |
 | `shopRedemptions` | Admin | **Yes** — completed purchases with the price charged and any refund |
 | `shopFlashSales`, `shopFlashSaleItems` | Admin | **Yes** — timed promotions and their item prices |
+| `arcadeSettings`, `arcadeGames`, `arcadeWallets`, `arcadeTransfers`, `arcadePlays`, `arcadeLaunchCodes` | Admin | **Yes** — arcade site switch, game catalog, point wallets, transfers, plays, and launch codes |
+| `rouletteSpins`, `slotSpins`, `slotWindows` | Admin | **Yes** — roulette and slot rounds and windows |
+| `o21Windows`, `o21Tables`, `o21Hands`, `o21Actions`, `o21Queue`, `o21LiveTables`, `o21Seats` | Admin | **Yes** — o21 card game tables, hands, queue, and seats |
+| `pokerPlayers`, `pokerQueue`, `pokerTables`, `pokerSeats`, `pokerTransactions`, `pokerSessionStats` | Admin | **Yes** — poker players, tables, seats, chip transactions, and session stats |
 | `participantMediaDisclosures` | Profile | **Yes** — one-time media-disclosure acceptance; door check-in requires a row |
 
 All register-owned blocks must remain identical to [`schema.reference.ts`](../scripts/register-schema-lock/schema.reference.ts) aside from `applicationReviews`, admin-owned tables, and profile-owned tables listed above.
