@@ -7,7 +7,7 @@ test.describe("organizer authentication", () => {
     await signInVolunteer(page);
     await expect(page.getByRole("navigation", { name: "Volunteer" }).getByRole("link")).toHaveText(["Dashboard", "Check-in"]);
     await expect(page.getByRole("navigation", { name: "Admin" })).toHaveCount(0);
-    for (const path of ["/admin/applications", "/admin/decision-emails", "/admin/applications/e2e-app-unreviewed", "/admin/participants", "/admin/volunteers", "/admin/meals", "/admin/scan/food", "/admin/scan/points"]) {
+    for (const path of ["/admin/applications", "/admin/decision-emails", "/admin/applications/e2e-app-unreviewed", "/admin/participants", "/admin/volunteers", "/admin/meals", "/admin/arcade", "/admin/scan/food", "/admin/scan/points"]) {
       await page.goto(path);
       await expect(page).toHaveURL(/\/admin\/scan$/);
       await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening),/ })).toBeVisible();
@@ -46,6 +46,7 @@ test.describe("organizer authentication", () => {
       "Events",
       "Meals",
       "Shop",
+      "Arcade",
       "Scan",
     ]);
     await page.getByRole("link", { name: "Participants", exact: true }).click();

@@ -12,6 +12,7 @@ const adminPages = [
   { link: "Events", heading: "Events" },
   { link: "Meals", heading: "Meals" },
   { link: "Shop", heading: "Shop" },
+  { link: "Arcade", heading: "Arcade" },
   { link: "Scan", heading: "Scan" },
 ] as const;
 
