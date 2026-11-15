@@ -16,29 +16,52 @@ export async function qrCodeSvg(value: string) {
   return result.svg;
 }
 
-type QrWindow = Window & { qrShown?: { id: number; image: HTMLImageElement } | null; qrNextId?: number };
+type QrWindow = Window & {
+  qrShown?: { id: number; image: HTMLImageElement } | null;
+  qrNextId?: number;
+  /** Camera streams requested and not yet seen as stopped. */
+  qrLiveCameras?: number;
+};
 
 /**
  * Replaces the camera with a canvas stream that shows whatever `scanQr` puts
- * in front of it (blank until then). Once the app stops a stream that showed
- * the current code, the code is taken away so it cannot be read twice.
+ * in front of it (blank until then). When the app stops a stream that showed
+ * the current code while its preview is still on the page (the scanner read
+ * it), the code is taken away so it cannot be read twice. A stream stopped
+ * because its scanner unmounted or remounted leaves the code in place.
  */
 export async function installQrCamera(page: Page) {
   await page.addInitScript(() => {
     const qrWindow = window as QrWindow;
     qrWindow.qrShown = null;
+    qrWindow.qrLiveCameras = 0;
     navigator.mediaDevices.getUserMedia = async () => {
+      // Counted synchronously, so a camera the app is still starting counts as live.
+      qrWindow.qrLiveCameras = (qrWindow.qrLiveCameras ?? 0) + 1;
       const canvas = document.createElement("canvas");
       canvas.width = 480;
       canvas.height = 480;
       const context = canvas.getContext("2d")!;
       const stream = canvas.captureStream(10);
       const drawnIds = new Set<number>();
+      // A decode stops the tracks before the preview is cleared; an unmount
+      // stops them after React has removed the preview from the document.
+      let stoppedWhileShown = false;
+      for (const track of stream.getTracks()) {
+        const stopTrack = track.stop.bind(track);
+        track.stop = () => {
+          if (Array.from(document.querySelectorAll("video")).some((video) => video.srcObject === stream)) {
+            stoppedWhileShown = true;
+          }
+          stopTrack();
+        };
+      }
       const draw = () => {
         const shown = qrWindow.qrShown;
         if (stream.getTracks().every((track) => track.readyState === "ended")) {
           clearInterval(interval);
-          if (shown && drawnIds.has(shown.id)) qrWindow.qrShown = null;
+          qrWindow.qrLiveCameras = Math.max(0, (qrWindow.qrLiveCameras ?? 1) - 1);
+          if (shown && drawnIds.has(shown.id) && stoppedWhileShown) qrWindow.qrShown = null;
           return;
         }
         context.fillStyle = "#fff";
@@ -69,17 +92,26 @@ export async function scanQr(page: Page, value: string) {
     qrWindow.qrNextId = (qrWindow.qrNextId ?? 0) + 1;
     qrWindow.qrShown = { id: qrWindow.qrNextId, image };
   }, svg);
-  const scanner = page.getByLabel("Camera scanner");
-  const startButton = scanner.getByRole("button", { name: /^(Scan with camera|Try camera again)$/ });
-  const stopButton = scanner.getByRole("button", { name: /^Stop camera/ });
-  if (!(await stopButton.isVisible())) {
-    if (await startButton.isVisible()) {
-      await startButton.click({ timeout: 5_000 });
-    }
-    // Fast decoders can finish before Playwright sees the transient Stop button.
-    // The consumed code below, and each caller's outcome assertion, prove scanning.
-  }
-  await page.waitForFunction(() => (window as QrWindow).qrShown === null, undefined, { timeout: 15_000 });
+  // Pages may start the camera on their own (Scan next after a camera scan).
+  // The start and stop buttons are one DOM node whose label flips with the
+  // camera state, so a Playwright click resolved while it read "Scan with
+  // camera" could land after it became "Stop camera" and stop the scan. Check
+  // and click inside one page turn instead, only when no camera is running.
+  await page.waitForFunction(
+    () => {
+      const qrWindow = window as QrWindow;
+      if (qrWindow.qrShown === null) return true;
+      if ((qrWindow.qrLiveCameras ?? 0) > 0) return false;
+      const scanner = document.querySelector('[aria-label="Camera scanner"]');
+      const start = Array.from(scanner?.querySelectorAll("button") ?? []).find((button) =>
+        /^(Scan with camera|Try camera again)$/.test(button.textContent?.trim() ?? ""),
+      );
+      if (start && !start.disabled) start.click();
+      return false;
+    },
+    undefined,
+    { timeout: 15_000, polling: 100 },
+  );
 }
 
 /**
