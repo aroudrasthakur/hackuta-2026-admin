@@ -1,5 +1,13 @@
 import { ADMIN_ERROR_MESSAGES, adminError } from "../errors.ts";
 import {
+  ARCADE_GAMES,
+  ARCADE_SETTINGS_ERROR_MESSAGES,
+  arcadeStateAt,
+  checkArcadeSettings,
+  isArcadeGameKey,
+  type ArcadeMode,
+} from "../arcadeRules.ts";
+import {
   assertEventPoints,
   CHECK_IN_STARTING_POINTS,
   normalizeEventInput,
@@ -236,6 +244,54 @@ let nextShopId = 1;
 /** When set, the next purchase is saved but its response is lost, like a dropped connection. */
 let dropNextPurchaseResponse = false;
 
+type ArcadeGameRecord = {
+  key: string;
+  name: string;
+  order: number;
+  enabled: boolean;
+  updatedAt: number;
+};
+
+type ArcadeSettingsRecord = {
+  mode: ArcadeMode;
+  opensAt: number | null;
+  closesAt: number | null;
+  launchEnabled: boolean;
+  backupSignIn: boolean;
+  updatedAt: number;
+};
+
+let arcadeSettings: ArcadeSettingsRecord = {
+  mode: "on",
+  opensAt: null,
+  closesAt: null,
+  launchEnabled: true,
+  backupSignIn: false,
+  updatedAt: 0,
+};
+const arcadeGames = new Map<string, ArcadeGameRecord>();
+
+function seedArcade(now: number) {
+  arcadeSettings = {
+    mode: "on",
+    opensAt: null,
+    closesAt: null,
+    launchEnabled: true,
+    backupSignIn: false,
+    updatedAt: now,
+  };
+  arcadeGames.clear();
+  for (const game of ARCADE_GAMES) {
+    arcadeGames.set(game.key, {
+      key: game.key,
+      name: game.name,
+      order: game.order,
+      enabled: true,
+      updatedAt: now,
+    });
+  }
+}
+
 /** Shop item and sale ids seeded for browser tests. */
 export const E2E_SHOP = {
   tee: "e2e-item-tee",
@@ -327,6 +383,7 @@ function resetStore() {
     });
   }
   seedShop(now);
+  seedArcade(now);
   eventAssignments.set("e2e-admin-lead", Object.values(E2E_EVENTS).map(({ eventId }) => eventId));
   volunteerActionLogs.push(
     { logId: "e2e-action-seed-1", actorAdminId: "e2e-admin-lead", action: "check_in", participantName: "Morgan Present", createdAt: now - 600_000 },
@@ -1073,6 +1130,8 @@ export function e2eMockRunQuery(path: string, args: Record<string, unknown>) {
       };
     }
     default: {
+      const arcade = runArcadeQuery(path, args, sessionToken);
+      if (arcade !== NOT_ARCADE) return arcade;
       const shop = runShopQuery(path, args, sessionToken);
       if (shop !== NOT_SHOP) return shop;
       throw new Error(`Unhandled E2E mock query: ${path}`);
@@ -1486,6 +1545,8 @@ export async function e2eMockRunMutation(path: string, args: Record<string, unkn
       return { sent: ids.length, failed: 0, total: ids.length };
     }
     default: {
+      const arcade = runArcadeMutation(path, args, sessionToken);
+      if (arcade !== NOT_ARCADE) return arcade;
       const shop = runShopMutation(path, args, sessionToken);
       if (shop !== NOT_SHOP) return shop;
       throw new Error(`Unhandled E2E mock mutation: ${path}`);
@@ -1829,5 +1890,61 @@ function runShopMutation(path: string, args: Record<string, unknown>, sessionTok
     }
     default:
       return NOT_SHOP;
+  }
+}
+
+const NOT_ARCADE = Symbol("not arcade");
+
+function runArcadeQuery(path: string, _args: Record<string, unknown>, sessionToken: string) {
+  switch (path) {
+    case "arcade/admin:getArcadeAdmin": {
+      requireAdmin(sessionToken);
+      const now = Date.now();
+      const settings = { ...arcadeSettings };
+      return {
+        serverNow: now,
+        settings,
+        state: arcadeStateAt(settings, now),
+        games: [...arcadeGames.values()].sort((a, b) => a.order - b.order),
+      };
+    }
+    default:
+      return NOT_ARCADE;
+  }
+}
+
+function runArcadeMutation(path: string, args: Record<string, unknown>, sessionToken: string) {
+  switch (path) {
+    case "arcade/admin:updateArcadeSettings": {
+      requireAdmin(sessionToken);
+      const now = Date.now();
+      const mode = args.mode as ArcadeMode;
+      const opensAt = (args.opensAt as number | null | undefined) ?? null;
+      const closesAt = (args.closesAt as number | null | undefined) ?? null;
+      const checked = checkArcadeSettings({ mode, opensAt, closesAt }, now);
+      if (!checked.ok) throw new Error(ARCADE_SETTINGS_ERROR_MESSAGES[checked.code]);
+      arcadeSettings = {
+        mode: checked.value.mode,
+        opensAt: checked.value.opensAt ?? null,
+        closesAt: checked.value.closesAt ?? null,
+        launchEnabled: typeof args.launchEnabled === "boolean" ? args.launchEnabled : arcadeSettings.launchEnabled,
+        backupSignIn: typeof args.backupSignIn === "boolean" ? args.backupSignIn : arcadeSettings.backupSignIn,
+        updatedAt: now,
+      };
+      bump();
+      return { ok: true as const };
+    }
+    case "arcade/admin:updateArcadeGame": {
+      requireAdmin(sessionToken);
+      const key = String(args.key ?? "");
+      if (!isArcadeGameKey(key)) throw new Error(ARCADE_SETTINGS_ERROR_MESSAGES.ARCADE_UNKNOWN_GAME);
+      const game = arcadeGames.get(key);
+      if (!game) throw new Error(ARCADE_SETTINGS_ERROR_MESSAGES.ARCADE_UNKNOWN_GAME);
+      arcadeGames.set(key, { ...game, enabled: Boolean(args.enabled), updatedAt: Date.now() });
+      bump();
+      return { ok: true as const };
+    }
+    default:
+      return NOT_ARCADE;
   }
 }

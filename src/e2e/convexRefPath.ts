@@ -58,8 +58,12 @@ import {
   purchaseShopItemRef,
 } from "../convex/adminApi";
 import { createMealPeriodRef, listMealPeriodsRef, listMealRedemptionsRef, removeMealPeriodRef, setMealPeriodActiveRef, updateMealPeriodRef } from "../convex/mealsApi";
+import { getArcadeAdminRef, updateArcadeGameRef, updateArcadeSettingsRef } from "../convex/arcadeApi";
 
 const REF_PATHS: ReadonlyArray<readonly [unknown, string]> = [
+  [getArcadeAdminRef, "arcade/admin:getArcadeAdmin"],
+  [updateArcadeSettingsRef, "arcade/admin:updateArcadeSettings"],
+  [updateArcadeGameRef, "arcade/admin:updateArcadeGame"],
   [listActiveMealPeriodsRef, "admin/volunteerScan:listActiveMealPeriods"],
   [resolveQrForMealRef, "admin/volunteerScan:resolveQrForMeal"],
   [redeemMealRef, "admin/volunteerScan:redeemMeal"],

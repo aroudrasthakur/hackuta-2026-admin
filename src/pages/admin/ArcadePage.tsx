@@ -64,7 +64,18 @@ function ArcadeControls({ sessionToken }: { sessionToken: string }) {
   const [saving, setSaving] = useState(false);
   const [gameBusy, setGameBusy] = useState<string | null>(null);
 
-  if (snapshot === undefined) return <LoadingState message="Loading arcade controls…" />;
+  if (snapshot === undefined) {
+    return (
+      <div className="arcade-admin">
+        <AdminPageHeader
+          id="arcade-heading"
+          title="Arcade"
+          description="Time-gate the HackUTA points arcade and switch individual games. The server clock decides what hackers see right now."
+        />
+        <LoadingState message="Loading arcade controls…" />
+      </div>
+    );
+  }
 
   const live = snapshot.state;
   const synced = draft ?? draftFromSnapshot(snapshot);
