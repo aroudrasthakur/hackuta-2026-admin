@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "../../convex/reactBindings";
 import {
   getArcadeAdminRef,
@@ -63,10 +63,6 @@ function ArcadeControls({ sessionToken }: { sessionToken: string }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [gameBusy, setGameBusy] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (snapshot && draft === null) setDraft(draftFromSnapshot(snapshot));
-  }, [draft, snapshot]);
 
   if (snapshot === undefined) return <LoadingState message="Loading arcade controls…" />;
 
