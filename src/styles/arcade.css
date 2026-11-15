@@ -1,0 +1,118 @@
+/* Admin Arcade tab — schedule card, toggle rows, games table */
+
+@layer components {
+  .arcade-admin {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .arcade-admin__mode-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .arcade-admin__mode-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-night);
+    cursor: pointer;
+  }
+
+  .arcade-admin__meta {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    color: var(--color-night);
+  }
+
+  .arcade-admin__meta .text-muted {
+    color: var(--color-ocean);
+  }
+
+  .arcade-admin__toggle-list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .arcade-admin__toggle-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 1rem 1.5rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .arcade-admin__toggle-row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .arcade-admin__toggle-title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--color-night);
+  }
+
+  .arcade-admin__toggle-copy {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--color-ocean);
+    max-width: 36rem;
+  }
+
+  .arcade-admin__toggle-row .admin-switch {
+    margin-top: 0.15rem;
+  }
+
+  .arcade-admin__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    padding-top: 0.25rem;
+  }
+
+  .arcade-admin__table-wrap {
+    margin: 0 calc(-1 * clamp(1rem, 2vw, 1.5rem));
+    border-top: 1px solid var(--color-border);
+  }
+
+  .arcade-admin__table-wrap .admin-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .arcade-admin__table-wrap .admin-table th:nth-child(1),
+  .arcade-admin__table-wrap .admin-table td:nth-child(1) {
+    width: 42%;
+    padding-left: clamp(1rem, 2vw, 1.5rem);
+  }
+
+  .arcade-admin__table-wrap .admin-table th:nth-child(2),
+  .arcade-admin__table-wrap .admin-table td:nth-child(2) {
+    width: 22%;
+  }
+
+  .arcade-admin__table-wrap .admin-table th:nth-child(3),
+  .arcade-admin__table-wrap .admin-table td:nth-child(3) {
+    width: 36%;
+    padding-right: clamp(1rem, 2vw, 1.5rem);
+  }
+}

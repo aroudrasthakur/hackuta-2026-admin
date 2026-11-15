@@ -1,5 +1,5 @@
 import { makeFunctionReference } from "convex/server";
-import type { ArcadeMode, ArcadeState } from "../../shared/arcade/rules";
+import type { ArcadeMode, ArcadeState } from "../../shared/admin/arcadeRules";
 
 export type ArcadeAdminGameRow = {
   key: string;

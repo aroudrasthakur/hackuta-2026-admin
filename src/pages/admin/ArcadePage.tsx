@@ -21,7 +21,7 @@ import {
   checkArcadeSettings,
   type ArcadeMode,
   type ArcadeStatus,
-} from "../../../shared/arcade/rules";
+} from "../../../shared/admin/arcadeRules";
 
 type SettingsDraft = {
   mode: ArcadeMode;
@@ -135,7 +135,7 @@ function ArcadeControls({ sessionToken }: { sessionToken: string }) {
   }
 
   return (
-  <>
+    <div className="arcade-admin">
     <AdminPageHeader
       id="arcade-heading"
       title="Arcade"
@@ -153,12 +153,12 @@ function ArcadeControls({ sessionToken }: { sessionToken: string }) {
       </p>
     ) : null}
 
-    <div className="admin-card grid gap-3">
+    <section className="admin-card admin-card__body space-y-4" aria-labelledby="arcade-live-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Live status</h2>
+        <h2 id="arcade-live-title" className="admin-card__title">Live status</h2>
         <AdminStatusBadge tone={STATUS_TONE[live.status]}>{STATUS_LABEL[live.status]}</AdminStatusBadge>
       </div>
-      <ul className="grid gap-1 text-sm">
+      <ul className="arcade-admin__meta">
         <li>
           Stored switch: <strong>{snapshot.settings.mode}</strong>
           {snapshot.settings.updatedAt ? (
@@ -177,32 +177,37 @@ function ArcadeControls({ sessionToken }: { sessionToken: string }) {
         ) : null}
         <li className="text-muted">Server now: {formatLogTime(snapshot.serverNow)}</li>
       </ul>
-    </div>
+    </section>
 
-    <form className="admin-card grid gap-4" onSubmit={(event) => void submitSettings(event)} aria-labelledby="arcade-settings-title">
-      <h2 id="arcade-settings-title" className="text-lg font-semibold">
-        Gates &amp; schedule
-      </h2>
-      <p className="text-muted text-sm">
-        <strong>Off</strong> seals the arcade (withdrawals still work). <strong>On</strong> opens now, with an optional auto-close time.
-        <strong> Scheduled</strong> opens and closes automatically between two times (your browser timezone).
-      </p>
+    <form
+      className="admin-card admin-card__body space-y-4"
+      onSubmit={(event) => void submitSettings(event)}
+      aria-labelledby="arcade-settings-title"
+    >
+      <div>
+        <h2 id="arcade-settings-title" className="admin-card__title">
+          Gates &amp; schedule
+        </h2>
+        <p className="admin-card__hint">
+          <strong>Off</strong> seals the arcade (withdrawals still work). <strong>On</strong> opens now, with an optional auto-close time.
+          {" "}
+          <strong>Scheduled</strong> opens and closes automatically between two times (your browser timezone).
+        </p>
+      </div>
 
-      <fieldset>
+      <fieldset className="arcade-admin__mode-options">
         <legend className="sr-only">Arcade mode</legend>
-        <div className="flex flex-wrap gap-4">
-          {ARCADE_MODES.map((mode) => (
-            <label key={mode} className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="arcade-mode"
-                checked={synced.mode === mode}
-                onChange={() => setDraft({ ...synced, mode })}
-              />
-              <span>{mode === "off" ? "Off" : mode === "on" ? "On now" : "Scheduled window"}</span>
-            </label>
-          ))}
-        </div>
+        {ARCADE_MODES.map((mode) => (
+          <label key={mode}>
+            <input
+              type="radio"
+              name="arcade-mode"
+              checked={synced.mode === mode}
+              onChange={() => setDraft({ ...synced, mode })}
+            />
+            <span>{mode === "off" ? "Off" : mode === "on" ? "On now" : "Scheduled window"}</span>
+          </label>
+        ))}
       </fieldset>
 
       {synced.mode === "scheduled" ? (
@@ -243,32 +248,32 @@ function ArcadeControls({ sessionToken }: { sessionToken: string }) {
         </label>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex items-center justify-between gap-3">
+      <ul className="arcade-admin__toggle-list">
+        <li className="arcade-admin__toggle-row">
           <div>
-            <p className="font-semibold">Profile launch button</p>
-            <p className="text-sm text-muted">Lets checked-in hackers open the arcade from the participant portal.</p>
+            <p className="arcade-admin__toggle-title">Profile launch button</p>
+            <p className="arcade-admin__toggle-copy">Lets checked-in hackers open the arcade from the participant portal.</p>
           </div>
           <AccessSwitch
             label="Profile launch button"
             checked={synced.launchEnabled}
             onChange={(launchEnabled) => setDraft({ ...synced, launchEnabled })}
           />
-        </div>
-        <div className="flex items-center justify-between gap-3">
+        </li>
+        <li className="arcade-admin__toggle-row">
           <div>
-            <p className="font-semibold">Backup sign-in on arcade site</p>
-            <p className="text-sm text-muted">Email + password form when launch codes are off.</p>
+            <p className="arcade-admin__toggle-title">Backup sign-in on arcade site</p>
+            <p className="arcade-admin__toggle-copy">Email + password form when launch codes are off.</p>
           </div>
           <AccessSwitch
             label="Arcade backup sign-in"
             checked={synced.backupSignIn}
             onChange={(backupSignIn) => setDraft({ ...synced, backupSignIn })}
           />
-        </div>
-      </div>
+        </li>
+      </ul>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="arcade-admin__actions">
         <button type="submit" className={reviewPrimaryButtonClass} disabled={saving}>
           {saving ? "Saving…" : "Save schedule"}
         </button>
@@ -283,12 +288,14 @@ function ArcadeControls({ sessionToken }: { sessionToken: string }) {
       </div>
     </form>
 
-    <section className="admin-card grid gap-4" aria-labelledby="arcade-games-title">
-      <h2 id="arcade-games-title" className="text-lg font-semibold">
-        Games
-      </h2>
-      <p className="text-muted text-sm">Paused games stay visible in the lobby but refuse new wagers.</p>
-      <div className="admin-table-scroll" role="region" aria-label="Arcade games" tabIndex={0}>
+    <section className="admin-card admin-card__body space-y-4" aria-labelledby="arcade-games-title">
+      <div>
+        <h2 id="arcade-games-title" className="admin-card__title">
+          Games
+        </h2>
+        <p className="admin-card__hint">Paused games stay visible in the lobby but refuse new wagers.</p>
+      </div>
+      <div className="arcade-admin__table-wrap admin-table-scroll" role="region" aria-label="Arcade games" tabIndex={0}>
         <table className="admin-table">
           <caption className="sr-only">Arcade game switches</caption>
           <thead>
@@ -321,7 +328,7 @@ function ArcadeControls({ sessionToken }: { sessionToken: string }) {
         </table>
       </div>
     </section>
-  </>
+    </div>
   );
 }
 

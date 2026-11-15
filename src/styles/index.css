@@ -4,6 +4,7 @@
 @import "./shop.css";
 @import "./volunteer.css";
 @import "./access.css";
+@import "./arcade.css";
 
 @theme {
   --font-sans: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
