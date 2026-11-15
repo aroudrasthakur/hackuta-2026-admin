@@ -19,6 +19,7 @@ vi.mock("../../src/pages/admin/VolunteersPage", () => ({ VolunteersPage: () => <
 vi.mock("../../src/pages/admin/VolunteerDetailPage", () => ({ VolunteerDetailPage: () => <h1>Volunteer detail</h1> }));
 vi.mock("../../src/pages/admin/EventsPage", () => ({ EventsPage: () => <h1>Events</h1> }));
 vi.mock("../../src/pages/admin/ShopPage", () => ({ ShopPage: () => <h1>Shop</h1> }));
+vi.mock("../../src/pages/admin/ArcadePage", () => ({ ArcadePage: () => <h1>Arcade</h1> }));
 vi.mock("../../src/pages/admin/VolunteerShopPage", () => ({ VolunteerShopPage: () => <h1>Shop redemption</h1> }));
 const query = vi.hoisted(() => vi.fn());
 vi.mock("../../src/convex/reactBindings", () => ({ useQuery: query, useMutation: () => vi.fn() }));
@@ -78,7 +79,7 @@ describe("staff route policy", () => {
     for (const route of [ADMIN_ROUTES.applications, ADMIN_ROUTES.decisionEmails, ADMIN_ROUTES.applicationReview("abc")]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role !== "volunteer");
     }
-    for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.events, ADMIN_ROUTES.shop]) {
+    for (const route of [ADMIN_ROUTES.participants, ADMIN_ROUTES.volunteers, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.events, ADMIN_ROUTES.shop, ADMIN_ROUTES.arcade]) {
       expect(canAccessStaffRoute(route, profile, allOptions)).toBe(role === "admin");
     }
     expect(canAccessStaffRoute(ADMIN_ROUTES.volunteer, profile, allOptions)).toBe(role === "volunteer");
@@ -183,6 +184,7 @@ describe("protected staff screens", () => {
     [ADMIN_ROUTES.volunteerDetail("volunteer-1"), "Volunteer detail"],
     [ADMIN_ROUTES.events, "Events"],
     [ADMIN_ROUTES.meals, "Meals"],
+    [ADMIN_ROUTES.arcade, "Arcade"],
   ])("opens %s for administrators", async (route, heading) => {
     await render(route, auth({ staff: { ...staff, role: "admin" } }));
     expect(path()).toBe(route);
@@ -205,7 +207,7 @@ describe("protected staff screens", () => {
     expect(current?.textContent).toBe("Volunteers");
   });
 
-  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop, ADMIN_ROUTES.meals])("sends volunteers away from %s", async (route) => {
+  it.each([ADMIN_ROUTES.events, ADMIN_ROUTES.volunteerDetail("volunteer-1"), ADMIN_ROUTES.shop, ADMIN_ROUTES.meals, ADMIN_ROUTES.arcade])("sends volunteers away from %s", async (route) => {
     await render(route, auth({ staff: { ...staff, role: "volunteer" } }));
     expect(path()).toBe(ADMIN_ROUTES.scan);
   });
