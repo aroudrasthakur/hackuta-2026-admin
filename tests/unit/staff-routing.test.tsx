@@ -145,6 +145,7 @@ describe("protected staff screens", () => {
       "Events",
       "Meals",
       "Shop",
+      "Arcade",
       "Scan",
     ]);
     expect(query.mock.calls.every(([, args]) => args === "skip")).toBe(true);
